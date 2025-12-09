@@ -63,9 +63,10 @@ public:
     void Update() {
         if (!active) return;
         
-        for (auto& comp : components) {
-            if (comp->IsEnabled()) {
-                comp->Update();
+        // Use index-based loop to avoid iterator invalidation
+        for (size_t i = 0; i < components.size(); i++) {
+            if (components[i] && components[i]->IsEnabled()) {
+                components[i]->Update();
             }
         }
     }
@@ -73,9 +74,10 @@ public:
     void Render() {
         if (!active) return;
         
-        for (auto& comp : components) {
-            if (comp->IsEnabled()) {
-                comp->Render();
+        // Use index-based loop to avoid iterator invalidation
+        for (size_t i = 0; i < components.size(); i++) {
+            if (components[i] && components[i]->IsEnabled()) {
+                components[i]->Render();
             }
         }
     }

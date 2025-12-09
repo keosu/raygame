@@ -18,16 +18,19 @@ public:
     virtual void OnLoad() {}
     virtual void OnUnload() {}
     virtual void Update() {
-        // Remove inactive objects
+        // Update all objects first (use index-based loop to avoid iterator invalidation)
+        for (size_t i = 0; i < gameObjects.size(); i++) {
+            if (gameObjects[i] && gameObjects[i]->active) {
+                gameObjects[i]->Update();
+            }
+        }
+        
+        // Remove inactive objects after all updates are done
         gameObjects.erase(
             std::remove_if(gameObjects.begin(), gameObjects.end(),
-                [](const Ref<GameObject>& obj) { return !obj->active; }),
+                [](const Ref<GameObject>& obj) { return !obj || !obj->active; }),
             gameObjects.end()
         );
-        
-        for (auto& obj : gameObjects) {
-            obj->Update();
-        }
     }
     
     virtual void Render() {
