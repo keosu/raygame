@@ -1,33 +1,201 @@
 #include "RayGame.h"
 
-// Note: Not including <random> as it conflicts with <ctime> through raylib headers
-// Use raylib's GetRandomValue() instead
-
-// Avoid 'using namespace' to prevent potential naming conflicts
-// Use explicit RayGame:: qualification where needed
-namespace {
-    using RayGame::Component;
-    using RayGame::GameObject;
-    using RayGame::Scene;
-    using RayGame::GameEngine;
-    using RayGame::CreateRef;
-    using RayGame::Ref;
-    using RayGame::Rigidbody;
-    using RayGame::CircleCollider;
-    using RayGame::Collider;
-    using RayGame::SpriteRenderer;
-    using RayGame::ParticleEmitter;
-    using RayGame::EmitterShape;
-    using RayGame::Camera2DComponent;
-    using RayGame::ResourceManager;
-    using RayGame::Input;
-    using RayGame::Normalize;
-    using RayGame::Random;
-    using RayGame::GameTime;
-}
+using namespace RayGame;
 
 // Forward declaration
 class SpaceShooterScene;
+
+// Star for background
+struct Star {
+    Vector2 position;
+    float size;
+    float brightness;
+    float twinkleSpeed;
+    float twinklePhase;
+};
+
+// Starfield background component with twinkling
+class StarfieldBackground : public Component {
+public:
+    std::vector<Star> stars;
+    int numStars = 150;
+    bool initialized = false;
+    
+    void InitializeStars() {
+        if (initialized) return;
+        
+        stars.clear();
+        stars.reserve(numStars);
+        
+        // Use raylib's GetRandomValue (safe and reliable)
+        for (int i = 0; i < numStars; i++) {
+            Star star;
+            star.position = {
+                static_cast<float>(GetRandomValue(0, 800)),
+                static_cast<float>(GetRandomValue(0, 600))
+            };
+            star.size = static_cast<float>(GetRandomValue(10, 30)) / 10.0f;
+            star.brightness = static_cast<float>(GetRandomValue(30, 100)) / 100.0f;
+            star.twinkleSpeed = static_cast<float>(GetRandomValue(5, 30)) / 10.0f;
+            star.twinklePhase = static_cast<float>(GetRandomValue(0, 628)) / 100.0f;
+            stars.push_back(star);
+        }
+        initialized = true;
+    }
+    
+    void Start() override {
+        // Initialize in Start() - raylib is guaranteed to be initialized by then
+        InitializeStars();
+    }
+    
+    void Update() override {
+        // Ensure initialization (defensive programming)
+        if (!initialized) {
+            InitializeStars();
+        }
+        if (stars.empty()) return;
+        
+        // Update star twinkling
+        float time = GameTime::GetTime();
+        for (auto& star : stars) {
+            star.brightness = 0.5f + 0.5f * sinf(time * star.twinkleSpeed + star.twinklePhase);
+            
+            // Slowly move stars down for parallax effect
+            star.position.y += 10.0f * GameTime::DeltaTime();
+            if (star.position.y > 600) {
+                star.position.y = 0;
+                star.position.x = static_cast<float>(GetRandomValue(0, 800));
+            }
+        }
+    }
+    
+    void Render() override {
+        // Ensure initialization (defensive programming)
+        if (!initialized) {
+            InitializeStars();
+        }
+        if (stars.empty()) return;
+        
+        // Draw twinkling stars
+        for (const auto& star : stars) {
+            unsigned char alpha = (unsigned char)(star.brightness * 255);
+            Color starColor = {255, 255, 255, alpha};
+            DrawCircleV(star.position, star.size, starColor);
+        }
+    }
+};
+
+// Custom renderer for player ship
+class PlayerShipRenderer : public Component {
+public:
+    Color primaryColor = SKYBLUE;
+    Color accentColor = BLUE;
+    
+    void Render() override {
+        if (!gameObject || !gameObject->transform) return;
+        
+        Vector2 pos = gameObject->transform->position;
+        
+        // Draw player ship as a triangle with wings
+        Vector2 nose = {pos.x, pos.y - 20};
+        Vector2 leftWing = {pos.x - 16, pos.y + 12};
+        Vector2 rightWing = {pos.x + 16, pos.y + 12};
+        Vector2 leftTail = {pos.x - 8, pos.y + 16};
+        Vector2 rightTail = {pos.x + 8, pos.y + 16};
+        
+        // Main body
+        DrawTriangle(leftWing, rightWing, nose, primaryColor);
+        
+        // Cockpit
+        DrawCircle(pos.x, pos.y - 5, 5, accentColor);
+        
+        // Wings detail
+        DrawTriangle(
+            {pos.x - 16, pos.y + 12},
+            {pos.x - 12, pos.y + 8},
+            {pos.x - 10, pos.y + 12},
+            accentColor
+        );
+        DrawTriangle(
+            {pos.x + 16, pos.y + 12},
+            {pos.x + 12, pos.y + 8},
+            {pos.x + 10, pos.y + 12},
+            accentColor
+        );
+        
+        // Tail fins
+        DrawTriangle(leftTail, {pos.x - 4, pos.y + 10}, {pos.x - 8, pos.y + 10}, DARKBLUE);
+        DrawTriangle(rightTail, {pos.x + 4, pos.y + 10}, {pos.x + 8, pos.y + 10}, DARKBLUE);
+    }
+};
+
+// Custom renderer for enemy ship
+class EnemyShipRenderer : public Component {
+public:
+    Color primaryColor = RED;
+    Color accentColor = DARKPURPLE;
+    
+    void Render() override {
+        if (!gameObject || !gameObject->transform) return;
+        
+        Vector2 pos = gameObject->transform->position;
+        
+        // Draw enemy ship as alien-looking craft
+        // Main body (wider, more menacing)
+        DrawTriangle(
+            {pos.x, pos.y + 16},
+            {pos.x - 18, pos.y - 10},
+            {pos.x + 18, pos.y - 10},
+            primaryColor
+        );
+        
+        // Wings (pointed)
+        DrawTriangle(
+            {pos.x - 18, pos.y - 10},
+            {pos.x - 24, pos.y - 8},
+            {pos.x - 20, pos.y + 4},
+            MAROON
+        );
+        DrawTriangle(
+            {pos.x + 18, pos.y - 10},
+            {pos.x + 24, pos.y - 8},
+            {pos.x + 20, pos.y + 4},
+            MAROON
+        );
+        
+        // Cockpit/core
+        DrawCircle(pos.x, pos.y, 8, accentColor);
+        DrawCircle(pos.x, pos.y, 5, {255, 100, 150, 255});
+        
+        // Engine glow
+        DrawCircle(pos.x, pos.y + 14, 4, {255, 100, 0, 200});
+    }
+};
+
+// Custom bullet renderer
+class BulletRenderer : public Component {
+public:
+    bool isPlayerBullet = true;
+    
+    void Render() override {
+        if (!gameObject || !gameObject->transform) return;
+        
+        Vector2 pos = gameObject->transform->position;
+        
+        if (isPlayerBullet) {
+            // Player bullet - blue energy bolt
+            DrawCircle(pos.x, pos.y, 5, {150, 200, 255, 200});
+            DrawCircle(pos.x, pos.y, 3, {200, 230, 255, 255});
+            DrawRectangle(pos.x - 2, pos.y - 8, 4, 16, {100, 180, 255, 180});
+            DrawCircle(pos.x, pos.y, 2, WHITE);
+        } else {
+            // Enemy bullet - red energy
+            DrawCircle(pos.x, pos.y, 4, {255, 100, 100, 200});
+            DrawCircle(pos.x, pos.y, 2, {255, 150, 150, 255});
+            DrawRectangle(pos.x - 1, pos.y - 6, 2, 12, {255, 80, 80, 180});
+        }
+    }
+};
 
 // Player controller component
 class PlayerController : public Component {
@@ -102,15 +270,17 @@ public:
     SpaceShooterScene() : Scene("Space Shooter") {}
     
     void OnLoad() override {
+        // Create starfield background (first, so it renders behind everything)
+        auto background = CreateGameObject("Starfield");
+        background->AddComponent<StarfieldBackground>();
+        
         // Create player
         player = CreateGameObject("Player");
         player->tag = "Player";
         player->transform->position = {400, 500};
         
-        // Add sprite (using colored texture)
-        auto playerTex = ResourceManager::CreateColorTexture("player", 32, 32, BLUE);
-        auto sprite = player->AddComponent<SpriteRenderer>(playerTex);
-        sprite->tint = SKYBLUE;
+        // Add custom ship renderer instead of sprite
+        player->AddComponent<PlayerShipRenderer>();
         
         // Add physics
         auto rb = player->AddComponent<Rigidbody>();
@@ -238,21 +408,22 @@ public:
     void SpawnEnemy() {
         auto enemy = CreateGameObject("Enemy");
         enemy->tag = "Enemy";
-        enemy->transform->position = {Random(50, 750), -30};
         
-        // Add sprite
-        auto enemyTex = ResourceManager::CreateColorTexture("enemy", 32, 32, RED);
-        auto sprite = enemy->AddComponent<SpriteRenderer>(enemyTex);
-        sprite->tint = {255, 100, 100, 255};
+        // Use GetRandomValue directly for testing
+        float x = static_cast<float>(GetRandomValue(50, 750));
+        enemy->transform->position = {x, -30};
+        
+        // Add custom enemy ship renderer
+        enemy->AddComponent<EnemyShipRenderer>();
         
         // Add collider
-        auto collider = enemy->AddComponent<CircleCollider>(16.0f);
+        auto collider = enemy->AddComponent<CircleCollider>(18.0f);
         
         // Add AI
         auto ai = enemy->AddComponent<EnemyAI>();
-        ai->speed = Random(50, 150);
-        ai->amplitude = Random(30, 100);
-        ai->frequency = Random(1, 3);
+        ai->speed = static_cast<float>(GetRandomValue(50, 150));
+        ai->amplitude = static_cast<float>(GetRandomValue(30, 100));
+        ai->frequency = static_cast<float>(GetRandomValue(1, 3));
     }
     
     void SpawnBullet(Vector2 position, bool isPlayerBullet = true) {
@@ -260,10 +431,9 @@ public:
         bullet->tag = "Bullet";
         bullet->transform->position = position;
         
-        // Add sprite
-        auto bulletTex = ResourceManager::CreateColorTexture("bullet", 8, 16, YELLOW);
-        auto sprite = bullet->AddComponent<SpriteRenderer>(bulletTex);
-        sprite->tint = isPlayerBullet ? YELLOW : RED;
+        // Add custom bullet renderer
+        auto renderer = bullet->AddComponent<BulletRenderer>();
+        renderer->isPlayerBullet = isPlayerBullet;
         
         // Add collider
         auto collider = bullet->AddComponent<CircleCollider>(4.0f);

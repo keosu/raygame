@@ -4,7 +4,7 @@ add_requires("raylib-cpp 5.5.0")
 
 -- RayGame Engine Library
 target("raygame")
-    set_kind("shared")
+    set_kind("static")
     set_languages("c++17")
     
     -- Define export macro
@@ -15,19 +15,19 @@ target("raygame")
     add_headerfiles("include/*.h")
     add_includedirs("include", {public = true})
     
-    -- Dependencies
-    add_packages("raylib-cpp")
+    -- Dependencies (public so they propagate to dependent targets)
+    add_packages("raylib-cpp", {public = true})
     
     -- Output directory
     set_targetdir("$(projectdir)/bin")
     
-    -- Platform-specific settings
+    -- Platform-specific settings (public so they propagate to dependent targets)
     if is_plat("windows") then
-        add_syslinks("winmm", "gdi32")
+        add_syslinks("winmm", "gdi32", {public = true})
     elseif is_plat("linux") then
-        add_syslinks("pthread", "m", "dl", "rt")
+        add_syslinks("pthread", "m", "dl", "rt", {public = true})
     elseif is_plat("macosx") then
-        add_frameworks("OpenGL", "Cocoa", "IOKit", "CoreVideo", "CoreAudio")
+        add_frameworks("OpenGL", "Cocoa", "IOKit", "CoreVideo", "CoreAudio", {public = true})
     end
 
 -- Space Shooter Example
@@ -38,7 +38,6 @@ target("space_shooter")
     
     add_files("examples/space_shooter/main.cpp")
     add_deps("raygame")
-    add_packages("raylib-cpp")
     
     -- Set output directory
     set_targetdir("$(projectdir)/bin")
@@ -49,15 +48,6 @@ target("space_shooter")
             os.cp("assets", path.join(target:targetdir(), "assets"))
         end
     end)
-    
-    -- Platform-specific settings
-    if is_plat("windows") then
-        add_syslinks("winmm", "gdi32")
-    elseif is_plat("linux") then
-        add_syslinks("pthread", "m", "dl", "rt")
-    elseif is_plat("macosx") then
-        add_frameworks("OpenGL", "Cocoa", "IOKit", "CoreVideo", "CoreAudio")
-    end
 
 -- Bouncing Balls Example
 target("bouncing_balls")
@@ -67,7 +57,6 @@ target("bouncing_balls")
     
     add_files("examples/bouncing_balls/main.cpp")
     add_deps("raygame")
-    add_packages("raylib-cpp")
     
     -- Set output directory
     set_targetdir("$(projectdir)/bin")
@@ -78,12 +67,3 @@ target("bouncing_balls")
             os.cp("assets", path.join(target:targetdir(), "assets"))
         end
     end)
-    
-    -- Platform-specific settings
-    if is_plat("windows") then
-        add_syslinks("winmm", "gdi32")
-    elseif is_plat("linux") then
-        add_syslinks("pthread", "m", "dl", "rt")
-    elseif is_plat("macosx") then
-        add_frameworks("OpenGL", "Cocoa", "IOKit", "CoreVideo", "CoreAudio")
-    end

@@ -1,23 +1,6 @@
 #include "RayGame.h"
 
-// Avoid 'using namespace' to prevent Time class conflict with <ctime>
-namespace {
-    using RayGame::Component;
-    using RayGame::GameObject;
-    using RayGame::Scene;
-    using RayGame::GameEngine;
-    using RayGame::CreateRef;
-    using RayGame::Ref;
-    using RayGame::Rigidbody;
-    using RayGame::CircleCollider;
-    using RayGame::SpriteRenderer;
-    using RayGame::ParticleEmitter;
-    using RayGame::EmitterShape;
-    using RayGame::ResourceManager;
-    using RayGame::Input;
-    using RayGame::Random;
-    using RayGame::GameTime;
-}
+using namespace RayGame;
 
 // Simple bouncing balls demo
 class BouncingBallsScene : public Scene {
