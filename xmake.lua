@@ -6,6 +6,12 @@ set_encodings("utf-8")
 
 add_requires("raylib-cpp 5.5.0")
 
+option("example_console")
+    set_default(false)
+    set_showmenu(true)
+    set_description("Enable the Windows console and raylib logs for examples")
+option_end()
+
 -- RayGame Engine Library (static)
 target("raygame")
     set_kind("static")
@@ -20,7 +26,9 @@ target("raygame")
     set_targetdir("$(projectdir)/bin")
 
     if is_plat("windows") then
-        add_syslinks("winmm", "gdi32", {public = true})
+        add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", {public = true})
+    elseif is_plat("mingw") then
+        add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", {public = true})
     elseif is_plat("linux") then
         add_syslinks("pthread", "m", "dl", "rt", {public = true})
     elseif is_plat("macosx") then
@@ -32,19 +40,32 @@ target("raygame")
 target_end()
 
 -- Helper to declare an example target
+target("example_assets")
+    set_kind("phony")
+    set_default(false)
+    on_build(function (target)
+        os.mkdir(path.join(os.projectdir(), "bin"))
+        os.cp(path.join(os.projectdir(), "assets"), path.join(os.projectdir(), "bin"))
+    end)
+target_end()
+
 function add_example(name, dir)
     target(name)
         set_kind("binary")
         set_languages("c++17")
         set_basename(name)
         add_files("examples/" .. dir .. "/main.cpp")
-        add_deps("raygame")
+        add_deps("raygame", "example_assets")
         set_targetdir("$(projectdir)/bin")
-        after_build(function (target)
-            if os.isdir("assets") then
-                os.cp("assets", path.join(target:targetdir(), "assets"))
+        if not has_config("example_console") then
+            add_defines("RAYGAME_QUIET_EXAMPLE")
+            if is_plat("windows") then
+                -- Keep the standard main() and CRT startup in a GUI executable.
+                add_ldflags("/SUBSYSTEM:WINDOWS", "/ENTRY:mainCRTStartup", {force = true})
+            elseif is_plat("mingw") then
+                add_ldflags("-mwindows", {force = true})
             end
-        end)
+        end
     target_end()
 end
 
@@ -69,7 +90,7 @@ target("smoke")
     set_kind("binary")
     set_languages("c++17")
     set_default(false)
-    add_files("tests/smoke.cpp")
-    add_deps("raygame")
+    add_files("tests/smoke.cpp", "tests/window_theme.cpp")
+    add_deps("raygame", "example_assets")
     set_targetdir("$(projectdir)/bin")
 target_end()

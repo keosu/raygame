@@ -429,6 +429,38 @@ static void TestUtilities() {
     remove("test_save_edges.tmp");
 }
 
+static void TestViewportAndPause() {
+    printf("[viewport scaling and pause]\n");
+    auto wide = CanvasViewport::Fit(800, 600, 1920, 1080);
+    CHECK(Approx(wide.scale, 1.8f));
+    CHECK(Approx(wide.bounds.x, 240) && Approx(wide.bounds.y, 0));
+    CHECK(Approx(wide.bounds.width, 1440) && Approx(wide.bounds.height, 1080));
+    Vector2 mouse = wide.ToCanvas({960, 540});
+    CHECK(Approx(mouse.x, 400) && Approx(mouse.y, 300));
+    CHECK(!wide.Contains({100, 540}) && wide.Contains({960, 540}));
+    for (auto viewport : {wide, CanvasViewport::Fit(820, 900, 1920, 1080),
+                         CanvasViewport::Fit(960, 720, 600, 900)}) {
+        Vector2 point = viewport.ToCanvas(viewport.ToScreen({127, 258}));
+        CHECK(Approx(point.x, 127) && Approx(point.y, 258));
+    }
+    auto minimized = CanvasViewport::Fit(800, 600, 0, 0);
+    CHECK(std::isfinite(minimized.scale) && minimized.scale > 0);
+    LogicEngine engine;
+    auto scene = CreateRef<CountingScene>();
+    engine.LoadScene(scene);
+    engine.SetFixedTimeStep(0.125f);
+    engine.Tick(0.125f);
+    float time = GameTime::GetTime();
+    int updates = scene->probe->updates;
+    engine.SetPaused(true);
+    engine.Tick(5);
+    CHECK(Approx(GameTime::GetTime(), time) && scene->probe->updates == updates);
+    engine.SetPaused(false);
+    engine.Tick(0.125f);
+    CHECK(scene->probe->updates == updates + 1 && scene->probe->fixed == 2);
+    engine.Shutdown();
+}
+
 static void TestRegressions() {
     TestLifecycle();
     TestTransformAndTilemap();
@@ -436,4 +468,5 @@ static void TestRegressions() {
     TestPhysicsResolutionAndMutation();
     TestFixedLoopAndSceneSwitch();
     TestUtilities();
+    TestViewportAndPause();
 }

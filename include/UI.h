@@ -9,9 +9,26 @@ namespace RayGame {
 class RAYGAME_API UI {
 public:
     static Font* font;              // optional custom font
+    static inline Font* headingFont = nullptr;
+    static inline bool inputEnabled = true;
     static Color textColor;
     static Color accentColor;
     static Color panelColor;
+
+    static void ResetFonts() { font = nullptr; headingFont = nullptr; }
+
+    static void Title(float x, float y, const std::string& text, int size = 36, Color color = RAYWHITE) {
+        DrawTextCustom(text, x, y, size, color, true);
+    }
+    static void TitleCentered(float cx, float y, const std::string& text, int size = 36, Color color = RAYWHITE) {
+        Title(cx - MeasureWidth(text, size, true) / 2, y, text, size, color);
+    }
+    static void LabelRight(float right, float y, const std::string& text, int size = 20, Color color = RAYWHITE) {
+        Label(right - MeasureWidth(text, size), y, text, size, color);
+    }
+    static void TitleRight(float right, float y, const std::string& text, int size = 36, Color color = RAYWHITE) {
+        Title(right - MeasureWidth(text, size, true), y, text, size, color);
+    }
 
     static void Label(float x, float y, const std::string& text, int size = 20, Color color = {0,0,0,0}) {
         Color c = (color.a == 0 && color.r == 0 && color.g == 0 && color.b == 0) ? textColor : color;
@@ -25,7 +42,8 @@ public:
 
     static void Panel(Rectangle rect, Color color = {0,0,0,0}) {
         Color c = (color.a == 0 && color.r == 0 && color.g == 0 && color.b == 0) ? panelColor : color;
-        DrawRectangleRounded(rect, 0.15f, 8, c);
+        DrawRectangleRounded(rect, 0.12f, 8, c);
+        DrawRectangleRoundedLines(rect, 0.12f, 8, {66, 86, 119, 100});
     }
 
     static void ProgressBar(Rectangle rect, float value01, Color fill = {0,0,0,0}) {
@@ -39,12 +57,13 @@ public:
     // Returns true on click (mouse released inside while pressed inside).
     static bool Button(Rectangle rect, const std::string& label, int size = 20) {
         Vector2 m = Input::GetMousePosition();
-        if (Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        if (!inputEnabled) hasPress = false;
+        if (inputEnabled && Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             pressPosition = m;
             hasPress = true;
         }
-        bool hover = CheckCollisionPointRec(m, rect);
-        Color bg = hover ? accentColor : panelColor;
+        bool hover = inputEnabled && Input::IsMouseInCanvas() && CheckCollisionPointRec(m, rect);
+        Color bg = hover ? Fade(accentColor, 0.4f) : Fade(accentColor, 0.15f);
         DrawRectangleRounded(rect, 0.25f, 8, bg);
         DrawRectangleRoundedLines(rect, 0.25f, 8, Fade(accentColor, hover ? 1.0f : 0.4f));
         float w = MeasureWidth(label, size);
@@ -59,23 +78,25 @@ public:
 private:
     static inline Vector2 pressPosition = {0, 0};
     static inline bool hasPress = false;
-    static float MeasureWidth(const std::string& text, int size) {
-        if (font && font->texture.id != 0)
-            return MeasureTextEx(*font, text.c_str(), (float)size, 1.0f).x;
+    static float MeasureWidth(const std::string& text, int size, bool heading = false) {
+        Font* selected = heading && headingFont ? headingFont : font;
+        if (selected && selected->texture.id != 0)
+            return MeasureTextEx(*selected, text.c_str(), (float)size, 0.5f).x;
         return (float)MeasureText(text.c_str(), size);
     }
 
-    static void DrawTextCustom(const std::string& text, float x, float y, int size, Color color) {
-        if (font && font->texture.id != 0)
-            DrawTextEx(*font, text.c_str(), {x, y}, (float)size, 1.0f, color);
+    static void DrawTextCustom(const std::string& text, float x, float y, int size, Color color, bool heading = false) {
+        Font* selected = heading && headingFont ? headingFont : font;
+        if (selected && selected->texture.id != 0)
+            DrawTextEx(*selected, text.c_str(), {x, y}, (float)size, 0.5f, color);
         else
             DrawText(text.c_str(), (int)x, (int)y, size, color);
     }
 };
 
 inline Font* UI::font = nullptr;
-inline Color UI::textColor = RAYWHITE;
+inline Color UI::textColor = {226, 234, 248, 255};
 inline Color UI::accentColor = {80, 180, 255, 255};
-inline Color UI::panelColor = {30, 30, 40, 220};
+inline Color UI::panelColor = {12, 19, 34, 235};
 
 }

@@ -1,6 +1,7 @@
 // Neon Breakout — showcases layered rendering, tweens, timers, collision
 // callbacks, particle trails, camera screen-shake, event bus, HUD and save.
 #include "RayGame.h"
+#include "../common/ExampleUI.h"
 #include <cmath>
 
 using namespace RayGame;
@@ -85,7 +86,9 @@ public:
 
     void Render() override {
         Vector2 p = gameObject->transform->GetWorldPosition();
-        Rectangle r = {p.x - size.x/2, p.y - size.y/2, size.x, size.y};
+        Vector2 scale = gameObject->transform->GetWorldScale();
+        Vector2 extent = {size.x * scale.x, size.y * scale.y};
+        Rectangle r = {p.x - extent.x/2, p.y - extent.y/2, extent.x, extent.y};
         DrawGlowRect(r, color);
     }
 };
@@ -123,7 +126,7 @@ public:
         float move = Input::GetAxis("Horizontal");
         pos.x += move * speed * GameTime::DeltaTime();
         // Mouse control too
-        if (move == 0 && std::fabs(Input::GetMouseDelta().x) > 0) {
+        if (move == 0 && Input::IsMouseInCanvas() && std::fabs(Input::GetMouseDelta().x) > 0) {
             pos.x = Input::GetMousePosition().x;
         }
         pos.x = Clamp(pos.x, size.x/2, SCREEN_W - size.x/2);
@@ -176,11 +179,13 @@ public:
     int highscore = 0;
     bool gameOver = false;
     bool won = false;
+    bool restartRequested = false;
     const char* savePath = "breakout_save.txt";
 
     BreakoutScene() : Scene("Neon Breakout") {}
 
     void OnLoad() override {
+        ExampleUI::Initialize(ExampleUI::cyan);
         SaveSystem save;
         if (save.Load(savePath)) highscore = save.GetInt("highscore", 0);
 
@@ -283,37 +288,31 @@ public:
     void Restart() {
         Clear();
         TweenManager::Clear();
-        score = 0; lives = 3; gameOver = false; won = false;
+        score = 0; lives = 3; gameOver = false; won = false; restartRequested = false;
         OnLoad();
         Start();
     }
 
     void Update() override {
         Scene::Update();
-        if (gameOver && Input::GetKeyDown(KEY_R)) Restart();
+        if (gameOver && (restartRequested || Input::GetKeyDown(KEY_R))) Restart();
     }
 
     void Render() override {
         Scene::Render();  // world (shaken)
 
-        // HUD (screen space)
-        UI::Label(20, 16, TextFormat("SCORE  %d", score), 28, Color{120, 240, 255, 255});
-        std::string lifeStr = "LIVES  ";
-        for (int i = 0; i < lives; i++) lifeStr += "o ";
-        UI::Label(20, 50, lifeStr, 24, Color{255, 120, 160, 255});
-        UI::Label(SCREEN_W - 240, 16, TextFormat("BEST  %d", highscore), 24, Color{255, 230, 120, 255});
+        ExampleUI::Header(SCREEN_W, "NEON BREAKOUT", "BREAK THE PATTERN");
+        ExampleUI::Lives(380, lives);
+        ExampleUI::Stat(SCREEN_W - 195.0f, "SCORE", TextFormat("%06d", score));
+        ExampleUI::Stat(SCREEN_W - 32.0f, "BEST", TextFormat("%06d", highscore), ExampleUI::gold);
+        ExampleUI::Footer(SCREEN_W, SCREEN_H, "MOUSE / A D  MOVE     SPACE / CLICK  LAUNCH");
 
-        if (!ball || !ball->GetComponent<Ball>() || !ball->GetComponent<Ball>()->launched) {
-            UI::LabelCentered(SCREEN_W/2, SCREEN_H - 150, "SPACE / CLICK to launch", 24, RAYWHITE);
+        if (!gameOver && ball && !ball->GetComponent<Ball>()->launched) {
+            UI::TitleCentered(SCREEN_W / 2, SCREEN_H - 180, "READY TO LAUNCH", 32);
+            UI::LabelCentered(SCREEN_W / 2, SCREEN_H - 142, "Press Space or click to begin", 20, ExampleUI::muted);
         }
-
-        if (gameOver) {
-            DrawRectangle(0, 0, SCREEN_W, SCREEN_H, Fade(BLACK, 0.6f));
-            UI::LabelCentered(SCREEN_W/2, SCREEN_H/2 - 60,
-                won ? "YOU WIN!" : "GAME OVER", 64,
-                won ? Color{90, 240, 140, 255} : Color{255, 80, 120, 255});
-            UI::LabelCentered(SCREEN_W/2, SCREEN_H/2 + 20, TextFormat("Score: %d", score), 32, RAYWHITE);
-            UI::LabelCentered(SCREEN_W/2, SCREEN_H/2 + 70, "Press R to restart", 24, GRAY);
+        if (gameOver && ExampleUI::Result(SCREEN_W, SCREEN_H, won ? "ALL CLEAR" : "GAME OVER", score, won)) {
+            restartRequested = true;
         }
     }
 };
@@ -325,7 +324,7 @@ void Ball::Update() {
 
     if (!launched) {
         if (game && game->paddle) pos = {game->paddle->transform->position.x, SCREEN_H - 90.0f};
-        if (Input::GetKeyDown(KEY_SPACE) || Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        if (Input::GetKeyDown(KEY_SPACE) || (Input::IsMouseInCanvas() && Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT))) {
             launched = true;
             velocity = Normalize({(float)GetRandomValue(-40, 40), -100});
             velocity = {velocity.x * speed, velocity.y * speed};
@@ -387,6 +386,7 @@ public:
 };
 
 int main() {
+    ExampleUI::ConfigureLogging();
     NeonBreakoutGame game;
     game.Run();
     return 0;

@@ -1,9 +1,11 @@
 #include "GameEngine.h"
+#include "WindowStyle.h"
 
 namespace RayGame {
 
-// GameEngine implementation - most methods are already inline in header
-// This file exists for future non-inline implementations if needed
+void GameEngine::RefreshWindowTheme(bool force) {
+    detail::UpdateWindowTheme(GetWindowHandle(), force);
+}
 
 } // namespace RayGame
 

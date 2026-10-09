@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core.h"
+#include "Display.h"
 
 namespace RayGame {
 
@@ -15,8 +16,13 @@ public:
     static bool GetMouseButton(int button) { return IsMouseButtonDown(button); }
     static bool GetMouseButtonDown(int button) { return IsMouseButtonPressed(button); }
     static bool GetMouseButtonUp(int button) { return IsMouseButtonReleased(button); }
-    static Vector2 GetMousePosition() { return ::GetMousePosition(); }
-    static Vector2 GetMouseDelta() { return ::GetMouseDelta(); }
+    static Vector2 GetMousePosition() { return Display::ScreenToCanvas(::GetMousePosition()); }
+    static Vector2 GetMouseDelta() {
+        Vector2 delta = ::GetMouseDelta();
+        float scale = Display::GetViewport().scale;
+        return {delta.x / scale, delta.y / scale};
+    }
+    static bool IsMouseInCanvas() { return Display::GetViewport().Contains(::GetMousePosition()); }
     static float GetMouseWheelMove() { return ::GetMouseWheelMove(); }
 
     // ---- Gamepad ----

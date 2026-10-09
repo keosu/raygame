@@ -1,156 +1,108 @@
 #include "RayGame.h"
+#include "../common/ExampleUI.h"
 
 using namespace RayGame;
 
-// Simple bouncing balls demo
 class BouncingBallsScene : public Scene {
 public:
-    BouncingBallsScene() : Scene("Bouncing Balls Demo") {}
-    
+    static constexpr int WIDTH = 800, HEIGHT = 600;
+    Rectangle arena = {24, 92, 752, 454};
+    bool gravityEnabled = true;
+    static constexpr int MAX_BALLS = 128;
+
+    BouncingBallsScene() : Scene("Bouncing Balls") {}
+
     void OnLoad() override {
-        // Create some bouncing balls
-        for (int i = 0; i < 10; i++) {
-            auto ball = CreateGameObject("Ball");
-            ball->transform->position = {
-                Random(100.0f, 700.0f),
-                Random(100.0f, 500.0f)
-            };
-            
-            // Add sprite
-            auto tex = ResourceManager::CreateCircleTexture(
-                "ball" + std::to_string(i), 16, 
-                Color{
-                    (unsigned char)GetRandomValue(100, 255),
-                    (unsigned char)GetRandomValue(100, 255),
-                    (unsigned char)GetRandomValue(100, 255),
-                    255
-                }
-            );
-            auto sprite = ball->AddComponent<SpriteRenderer>(tex);
-            
-            // Add physics
-            auto rb = ball->AddComponent<Rigidbody>();
-            rb->velocity = {Random(-200.0f, 200.0f), Random(-200.0f, 200.0f)};
-            rb->drag = 1.0f;  // No drag
-            rb->useGravity = true;
-            rb->gravity = 300.0f;
-            
-            auto collider = ball->AddComponent<CircleCollider>(16.0f);
-            
-            // Add particle trail
-            auto particles = ball->AddComponent<ParticleEmitter>();
-            particles->emissionRate = 20;
-            particles->maxParticles = 50;
-            particles->shape = EmitterShape::Point;
-            particles->startVelocityMin = {-20, -20};
-            particles->startVelocityMax = {20, 20};
-            particles->acceleration = {0, 50};
-            particles->lifetimeMin = 0.3f;
-            particles->lifetimeMax = 0.6f;
-            particles->startSizeMin = 2;
-            particles->startSizeMax = 4;
-            particles->startColor = sprite->tint;
+        ExampleUI::Initialize({132, 233, 181, 255});
+        for (int i = 0; i < 10; ++i) {
+            AddRandomBall({Random(arena.x + 24, arena.x + arena.width - 24),
+                           Random(arena.y + 24, arena.y + arena.height * 0.6f)});
         }
     }
-    
+
+    void Update() override {
+        if (Input::GetKeyDown(KEY_R)) { Clear(); OnLoad(); Start(); }
+        if (Input::GetKeyDown(KEY_G)) {
+            gravityEnabled = !gravityEnabled;
+            for (const auto& obj : GetAllGameObjects()) obj->GetComponent<Rigidbody>()->useGravity = gravityEnabled;
+        }
+        if (Input::GetKeyDown(KEY_SPACE)) AddRandomBall();
+        Vector2 mouse = Input::GetMousePosition();
+        if (Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT) && Input::IsMouseInCanvas()
+            && CheckCollisionPointRec(mouse, arena)) AddRandomBall(mouse);
+        Scene::Update();
+    }
+
     void FixedUpdate() override {
         Scene::FixedUpdate();
-        
-        // Keep balls in bounds (bounce off walls)
-        for (auto& obj : GetAllGameObjects()) {
-            auto rb = obj->GetComponent<Rigidbody>();
-            if (!rb) continue;
-            
-            Vector2& pos = obj->transform->position;
-            Vector2& vel = rb->velocity;
-            
-            float radius = 16;
-            if (pos.x - radius < 0) {
-                pos.x = radius;
-                vel.x = -vel.x * 0.8f;
-            }
-            if (pos.x + radius > 800) {
-                pos.x = 800 - radius;
-                vel.x = -vel.x * 0.8f;
-            }
-            if (pos.y - radius < 0) {
-                pos.y = radius;
-                vel.y = -vel.y * 0.8f;
-            }
-            if (pos.y + radius > 600) {
-                pos.y = 600 - radius;
-                vel.y = -vel.y * 0.8f;
-            }
+        for (const auto& obj : GetAllGameObjects()) {
+            auto body = obj->GetComponent<Rigidbody>();
+            if (!body) continue;
+            auto& pos = obj->transform->position;
+            auto& vel = body->velocity;
+            constexpr float radius = 16;
+            if (pos.x - radius < arena.x) { pos.x = arena.x + radius; vel.x = std::fabs(vel.x) * 0.9f; }
+            if (pos.x + radius > arena.x + arena.width) { pos.x = arena.x + arena.width - radius; vel.x = -std::fabs(vel.x) * 0.9f; }
+            if (pos.y - radius < arena.y) { pos.y = arena.y + radius; vel.y = std::fabs(vel.y) * 0.9f; }
+            if (pos.y + radius > arena.y + arena.height) { pos.y = arena.y + arena.height - radius; vel.y = -std::fabs(vel.y) * 0.85f; }
         }
     }
-    
+
     void Render() override {
-        Scene::Render();
-        
-        // Draw UI
-        DrawText("RAYGAME ENGINE - Bouncing Balls Demo", 10, 10, 20, WHITE);
-        DrawText(TextFormat("Objects: %d", (int)GetAllGameObjects().size()), 10, 35, 20, YELLOW);
-        DrawText("F1: Toggle Debug", 10, 60, 15, GRAY);
-        DrawText("ESC: Quit", 10, 75, 15, GRAY);
-        DrawText("SPACE: Add Ball", 10, 90, 15, GRAY);
-        
-        if (Input::GetKeyDown(KEY_SPACE)) {
-            AddRandomBall();
+        DrawRectangleGradientV(0, 0, WIDTH, HEIGHT, {10, 22, 34, 255}, {6, 11, 23, 255});
+        DrawRectangleRounded(arena, 0.035f, 8, {12, 23, 38, 255});
+        DrawRectangleRoundedLines(arena, 0.035f, 8, {45, 73, 92, 255});
+        for (int y = 112; y < 530; y += 32) {
+            for (int x = 44; x < 760; x += 32) DrawCircle(x, y, 1, {36, 55, 73, 255});
         }
+        Scene::Render();
+        ExampleUI::Header(WIDTH, "BOUNCING BALLS", "PHYSICS PLAYGROUND");
+        ExampleUI::Stat(WIDTH - 180.0f, "BALLS", TextFormat("%03d / %d", (int)GetAllGameObjects().size(), MAX_BALLS), UI::accentColor);
+        ExampleUI::Stat(WIDTH - 32.0f, "GRAVITY", gravityEnabled ? "ON" : "OFF", ExampleUI::gold);
+        ExampleUI::Footer(WIDTH, HEIGHT, "SPACE / CLICK  ADD    G  GRAVITY    R  RESET");
     }
-    
-    void AddRandomBall() {
+
+    void AddRandomBall(Vector2 position = {-1, -1}) {
+        if (GetAllGameObjects().size() >= MAX_BALLS) return;
         auto ball = CreateGameObject("Ball");
-        ball->transform->position = {Random(100.0f, 700.0f), 50.0f};
-        
-        int ballIndex = GetAllGameObjects().size();
-        auto tex = ResourceManager::CreateCircleTexture(
-            "ball_new_" + std::to_string(ballIndex), 16,
-            Color{
-                (unsigned char)GetRandomValue(100, 255),
-                (unsigned char)GetRandomValue(100, 255),
-                (unsigned char)GetRandomValue(100, 255),
-                255
-            }
-        );
-        auto sprite = ball->AddComponent<SpriteRenderer>(tex);
-        
-        auto rb = ball->AddComponent<Rigidbody>();
-        rb->velocity = {Random(-100.0f, 100.0f), Random(-50.0f, 50.0f)};
-        rb->drag = 1.0f;
-        rb->useGravity = true;
-        rb->gravity = 300.0f;
-        
-        auto collider = ball->AddComponent<CircleCollider>(16.0f);
-        
+        if (position.x < 0) position = {Random(arena.x + 24, arena.x + arena.width - 24), arena.y + 32};
+        ball->transform->position = {
+            Clamp(position.x, arena.x + 16, arena.x + arena.width - 16),
+            Clamp(position.y, arena.y + 16, arena.y + arena.height - 16)};
+        constexpr Color palette[] = {{97,218,255,255}, {255,115,173,255}, {255,207,112,255}, {132,233,181,255}, {181,157,255,255}};
+        Color color = palette[GetRandomValue(0, 4)];
+        auto texture = ResourceManager::CreateCircleTexture("ball", 16, WHITE);
+        ball->AddComponent<SpriteRenderer>(texture)->tint = color;
+        auto body = ball->AddComponent<Rigidbody>();
+        body->velocity = {Random(-180.0f, 180.0f), Random(-100.0f, 50.0f)};
+        body->drag = 1;
+        body->useGravity = gravityEnabled;
+        body->gravity = 300;
+        ball->AddComponent<CircleCollider>(16.0f);
         auto particles = ball->AddComponent<ParticleEmitter>();
-        particles->emissionRate = 20;
-        particles->maxParticles = 50;
-        particles->shape = EmitterShape::Point;
-        particles->startVelocityMin = {-20, -20};
-        particles->startVelocityMax = {20, 20};
-        particles->acceleration = {0, 50};
-        particles->lifetimeMin = 0.3f;
-        particles->lifetimeMax = 0.6f;
-        particles->startSizeMin = 2;
-        particles->startSizeMax = 4;
-        particles->startColor = sprite->tint;
+        particles->renderOrder = -1;
+        particles->emissionRate = 16;
+        particles->maxParticles = 32;
+        particles->startVelocityMin = {-12, -12};
+        particles->startVelocityMax = {12, 12};
+        particles->acceleration = {0, 30};
+        particles->lifetimeMin = 0.15f;
+        particles->lifetimeMax = 0.4f;
+        particles->startSizeMin = 1;
+        particles->startSizeMax = 3;
+        particles->startColor = color;
     }
 };
 
 class MyGame : public GameEngine {
 public:
-    MyGame() : GameEngine("RayGame Engine Demo", 800, 600) {}
-    
-    void OnInit() override {
-        auto scene = CreateRef<BouncingBallsScene>();
-        LoadScene(scene);
-    }
+    MyGame() : GameEngine("RayGame - Bouncing Balls", 800, 600) {}
+    void OnInit() override { LoadScene(CreateRef<BouncingBallsScene>()); }
 };
 
 int main() {
+    ExampleUI::ConfigureLogging();
     MyGame game;
     game.Run();
     return 0;
 }
-

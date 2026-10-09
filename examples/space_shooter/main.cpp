@@ -1,4 +1,5 @@
 #include "RayGame.h"
+#include "../common/ExampleUI.h"
 
 using namespace RayGame;
 
@@ -34,7 +35,7 @@ public:
                 static_cast<float>(GetRandomValue(0, 800)),
                 static_cast<float>(GetRandomValue(0, 600))
             };
-            star.size = static_cast<float>(GetRandomValue(10, 30)) / 10.0f;
+            star.size = static_cast<float>(GetRandomValue(5, 18)) / 10.0f;
             star.brightness = static_cast<float>(GetRandomValue(30, 100)) / 100.0f;
             star.twinkleSpeed = static_cast<float>(GetRandomValue(5, 30)) / 10.0f;
             star.twinklePhase = static_cast<float>(GetRandomValue(0, 628)) / 100.0f;
@@ -76,6 +77,8 @@ public:
         }
         if (stars.empty()) return;
         
+        DrawRectangleGradientV(0, 0, 800, 600, {8, 16, 32, 255}, {3, 7, 17, 255});
+
         // Draw twinkling stars
         for (const auto& star : stars) {
             unsigned char alpha = (unsigned char)(star.brightness * 255);
@@ -104,19 +107,19 @@ public:
         Vector2 rightTail = {pos.x + 8, pos.y + 16};
         
         // Main body
-        DrawTriangle(leftWing, rightWing, nose, primaryColor);
+        ExampleUI::Triangle(leftWing, rightWing, nose, primaryColor);
         
         // Cockpit
         DrawCircle(pos.x, pos.y - 5, 5, accentColor);
         
         // Wings detail
-        DrawTriangle(
+        ExampleUI::Triangle(
             {pos.x - 16, pos.y + 12},
             {pos.x - 12, pos.y + 8},
             {pos.x - 10, pos.y + 12},
             accentColor
         );
-        DrawTriangle(
+        ExampleUI::Triangle(
             {pos.x + 16, pos.y + 12},
             {pos.x + 12, pos.y + 8},
             {pos.x + 10, pos.y + 12},
@@ -124,8 +127,8 @@ public:
         );
         
         // Tail fins
-        DrawTriangle(leftTail, {pos.x - 4, pos.y + 10}, {pos.x - 8, pos.y + 10}, DARKBLUE);
-        DrawTriangle(rightTail, {pos.x + 4, pos.y + 10}, {pos.x + 8, pos.y + 10}, DARKBLUE);
+        ExampleUI::Triangle(leftTail, {pos.x - 4, pos.y + 10}, {pos.x - 8, pos.y + 10}, DARKBLUE);
+        ExampleUI::Triangle(rightTail, {pos.x + 4, pos.y + 10}, {pos.x + 8, pos.y + 10}, DARKBLUE);
     }
 };
 
@@ -142,7 +145,7 @@ public:
         
         // Draw enemy ship as alien-looking craft
         // Main body (wider, more menacing)
-        DrawTriangle(
+        ExampleUI::Triangle(
             {pos.x, pos.y + 16},
             {pos.x - 18, pos.y - 10},
             {pos.x + 18, pos.y - 10},
@@ -150,13 +153,13 @@ public:
         );
         
         // Wings (pointed)
-        DrawTriangle(
+        ExampleUI::Triangle(
             {pos.x - 18, pos.y - 10},
             {pos.x - 24, pos.y - 8},
             {pos.x - 20, pos.y + 4},
             MAROON
         );
-        DrawTriangle(
+        ExampleUI::Triangle(
             {pos.x + 18, pos.y - 10},
             {pos.x + 24, pos.y - 8},
             {pos.x + 20, pos.y + 4},
@@ -266,10 +269,12 @@ public:
     float enemySpawnTimer = 0;
     float enemySpawnRate = 2.0f;
     int score = 0;
+    bool restartRequested = false;
     
     SpaceShooterScene() : Scene("Space Shooter") {}
     
     void OnLoad() override {
+        ExampleUI::Initialize();
         // Create starfield background (first, so it renders behind everything)
         auto background = CreateGameObject("Starfield");
         background->AddComponent<StarfieldBackground>();
@@ -323,6 +328,11 @@ public:
     void Update() override {
         Scene::Update();
         
+        if (!player || player->IsDestroyed()) {
+            if (restartRequested || Input::GetKeyDown(KEY_R)) Restart();
+            return;
+        }
+
         // Spawn enemies
         enemySpawnTimer += GameTime::DeltaTime();
         if (enemySpawnTimer >= enemySpawnRate) {
@@ -383,30 +393,25 @@ public:
     void Render() override {
         Scene::Render();
         
-        // Draw UI
-        DrawText("SPACE SHOOTER DEMO", 10, 10, 20, WHITE);
-        DrawText(TextFormat("Score: %d", score), 10, 35, 20, YELLOW);
-        DrawText("WASD/Arrows: Move", 10, 60, 15, GRAY);
-        DrawText("SPACE: Shoot", 10, 75, 15, GRAY);
-        DrawText("F1: Toggle Debug", 10, 90, 15, GRAY);
-        DrawText("ESC: Quit", 10, 105, 15, GRAY);
-        
+        ExampleUI::Header(800, "SPACE SHOOTER", "ORBITAL DEFENSE");
+        ExampleUI::Stat(768, "SCORE", TextFormat("%06d", score));
+        ExampleUI::Footer(800, 600, "WASD / ARROWS  MOVE     SPACE  FIRE");
         if (!player || !player->active) {
-            DrawText("GAME OVER!", 300, 250, 40, RED);
-            DrawText("Press R to Restart", 290, 300, 25, WHITE);
-            
-            if (Input::GetKeyDown(KEY_R)) {
-                // Reload scene
-                OnUnload();
-                Clear();
-                score = 0;
-                enemySpawnRate = 2.0f;
-                OnLoad();
-                Start();
-            }
+            if (ExampleUI::Result(800, 600, "SECTOR LOST", score)) restartRequested = true;
         }
     }
-    
+
+    void Restart() {
+        OnUnload();
+        Clear();
+        score = 0;
+        enemySpawnTimer = 0;
+        enemySpawnRate = 2.0f;
+        restartRequested = false;
+        OnLoad();
+        Start();
+    }
+
     void SpawnEnemy() {
         auto enemy = CreateGameObject("Enemy");
         enemy->tag = "Enemy";
@@ -505,10 +510,10 @@ void PlayerController::Update() {
         gameObject->transform->position.x = margin;
     if (gameObject->transform->position.x > 800 - margin) 
         gameObject->transform->position.x = 800 - margin;
-    if (gameObject->transform->position.y < margin) 
-        gameObject->transform->position.y = margin;
-    if (gameObject->transform->position.y > 600 - margin) 
-        gameObject->transform->position.y = 600 - margin;
+    if (gameObject->transform->position.y < 92)
+        gameObject->transform->position.y = 92;
+    if (gameObject->transform->position.y > 546)
+        gameObject->transform->position.y = 546;
 }
 
 void PlayerController::Shoot() {
@@ -546,6 +551,7 @@ public:
 };
 
 int main() {
+    ExampleUI::ConfigureLogging();
     SpaceShooterGame game;
     game.Run();
     return 0;

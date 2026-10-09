@@ -2,6 +2,7 @@
 // parent-child transforms (boss turrets), collision via data-oriented fields,
 // tweened boss movement, HUD, and camera screen-shake.
 #include "RayGame.h"
+#include "../common/ExampleUI.h"
 #include <cmath>
 
 using namespace RayGame;
@@ -172,11 +173,13 @@ public:
     int score = 0;
     bool gameOver = false;
     bool won = false;
+    bool restartRequested = false;
     float shake = 0;
 
     BulletHellScene() : Scene("Bullet Hell") {}
 
     void OnLoad() override {
+        ExampleUI::Initialize(ExampleUI::pink);
         EventBus::Clear();
         EventBus::Subscribe("shake", [this](const EventData& d){ shake = Clamp(shake + d.f, 0.0f, 1.0f); });
 
@@ -218,7 +221,7 @@ public:
             shake = std::max(0.0f, shake - GameTime::DeltaTime() * 1.6f);
         }
 
-        if (gameOver && Input::GetKeyDown(KEY_R)) {
+        if (gameOver && (restartRequested || Input::GetKeyDown(KEY_R))) {
             Restart();
         }
     }
@@ -226,7 +229,7 @@ public:
     void Restart() {
         Clear();
         TweenManager::Clear();
-        score = 0; shake = 0; gameOver = false; won = false;
+        score = 0; shake = 0; gameOver = false; won = false; restartRequested = false;
         OnLoad();
         Start();
     }
@@ -234,30 +237,26 @@ public:
     void EndGame(bool victory) { if (!gameOver) { gameOver = true; won = victory; } }
 
     void Render() override {
+        DrawRectangleGradientV(0, 0, SCREEN_W, SCREEN_H, {19, 12, 36, 255}, {6, 12, 24, 255});
+        for (int y = 110; y < SCREEN_H - 40; y += 48) {
+            for (int x = 26; x < SCREEN_W; x += 48) DrawCircle(x, y, 1, {53, 51, 82, 160});
+        }
         Scene::Render();
+        ExampleUI::Header(SCREEN_W, "BULLET HELL", "BOSS ENCOUNTER / 01");
+        if (player) ExampleUI::Lives(320, player->GetComponent<Player>()->lives);
+        ExampleUI::Stat(SCREEN_W - 190.0f, "SCORE", TextFormat("%06d", score), ExampleUI::gold);
+        ExampleUI::Stat(SCREEN_W - 32.0f, "BULLETS", TextFormat("%04d",
+            (enemyField ? enemyField->Count() : 0) + (playerField ? playerField->Count() : 0)), ExampleUI::pink);
+        ExampleUI::Footer(SCREEN_W, SCREEN_H, "WASD  MOVE    Z / SPACE  FIRE    SHIFT  FOCUS");
 
-        UI::Label(16, 14, TextFormat("SCORE  %d", score), 26, Color{255, 230, 120, 255});
-        if (player && player->GetComponent<Player>()) {
-            int lives = player->GetComponent<Player>()->lives;
-            std::string s = "LIVES  ";
-            for (int i=0;i<lives;i++) s += "A ";
-            UI::Label(16, 46, s, 22, Color{120, 220, 255, 255});
+        if (boss && !gameOver) {
+            auto enemy = boss->GetComponent<Boss>();
+            UI::Label(28, 82, "THE SENTINEL", 13, ExampleUI::muted);
+            UI::LabelRight(SCREEN_W - 28, 82, TextFormat("%d%%", (int)(100 * enemy->hp / enemy->maxHp)), 13, ExampleUI::pink);
+            UI::ProgressBar({28, 101, SCREEN_W - 56.0f, 6}, enemy->hp / enemy->maxHp, ExampleUI::pink);
         }
-        UI::Label(SCREEN_W - 230, 14, TextFormat("BULLETS %d",
-            (enemyField?enemyField->Count():0) + (playerField?playerField->Count():0)), 20, GRAY);
-
-        // Boss HP bar
-        if (boss && boss->GetComponent<Boss>() && !gameOver) {
-            auto bs = boss->GetComponent<Boss>();
-            UI::ProgressBar({SCREEN_W/2 - 300.0f, 70, 600, 16},
-                            bs->hp / bs->maxHp, Color{255, 80, 140, 255});
-        }
-
-        if (gameOver) {
-            DrawRectangle(0,0,SCREEN_W,SCREEN_H, Fade(BLACK, 0.6f));
-            UI::LabelCentered(SCREEN_W/2, SCREEN_H/2 - 50, won ? "VICTORY!" : "DEFEATED",
-                              60, won ? Color{120,255,160,255} : Color{255,80,120,255});
-            UI::LabelCentered(SCREEN_W/2, SCREEN_H/2 + 30, "Press R to retry", 24, GRAY);
+        if (gameOver && ExampleUI::Result(SCREEN_W, SCREEN_H, won ? "VICTORY" : "DEFEATED", score, won)) {
+            restartRequested = true;
         }
     }
 };
@@ -317,7 +316,7 @@ void Player::Update() {
     pos.x += mv.x * s * GameTime::DeltaTime();
     pos.y += mv.y * s * GameTime::DeltaTime();
     pos.x = Clamp(pos.x, 12.0f, SCREEN_W - 12.0f);
-    pos.y = Clamp(pos.y, 12.0f, SCREEN_H - 12.0f);
+    pos.y = Clamp(pos.y, 122.0f, SCREEN_H - 58.0f);
 
     // Fire
     fireTimer -= GameTime::DeltaTime();
@@ -354,6 +353,7 @@ public:
 };
 
 int main() {
+    ExampleUI::ConfigureLogging();
     BulletHellGame game;
     game.Run();
     return 0;

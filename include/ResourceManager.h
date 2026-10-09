@@ -59,14 +59,18 @@ public:
         Image img = GenImageColor(size, size, BLANK);
         for (int y = 0; y < size; y++) {
             for (int x = 0; x < size; x++) {
-                int dx = x - radius, dy = y - radius;
-                if (dx*dx + dy*dy <= radius*radius) ImageDrawPixel(&img, x, y, color);
+                float dx = x - radius + 0.5f, dy = y - radius + 0.5f;
+                float coverage = Clamp(radius + 0.5f - std::sqrt(dx*dx + dy*dy), 0.0f, 1.0f);
+                Color pixel = color;
+                pixel.a = (unsigned char)(color.a * coverage);
+                if (coverage > 0) ImageDrawPixel(&img, x, y, pixel);
             }
         }
         Texture2D tex = LoadTextureFromImage(img);
         UnloadImage(img);
         if (tex.id == 0) return nullptr;
         textures[name] = tex;
+        SetTextureFilter(textures[name], TEXTURE_FILTER_BILINEAR);
         return &textures[name];
     }
 

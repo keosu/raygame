@@ -22,6 +22,9 @@ Version 0.2.0 · C++17 · MIT
 - **Sprite & animation** components with pivot, flip and tint
 - **Global layer sorting**: components draw in `layer`/`renderOrder` order across all objects
 - **Camera2D** with smooth follow, zoom, world/screen conversion, opt-in render integration
+- **Resizable window & borderless fullscreen** with a fixed logical canvas, aspect-ratio preservation and mapped mouse input
+- **Sharp UI text** with a display-sized render target and bundled example fonts
+- **Native Windows title bar** follows the system's app light/dark preference, including changes while running
 
 ### Physics
 - **Rigidbody**: velocity, acceleration, mass, drag, gravity, restitution, impulses/forces
@@ -175,6 +178,35 @@ save.Save("save.txt");
 | `neon_breakout` | Layered neon rendering, tweens, timers, trigger callbacks, camera shake, HUD, save |
 | `bullet_hell` | Object pooling (thousands of bullets), parent-child turrets, bullet patterns, HUD |
 
+All four examples share the following window controls:
+
+| Key | Action |
+| --- | --- |
+| `F11` or `Alt+Enter` | Toggle borderless fullscreen on the current monitor |
+| `Esc` | Leave fullscreen; in windowed mode, quit |
+| `P` | Pause or resume |
+| `F1` | Toggle debug overlay |
+| `R` | Retry after game over; reset the bouncing-balls playground |
+
+The window is resizable. Game coordinates stay at the example's original
+resolution; unused space is letterboxed, and mouse input follows the same viewport.
+The previous window size and position are restored when leaving fullscreen.
+On Windows, the native title bar follows the light/dark app theme and respects
+high-contrast mode. Theme changes are picked up within half a second.
+For your own games, use `GameEngine::SetFullscreen`, `SetPaused`, or
+`SetCanvasSize`. `GetScreenWidth/Height` on the engine return logical canvas units;
+raylib's global functions return the actual window size. Use `Input::GetMousePosition`
+for game coordinates and `Input::IsMouseInCanvas` to ignore clicks in the margins.
+
+The examples use **Rajdhani SemiBold** for headings and scores and **Barlow Medium**
+for labels, with matching HUDs and retry panels. The TTF files and SIL Open Font
+License notices live in `assets/fonts`; xmake copies them to `bin/assets` through
+the shared `example_assets` target. They work without installing system fonts.
+
+In `bouncing_balls`, press `Space` or click in the arena to add a ball, `G` to toggle
+gravity, and `R` to reset. Balls share one texture and the arena is capped at 128
+balls to keep the physics playground responsive.
+
 ## Building
 
 ```bash
@@ -196,6 +228,12 @@ xmake
 Use `-m release` for an optimized build. xmake downloads raylib-cpp/raylib and
 compiles the dependencies for the selected toolchain. Targets use UTF-8 source
 encoding and put executables in `bin`.
+
+The four examples build as Windows GUI applications by default: launching an EXE
+does not open a console, and raylib trace output is disabled. To enable the console
+and logs for debugging, run `xmake f --example_console=y` and rebuild. Use
+`xmake f --example_console=n` to return to quiet launches. The `tests` and `smoke`
+targets always keep their console and diagnostic output.
 
 When including individual headers, replace the old `#include "Time.h"` with
 `#include "GameTime.h"`. Windows treats `Time.h` and the C runtime's `time.h` as
@@ -220,6 +258,10 @@ xmake run smoke
 ```
 
 It requires an OpenGL 3.3-capable display even though the window is hidden.
+It also checks fullscreen/window restoration, the native Windows title-bar theme,
+font loading, viewport scaling and
+resource cleanup, and saves rendered previews to `bin/screenshots`. The logic suite
+covers letterboxing, coordinate conversion and pause timing without a window.
 
 ## License
 
