@@ -5,15 +5,23 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  XMAKE_VERSION: '3.1.1'
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-24.04, windows-2022]
         mode: [debug, release]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
@@ -29,12 +37,12 @@ jobs:
       - name: Setup xmake
         uses: xmake-io/github-action-setup-xmake@v1
         with:
-          xmake-version: latest
+          xmake-version: ${{ env.XMAKE_VERSION }}
 
       - name: Configure Windows (MSVC)
         # Configure Windows explicitly to avoid picking up a MinGW toolchain.
         if: runner.os == 'Windows'
-        run: xmake f -p windows -a x64 --toolchain=msvc -m ${{ matrix.mode }} -y
+        run: xmake f -p windows -a x64 --toolchain=msvc -m ${{ matrix.mode }} --example_console=n -y
 
       - name: Configure Linux
         if: runner.os == 'Linux'
@@ -48,3 +56,62 @@ jobs:
 
       - name: Run tests
         run: xmake run tests
+
+      - name: Upload Windows games and assets
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: raygame-windows-x64-${{ matrix.mode }}
+          path: |
+            bin/space_shooter.exe
+            bin/bouncing_balls.exe
+            bin/neon_breakout.exe
+            bin/bullet_hell.exe
+            bin/*.dll
+            bin/assets/
+          if-no-files-found: error
+          retention-days: 14
+
+  android:
+    name: Android ARM64 APKs
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK and NDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-35 build-tools;35.0.0 ndk;28.2.13676358'
+
+      - name: Setup xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: ${{ env.XMAKE_VERSION }}
+
+      - name: Build and verify APKs
+        run: |
+          ./scripts/build-android.ps1 -Mode release -SdkRoot $env:ANDROID_HOME `
+            -NdkRoot "$env:ANDROID_HOME/ndk/28.2.13676358" -JavaHome $env:JAVA_HOME
+          Copy-Item -LiteralPath build/android/verification-release.json `
+            -Destination bin/android/arm64-v8a/release/verification.json
+
+      - name: Upload Android APKs and verification report
+        uses: actions/upload-artifact@v4
+        with:
+          name: raygame-android-arm64-release
+          path: |
+            bin/android/arm64-v8a/release/*.apk
+            bin/android/arm64-v8a/release/verification.json
+          if-no-files-found: error
+          retention-days: 14

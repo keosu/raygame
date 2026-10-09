@@ -64,6 +64,20 @@ ZIP 对齐、ARM64 ELF 的 16 KiB LOAD 段对齐、NativeActivity 导出入口�
 C++ 运行库以及字体/许可内容。SHA-256 等结果存入
 `build/android/verification-release.json`（Debug 对应 `verification-debug.json`）。
 
+## GitHub Actions 构建与下载
+
+`.github/workflows/ci.yml` 的 Android 任务在 Windows 2022 runner 上调用同一
+脚本，固定 xmake 3.1.1、JDK 17、SDK 35/build-tools 35.0.0 和 NDK r28c。
+推送到 `main`、面向 `main` 的 PR，或在 Actions → CI → Run workflow 手动触发
+后，成功运行的 Artifacts 中提供 `raygame-android-arm64-release`，含四个 APK
+及 `verification.json`，保留 14 天。同一工作流还构建并上传 Windows x64
+Debug/Release EXE 和字体资源，Linux 保留 Debug/Release 构建与逻辑测试。
+
+CI 每次生成独立的临时调试密钥，不上传密钥，也不需要配置仓库签名 Secret。
+因此不同运行或本地与 CI 之间的 APK 签名不同；需要先卸载旧版本再安装，卸载
+会清除应用数据。需要持续覆盖安装时，继续使用保留同一调试密钥的本地构建。
+CI 检查构建/签名/打包，不安装或启动 Android 应用。
+
 ## 直接使用 xmake（Linux/macOS 也可参考）
 
 配置好 JAVA_HOME/PATH，生成上述 debug.keystore 后：

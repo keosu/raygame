@@ -269,3 +269,15 @@ NativeActivity 入口、16 KiB 对齐等构建检查已纳入脚本。配置与�
 启动真机/模拟器。后台恢复、GPU 上下文丢失、手势/刘海安全区域、热/电量和长稳
 性能仍需设备验证。详情见 `ANDROID.md`，本轮最终记录见 `AGENT_STATE.md`。
 M0 的物理世界隔离、更新阶段/插值仍是后续主线，Android 工作不替代这些验收。
+
+
+**13. CI 构建与下载产物**
+
+在原 Windows/MSVC 和 Linux Debug/Release 构建、逻辑测试基础上，增加四游戏
+Windows EXE/字体产物和 Android ARM64 Release APK/校验报告上传，保留 14 天。
+固定 xmake 3.1.1、Windows 2022/Ubuntu 24.04 runner；Android 使用 JDK 17、
+SDK 35、NDK r28c 和本地共用构建脚本，支持手动触发。
+
+本包通过 actionlint 和差异检查，新工作流尚待推送后在 GitHub 执行。临时调试
+签名的 APK 用于手动测试；稳定发行签名、SDK 消费、干净设备运行、依赖锁定与
+根目录许可等 R12 验收仍未闭合，产物上传不等于正式产品发行。

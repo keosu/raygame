@@ -11,7 +11,31 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：Android APK（已实现并验证构建）
+## 最近工作包：CI 构建和产物下载（已配置，远端待运行）
+
+提交主题：`Build and upload Windows games and Android APKs in CI`。
+
+- `.github/workflows/ci.yml` 保留 Windows/MSVC 和 Linux Debug/Release 构建与
+  逻辑测试，增加 Windows 四 EXE/字体资源上传；新增 Android ARM64 Release
+  构建及签名/打包校验，上传四 APK 和 `verification.json`。产物保留 14 天。
+- 增加 `workflow_dispatch`，保留 `main` push/PR 触发。固定 xmake 3.1.1，
+  runner 为 Windows 2022 / Ubuntu 24.04。Android 用 JDK 17、SDK 35、
+  build-tools 35.0.0、NDK r28c，复用 `scripts/build-android.ps1`。
+- CI 使用每次新建的临时调试签名，密钥不上传。不同运行的 APK 不能直接覆盖
+  安装；卸载会清除数据，详见 `docs/ANDROID.md`。没有自动安装、模拟器或发布流程。
+- README 和 Android 文档已说明产物名、下载路径、签名限制和手动运行方法。
+
+本包验证：`actionlint 1.7.12`、Android 步骤 PowerShell 语法检查和
+`git diff --check` 通过，记录在 `build/ci-validation.log`。
+已确认 xmake v3.1.1 的 Android `xmake.lua/load.lua/package.lua` 规则与本机
+已成功构建 APK 的版本一致。仅改 CI/文档，未重复执行上一包已通过的编译/游戏测试。
+
+远端状态：检查时 GitHub 最新成功运行是 `37943402300`（提交 `7039164`），
+Windows/Linux Debug/Release 四任务均成功，尚无 Android job。本包未推送或触发
+远端工作流；本地检查不能视为新 CI 已通过。推送后在 Actions → CI 验证五个任务
+以及三个产物归档，下载解压 EXE/字体，APK 继续由用户手动验证。
+
+## 上一工作包：Android APK（已实现并验证构建）
 
 用户要求尝试生成 APK，并明确由其手动安装/验证；不要运行 adb 安装或模拟器。
 本机已有 `$USERPROFILE/.cache/balanceball-tools/jdk/jdk-17.0.18+8` 和 Android 34
@@ -19,7 +43,7 @@ SDK，以及 `.android` 中的工具/调试密钥。本包使用现有 JDK；SDK
 已下载至 `$LOCALAPPDATA/raygame/android-sdk`，未覆盖已有工具或密钥。
 
 提交主题：`Add Android APK builds and touch controls for example games`。
-本状态文件随该工作包一起提交，提交号通过 `git log` 查询。
+提交号：`a79fd50`。
 
 1. xmake 将四游戏构建为 NativeActivity 共享库/APK，ARM64、API 26 起、target
    API 35、OpenGL ES 2.0。Release 原生代码使用本地调试签名，适合侧载测试。
@@ -69,6 +93,7 @@ Android 当前限制：未验证后台/锁屏恢复、GPU 上下文丢失后资�
 - `69565f1`：全屏、字体/HUD、原生标题栏与 GUI 子系统。
 - `7039164`：生命周期异常清理、时间域、安全存档、文件日志、四游戏比例适配。
 - `d95cdb9`：类型资源句柄、固定 tick 输入缓冲与回调所有者作用域。
+- `a79fd50`：Android APK 构建、触屏操作、私有文件与 APK 资源适配。
 - 历史工作包先后通过 MSVC Debug/Release 各 206、252 项逻辑检查，图形 smoke
   零失败；本包新增 Android 支持后的最终成绩见上文。
 

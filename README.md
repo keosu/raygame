@@ -399,7 +399,23 @@ destruction, render ordering, fixed physics, scene switching, transform hierarch
 tilemaps, tween callback mutation, timers, pooling, events and saves.
 `tests/header_compat.cpp` checks standard-library header interoperability.
 GitHub Actions builds and runs the logic suite in Debug and Release on Linux and
-Windows; Windows explicitly selects MSVC (`.github/workflows/ci.yml`).
+Windows; Windows explicitly selects MSVC. A separate Windows job builds and verifies
+the four ARM64 Android Release APKs with JDK 17, SDK 35 and NDK r28c. All jobs use
+xmake 3.1.1 (`.github/workflows/ci.yml`). CI runs on pushes/PRs to `main` and supports
+manual **Actions → CI → Run workflow** runs.
+
+Successful runs provide downloadable artifacts for 14 days:
+
+| Artifact | Contents |
+| --- | --- |
+| `raygame-windows-x64-release` | Four Release EXEs and `assets/` (fonts and notices) |
+| `raygame-windows-x64-debug` | Four Debug EXEs and `assets/` |
+| `raygame-android-arm64-release` | Four APKs and `verification.json` with SHA-256 hashes |
+
+Open a CI run and download from **Artifacts**. Keep `assets/` next to the extracted
+Windows EXEs. Android CI generates a fresh debug signing key for each run; builds
+from different runs cannot update one another in place. Android execution remains
+a manual device check; CI does not launch an emulator. See [Android notes](docs/ANDROID.md).
 
 An optional integration test runs all four examples in a hidden window, including
 runtime spawning, collisions, scene changes, restarts and resource cleanup:
