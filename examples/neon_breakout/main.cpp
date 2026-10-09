@@ -128,6 +128,9 @@ public:
         if (move == 0 && Input::IsMouseInCanvas() && std::fabs(Input::GetMouseDelta().x) > 0) {
             pos.x = Input::GetMousePosition().x;
         }
+#if defined(__ANDROID__)
+        if (ExampleUI::TouchInPlayfield()) pos.x = Input::GetTouchPosition(0).x;
+#endif
         pos.x = Clamp(pos.x, size.x/2, ExampleUI::Width() - size.x/2);
         auto box = gameObject->GetComponent<BoxCollider>();
         if (box) box->size = size;
@@ -328,7 +331,7 @@ public:
         ExampleUI::Lives(380, lives);
         ExampleUI::Stat(ExampleUI::Width() - 195.0f, "SCORE", TextFormat("%06d", score));
         ExampleUI::Stat(ExampleUI::Width() - 32.0f, "BEST", TextFormat("%06d", highscore), ExampleUI::gold);
-        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "MOUSE / A D  MOVE     SPACE / CLICK  LAUNCH");
+        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "MOUSE / A D  MOVE     SPACE / CLICK  LAUNCH", "DRAG PADDLE / TAP TO LAUNCH");
 
         if (!gameOver && ball && !ball->GetComponent<Ball>()->launched) {
             UI::TitleCentered(ExampleUI::Width() / 2, ExampleUI::Height() - 180, "READY TO LAUNCH", 32);

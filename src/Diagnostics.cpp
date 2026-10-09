@@ -6,6 +6,9 @@
 #include <cstdio>
 #include <ctime>
 #include <cstdarg>
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
 
 namespace RayGame {
 namespace {
@@ -45,6 +48,10 @@ bool Diagnostics::Initialize(const std::filesystem::path& file, bool console, si
 }
 
 void Diagnostics::Write(LogLevel level, const std::string& message) noexcept {
+#if defined(__ANDROID__)
+    int priority = level == LogLevel::Error ? ANDROID_LOG_ERROR : level == LogLevel::Warning ? ANDROID_LOG_WARN : ANDROID_LOG_INFO;
+    __android_log_write(priority, "raygame", message.c_str());
+#endif
     try {
         std::lock_guard<std::mutex> lock(logMutex);
         const char* label = level == LogLevel::Error ? "ERROR" : level == LogLevel::Warning ? "WARN" : "INFO";

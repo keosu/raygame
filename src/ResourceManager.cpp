@@ -1,5 +1,6 @@
 #include "ResourceManager.h"
 #include "Diagnostics.h"
+#include "FileSystem.h"
 #include "rlgl.h"
 #include <limits>
 
@@ -119,7 +120,7 @@ ShaderHandle ResourceManager::LoadShaderResource(const std::string& name, const 
 }
 bool ResourceManager::ReloadShader(const std::string& name, const std::string& vs, const std::string& fs) {
     auto slot = Ensure(shaders, name);
-    bool files = (vs.empty() || FileExists(vs.c_str())) && (fs.empty() || FileExists(fs.c_str()));
+    bool files = (vs.empty() || FileSystem::AssetExists(vs)) && (fs.empty() || FileSystem::AssetExists(fs));
     Shader value = IsWindowReady() && files && (!vs.empty() || !fs.empty())
         ? ::LoadShader(vs.empty() ? nullptr : vs.c_str(), fs.empty() ? nullptr : fs.c_str()) : Shader{};
     bool valid = value.id && value.id != rlGetShaderIdDefault();

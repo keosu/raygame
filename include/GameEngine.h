@@ -33,17 +33,24 @@ public:
             if (!applicationCallbacks.Token().IsAlive()) applicationCallbacks.Renew();
             ScopeActivation scope(GetCallbackScope());
             Input::Reset();
+#if defined(__ANDROID__)
+            SetConfigFlags(FLAG_FULLSCREEN_MODE);
+            InitWindow(0, 0, windowTitle.c_str()); // Let Android supply the real surface size.
+#else
             InitWindow(screenWidth, screenHeight, windowTitle.c_str());
+#endif
             if (!IsWindowReady()) throw std::runtime_error("Cannot initialize the game window");
             initialized = true;
             RefreshWindowTheme(true);
+#if !defined(__ANDROID__)
             SetWindowState(FLAG_WINDOW_RESIZABLE);
             SetWindowMinSize(std::max(320, screenWidth / 2), std::max(240, screenHeight / 2));
-            SetExitKey(KEY_NULL);
             int monitor = GetCurrentMonitor();
             float fit = std::min(1.0f, std::min(GetMonitorWidth(monitor) * 0.9f / screenWidth,
                                               GetMonitorHeight(monitor) * 0.85f / screenHeight));
             if (fit < 1) SetWindowSize((int)(screenWidth * fit), (int)(screenHeight * fit));
+#endif
+            SetExitKey(KEY_NULL);
             Display::Configure(screenWidth, screenHeight, canvasScaleMode);
             RefreshCanvas();
             if (startFullscreen) SetFullscreen(true);
@@ -126,21 +133,30 @@ public:
     void Quit() { running = false; }
 
     bool IsFullscreen() const {
+#if defined(__ANDROID__)
+        return true;
+#else
         return initialized ? IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE) : startFullscreen;
+#endif
     }
     void SetFullscreen(bool value) {
+#if defined(__ANDROID__)
+        (void)value; // NativeActivity owns the full screen surface.
+#else
         startFullscreen = value;
         if (initialized && IsFullscreen() != value) {
             ToggleBorderlessWindowed();
             RefreshWindowTheme(true);
             RefreshCanvas();
         }
+#endif
     }
     void ToggleFullscreen() { SetFullscreen(!IsFullscreen()); }
 
     void SetPaused(bool value) {
         if (paused == value) return;
         paused = value;
+        UI::ResetInteraction();
         fixedAccumulator = 0;
         Input::DiscardPending();
     }
@@ -258,6 +274,7 @@ private:
         PhysicsWorld::Clear();
         Input::DiscardPending();
         fixedAccumulator = 0;
+        UI::ResetInteraction();
 
         currentScene = std::move(next);
 
@@ -270,6 +287,11 @@ private:
     void Update() {
         Input::CaptureFrame();
         RefreshWindowTheme();
+#if defined(__ANDROID__)
+        if (Input::GetKeyDown(KEY_BACK)) SetPaused(!paused);
+        if (!paused && Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)
+            && CheckCollisionPointRec(Input::GetMousePosition(), PauseButtonBounds())) SetPaused(true);
+#endif
         if (Input::GetKeyDown(KEY_F11) || (Input::GetKeyDown(KEY_ENTER)
             && (Input::GetKey(KEY_LEFT_ALT) || Input::GetKey(KEY_RIGHT_ALT)))) ToggleFullscreen();
         if (Input::GetKeyDown(KEY_ESCAPE)) {
@@ -312,13 +334,29 @@ private:
             if (camera) camera->End();
         }
 
+#if defined(__ANDROID__)
+        if (!paused) {
+            UI::Panel(PauseButtonBounds());
+            UI::LabelCentered(Display::GetWidth() - 70, Display::GetHeight() - 38, "PAUSE", 18);
+        }
+#endif
         if (paused) {
             float width = Display::GetWidth(), height = Display::GetHeight();
             DrawRectangle(0, 0, (int)std::ceil(width), (int)std::ceil(height), {4, 7, 16, 190});
             UI::Panel({width / 2 - 190, height / 2 - 78, 380, 156});
             UI::TitleCentered(width / 2, height / 2 - 50, "PAUSED", 52);
+#if defined(__ANDROID__)
+            UI::inputEnabled = true;
+            if (UI::Button({width / 2 - 170, height / 2 + 18, 160, 44}, "RESUME")) SetPaused(false);
+            if (UI::Button({width / 2 + 10, height / 2 + 18, 160, 44}, "EXIT")) Quit();
+#else
             UI::LabelCentered(width / 2, height / 2 + 18, "Press P to continue", 22);
+#endif
         }
+    }
+
+    static Rectangle PauseButtonBounds() {
+        return {Display::GetWidth() - 124, Display::GetHeight() - 46, 108, 34};
     }
 };
 

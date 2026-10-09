@@ -14,10 +14,16 @@ struct InputGamepad {
     InputButtons<32> buttons;
     std::array<float, 8> axes{};
 };
+struct InputTouch {
+    int id = -1;
+    Vector2 position{};
+};
 struct InputFrame {
     InputButtons<512> keys;
     InputButtons<8> mouse;
     std::array<InputGamepad, 4> gamepads;
+    std::array<InputTouch, 8> touches;
+    int touchCount = 0;
     Vector2 mousePosition{}, mouseDelta{}; // Raw window coordinates.
     float mouseWheel = 0;
     bool focused = true;
@@ -54,6 +60,14 @@ public:
     }
     static bool IsMouseInCanvas() { return Display::GetViewport().Contains(GetFrame().mousePosition); }
     static float GetMouseWheelMove() { return GetFrame().mouseWheel; }
+    static int GetTouchCount() { return GetFrame().touchCount; }
+    static int GetTouchId(int index) {
+        return index >= 0 && index < GetTouchCount() ? GetFrame().touches[index].id : -1;
+    }
+    static Vector2 GetTouchPosition(int index) {
+        return index >= 0 && index < GetTouchCount()
+            ? Display::ScreenToCanvas(GetFrame().touches[index].position) : Vector2{-1, -1};
+    }
 
     // ---- Gamepad ----
     static bool GamepadAvailable(int pad = 0) { return pad >= 0 && pad < 4 && GetFrame().gamepads[pad].available; }

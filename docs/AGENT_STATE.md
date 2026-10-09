@@ -11,18 +11,71 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
+## 最近工作包：Android APK（已实现并验证构建）
+
+用户要求尝试生成 APK，并明确由其手动安装/验证；不要运行 adb 安装或模拟器。
+本机已有 `$USERPROFILE/.cache/balanceball-tools/jdk/jdk-17.0.18+8` 和 Android 34
+SDK，以及 `.android` 中的工具/调试密钥。本包使用现有 JDK；SDK 35 和 NDK r28c
+已下载至 `$LOCALAPPDATA/raygame/android-sdk`，未覆盖已有工具或密钥。
+
+提交主题：`Add Android APK builds and touch controls for example games`。
+本状态文件随该工作包一起提交，提交号通过 `git log` 查询。
+
+1. xmake 将四游戏构建为 NativeActivity 共享库/APK，ARM64、API 26 起、target
+   API 35、OpenGL ES 2.0。Release 原生代码使用本地调试签名，适合侧载测试。
+   raylib 固定为 5.5。原始 xmake-repo 配方的 `--wrap=fopen` 导致真实链接失败，
+   仓库内 `android/raylib.lua` 去掉重复包装并保留链接检查，未修改系统包仓库。
+2. Android 入口桥接在启动日志前取得 Activity；日志和存档写应用私有目录，
+   日志同时写入 logcat。字体及许可打入 APK；`FileSystem::AssetExists` 支持
+   AssetManager，着色器存在检查也使用该接口。
+3. 输入快照支持最多 8 个触点及 ID，位置按当前 Display 画布映射。四游戏增加
+   触屏操作、暂停/退出菜单；系统返回键切换暂停。前三游戏横屏、弹幕游戏竖屏，
+   同方向内可传感器翻转。Android 使用原生 Surface 尺寸并保留 Expand 等比适配。
+4. 修复暂停页按钮被禁用的背景按钮清除按压状态的问题，暂停/切场景时显式重置
+   UI 交互。Bouncing Balls 重开改用 `Clear(); Load();`，维持回调作用域契约。
+5. `scripts/build-android.ps1` 自动发现工具、生成独立调试密钥、构建并检查 APK。
+   Android 配置放在 `build/android/config`；产物、对象文件与桌面隔离，调用结束
+   恢复环境。工具链、签名密钥、日志和 APK 不提交到 Git。
+
+### 本包最终验证
+
+- 四个 ARM64 Release APK 实际构建成功，位于
+  `bin/android/arm64-v8a/release/{space_shooter,bouncing_balls,neon_breakout,bullet_hell}.apk`，
+  各约 1.1 MB。签名 v2/v3、ZIP 对齐、ELF LOAD 段 16 KiB 对齐、ARM64 ABI、
+  NativeActivity 导出入口、静态 C++ 运行库和字体/许可检查全部通过。
+- 构建脚本已实际执行；四份 SHA-256/路径/元数据记录在
+  `build/android/verification-release.json`，`RuntimeTested=false`。
+- MSVC 2022 x64 Debug、Release 全目标构建通过；每种模式 **259 项逻辑检查
+  通过，0 失败**，图形 smoke 均 **0 failures**。新增触点快照/固定 tick/失焦
+  检查，并在图形 smoke 验证文件资源查询、四游戏四比例的触点映射和菜单按压。
+- 最终桌面配置为 Windows x64、MSVC Release、`example_console=n`。
+- `git diff --check` 通过。本包未执行 Android 真机/模拟器、Android Debug、
+  其他 ABI 或 Linux/macOS 构建/运行验证；不把构建检查视为 Android 运行验收。
+
+日志：`build/android-script-build.log`、
+`build/android-desktop-{debug,release}-{config,build,tests,smoke}.log`。
+依赖原始失败记录：`build/android-dependency-failure.log`。
+运行 `pwsh -NoProfile -File scripts/build-android.ps1` 可重新生成全部 APK。
+保持 `build/android/debug.keystore`，覆盖安装依赖同一签名；未改用户 `.android` 密钥。
+构建说明、各游戏操作和手动验收项见 `docs/ANDROID.md`。
+
+Android 当前限制：未验证后台/锁屏恢复、GPU 上下文丢失后资源重建、刘海/手势
+安全区域、性能/耗电/长稳；多点触控路由和弹幕独立慢速按钮尚未实现。下一步先
+根据用户真机反馈修复，再按本文末尾 M0 主线推进，不能将整个 M0 标记完成。
+
 ## 已完成基线
 
 - `04cdfad`：0.2 引擎改进与 MSVC 构建修复。
 - `69565f1`：全屏、字体/HUD、原生标题栏与 GUI 子系统。
 - `7039164`：生命周期异常清理、时间域、安全存档、文件日志、四游戏比例适配。
-- 上一批 MSVC Debug/Release 各 206 项逻辑检查通过；图形 smoke 零失败。
-  该成绩属于基线；本批验证结果见下文。
+- `d95cdb9`：类型资源句柄、固定 tick 输入缓冲与回调所有者作用域。
+- 历史工作包先后通过 MSVC Debug/Release 各 206、252 项逻辑检查，图形 smoke
+  零失败；本包新增 Android 支持后的最终成绩见上文。
 
-## 最近工作包（已实现并验证）
+## 上一工作包：资源、输入和回调作用域
 
 提交主题：`Add typed resources, buffered input and callback ownership scopes`。
-本状态文件随该工作包一起提交，提交号可通过 `git log -1 --oneline` 查询。
+提交号：`d95cdb9`。以下为该包实现和历史验证记录。
 
 1. 纹理/字体/着色器迁移至类型句柄，共享稳定元数据。显式卸载立即失效；
    同名重建不复活旧句柄；成功替换更新引用和修订号，失败保留旧值并记录错误。
@@ -40,7 +93,7 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 5. 场景清理可更新作用域；手动重载使用 `Clear(); Load();`。Breakout 和
    BulletHell 已去掉重开时的全局事件/补间清空。README 提供 API 迁移与契约。
 
-## 最终验证
+## 上一工作包验证（历史基线）
 
 MSVC 2022 x64，通过 xmake 验证：
 

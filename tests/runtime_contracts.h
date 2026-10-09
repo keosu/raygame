@@ -110,6 +110,30 @@ static void Inputs() {
     Input::Reset();
 }
 
+static void TouchSnapshots() {
+    Input::Reset();
+    Display::Configure(800, 600);
+    InputFrame input;
+    input.touchCount = 2;
+    input.touches[0] = {42, {200, 300}};
+    input.touches[1] = {7, {500, 450}};
+    Input::SetFrame(input);
+    CHECK(Input::GetTouchCount() == 2 && Input::GetTouchId(0) == 42 && Input::GetTouchId(1) == 7);
+    CHECK(Approx(Input::GetTouchPosition(0).x, 200) && Approx(Input::GetTouchPosition(0).y, 300));
+    CHECK(Input::GetTouchId(-1) == -1 && Input::GetTouchId(2) == -1 && Input::GetTouchPosition(8).x == -1);
+    { Input::FixedTickScope tick; CHECK(Input::GetTouchCount() == 2 && Input::GetTouchId(0) == 42); }
+    input.touchCount = 1; input.touches[0] = input.touches[1];
+    Input::SetFrame(input);
+    { Input::FixedTickScope tick; CHECK(Input::GetTouchId(0) == 7 && Input::GetTouchId(1) == -1); }
+    input.touchCount = 100;
+    Input::SetFrame(input);
+    CHECK(Input::GetTouchCount() == 8);
+    input.focused = false;
+    Input::SetFrame(input);
+    CHECK(Input::GetTouchCount() == 0 && Input::GetTouchId(0) == -1);
+    Input::Reset();
+}
+
 struct ScopedScene : Scene {
     int calls = 0;
     void OnLoad() override { EventBus::Subscribe("scoped", [this](const EventData&) { ++calls; }); }
@@ -258,5 +282,6 @@ static void Scopes() {
 static void TestRuntimeContracts() {
     printf("[input snapshots and callback scopes]\n");
     runtime_tests::Inputs();
+    runtime_tests::TouchSnapshots();
     runtime_tests::Scopes();
 }

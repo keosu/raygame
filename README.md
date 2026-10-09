@@ -271,6 +271,22 @@ save.SetInt("highscore", 4200);
 save.Save("save.txt");
 ```
 
+## Android APK (experimental)
+
+The four games can be packaged as ARM64 NativeActivity APKs with xmake and raylib.
+The current build targets Android 8.0+ (API 26), target SDK 35, and includes bundled
+fonts, touch controls, pause/exit UI and application-private saves/logs.
+
+```powershell
+pwsh -NoProfile -File scripts/build-android.ps1
+```
+
+Outputs: `bin/android/arm64-v8a/release/*.apk`. These use Release native code and a
+local debug signing key. The script keeps the desktop xmake configuration intact
+and checks signatures, native entry points, assets and 16 KiB page alignment.
+Device execution is still pending manual validation. See [Android setup, controls
+and platform limits](docs/ANDROID.md) (Chinese) for prerequisites and commands.
+
 ## Examples
 
 | Target | Showcases |

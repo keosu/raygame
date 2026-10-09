@@ -58,9 +58,12 @@ inline void Triangle(Vector2 a, Vector2 b, Vector2 c, Color color) {
 }
 
 inline RayGame::FontHandle LoadFont(const std::string& file, int size) {
+#if defined(__ANDROID__)
+    std::string path = "fonts/" + file;
+#else
     std::string path = std::string(GetApplicationDirectory()) + "assets/fonts/" + file;
     if (!FileExists(path.c_str())) path = "assets/fonts/" + file;
-    if (!FileExists(path.c_str())) return nullptr;
+#endif
     auto font = RayGame::ResourceManager::LoadFontResource(file, path, size);
     if (font) SetTextureFilter(font->texture, TEXTURE_FILTER_BILINEAR);
     return font;
@@ -95,10 +98,33 @@ inline void Lives(float x, int count) {
     }
 }
 
-inline void Footer(float width, float height, const std::string& controls) {
+inline bool TouchInPlayfield() {
+    return RayGame::Input::GetTouchCount() > 0 && CheckCollisionPointRec(
+        RayGame::Input::GetTouchPosition(0), {16, 84, Width() - 32, Height() - 138});
+}
+
+inline bool MoveWithTouch(Vector2& position, float speed) {
+    if (!TouchInPlayfield()) return false;
+    Vector2 target = RayGame::Input::GetTouchPosition(0);
+    target.y -= 56; // Keep the ship visible above the finger.
+    Vector2 offset = {target.x - position.x, target.y - position.y};
+    float distance = std::sqrt(offset.x * offset.x + offset.y * offset.y);
+    float factor = distance > 0 ? std::min(1.0f, speed * RayGame::GameTime::DeltaTime() / distance) : 0;
+    position.x += offset.x * factor; position.y += offset.y * factor;
+    return true;
+}
+
+inline void Footer(float width, float height, const std::string& controls,
+                   const std::string& touchControls = "TAP / DRAG TO PLAY") {
     RayGame::UI::Panel({16, height - 40, width - 32, 26}, {9, 15, 28, 224});
+#if defined(__ANDROID__)
+    (void)controls;
+    RayGame::UI::Label(28, height - 35, touchControls, 16, muted);
+#else
+    (void)touchControls;
     RayGame::UI::Label(28, height - 35, controls, 16, muted);
     RayGame::UI::LabelRight(width - 28, height - 35, "P  PAUSE     F11  FULLSCREEN", 16, muted);
+#endif
 }
 
 inline bool Result(float width, float height, const std::string& title, int score, bool victory = false) {
@@ -111,7 +137,11 @@ inline bool Result(float width, float height, const std::string& title, int scor
     UI::LabelCentered(width / 2, y + 27, victory ? "MISSION COMPLETE" : "RUN COMPLETE", 14, muted);
     UI::TitleCentered(width / 2, y + 51, title, 52, accent);
     UI::LabelCentered(width / 2, y + 120, TextFormat("FINAL SCORE   %06d", score), 24);
+#if defined(__ANDROID__)
+    return UI::Button({x + 96, y + 186, 248, 44}, "PLAY AGAIN", 20);
+#else
     return UI::Button({x + 96, y + 186, 248, 44}, "PLAY AGAIN  /  R", 20);
+#endif
 }
 
 }

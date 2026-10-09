@@ -410,7 +410,7 @@ public:
         
         ExampleUI::Header(ExampleUI::Width(), "SPACE SHOOTER", "ORBITAL DEFENSE");
         ExampleUI::Stat(ExampleUI::Width() - 32, "SCORE", TextFormat("%06d", score));
-        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "WASD / ARROWS  MOVE     SPACE  FIRE");
+        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "WASD / ARROWS  MOVE     SPACE  FIRE", "DRAG TO MOVE / AUTO FIRE");
         if (!player || !player->active) {
             if (ExampleUI::Result(ExampleUI::Width(), ExampleUI::Height(), "SECTOR LOST", score)) restartRequested = true;
         }
@@ -498,7 +498,13 @@ void PlayerController::Update() {
     if (!gameObject) return;
     
     // Movement
-    Vector2 input = Input::GetMovementInput();
+#if defined(__ANDROID__)
+    bool touch = ExampleUI::MoveWithTouch(gameObject->transform->position, speed);
+    if (touch) if (auto body = gameObject->GetComponent<Rigidbody>()) body->SetVelocity({0, 0});
+#else
+    bool touch = false;
+#endif
+    Vector2 input = touch ? Vector2{0, 0} : Input::GetMovementInput();
     if (input.x != 0 || input.y != 0) {
         Vector2 normalized = Normalize(input);
         
@@ -514,7 +520,7 @@ void PlayerController::Update() {
     // Shooting
     fireTimer -= GameTime::DeltaTime();
     
-    if (Input::GetKey(KEY_SPACE) && fireTimer <= 0) {
+    if ((Input::GetKey(KEY_SPACE) || touch) && fireTimer <= 0) {
         Shoot();
         fireTimer = fireRate;
     }

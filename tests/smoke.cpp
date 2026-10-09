@@ -55,6 +55,8 @@ public:
         auto imagePath = (root / "replacement.png").string();
         Image source = GenImageColor(16, 16, GREEN);
         Expect(ExportImage(source, imagePath.c_str()), "prepare replacement texture");
+        Expect(FileSystem::AssetExists(imagePath) && !FileSystem::AssetExists((root / "absent.png").string()),
+            "resource existence checks include filesystem assets");
         UnloadImage(source);
         auto texture = ResourceManager::CreateColorTexture("handle-test", 8, 8, WHITE);
         auto copy = texture;
@@ -105,6 +107,18 @@ public:
         auto target = LoadRenderTexture(96, 64);
         BeginTextureMode(target); ClearBackground(BLACK);
         resources.Render(); UI::Label(0, 36, "fallback", 16);
+        Input::Reset(); UI::ResetInteraction();
+        InputFrame menuInput;
+        menuInput.mousePosition = Display::CanvasToScreen({10, 46}); menuInput.mouse.held[MOUSE_BUTTON_LEFT] = true;
+        Input::SetFrame(menuInput);
+        UI::inputEnabled = true;
+        Expect(!UI::Button({0, 36, 40, 24}, "menu", 12), "menu press waits for release");
+        menuInput.mouse.held[MOUSE_BUTTON_LEFT] = false; Input::SetFrame(menuInput);
+        UI::inputEnabled = false;
+        UI::Button({0, 36, 40, 24}, "behind", 12);
+        UI::inputEnabled = true;
+        Expect(UI::Button({0, 36, 40, 24}, "menu", 12), "disabled game buttons do not swallow pause menu clicks");
+        UI::ResetInteraction(); Input::Reset();
         EndTextureMode();
         Image result = LoadImageFromTexture(target.texture);
         ImageFlipVertical(&result);
@@ -275,11 +289,16 @@ public:
                 && std::fabs(view.bounds.height - ::GetScreenHeight()) < 0.01f, "adaptive canvas fills each window ratio");
             InputFrame injected;
             injected.mousePosition = {(float)::GetScreenWidth() / 2, (float)::GetScreenHeight() / 2};
+            injected.touchCount = 1;
+            injected.touches[0] = {101, injected.mousePosition};
             Input::SetFrame(injected);
             auto mapped = Input::GetMousePosition();
             Expect(std::fabs(mapped.x - Display::GetWidth() / 2) < 0.01f
                 && std::fabs(mapped.y - Display::GetHeight() / 2) < 0.01f && Input::IsMouseInCanvas(),
                 "injected input uses the current adaptive viewport");
+            auto touch = Input::GetTouchPosition(0);
+            Expect(std::fabs(touch.x - mapped.x) < 0.01f && std::fabs(touch.y - mapped.y) < 0.01f,
+                "touch snapshots use the current adaptive viewport");
             auto end = Display::ScreenToCanvas({(float)::GetScreenWidth(), (float)::GetScreenHeight()});
             Expect(std::fabs(end.x - Display::GetWidth()) < 0.01f && std::fabs(end.y - Display::GetHeight()) < 0.01f,
                 "adaptive mouse reaches the entire canvas");

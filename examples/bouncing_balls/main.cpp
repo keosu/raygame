@@ -7,6 +7,7 @@ class BouncingBallsScene : public Scene {
 public:
     Rectangle arena = {24, 92, 752, 454};
     bool gravityEnabled = true;
+    bool resetRequested = false, gravityRequested = false;
     static constexpr int MAX_BALLS = 128;
 
     BouncingBallsScene() : Scene("Bouncing Balls") {}
@@ -34,8 +35,9 @@ public:
     }
 
     void Update() override {
-        if (Input::GetKeyDown(KEY_R)) { Clear(); OnLoad(); Start(); }
-        if (Input::GetKeyDown(KEY_G)) {
+        if (resetRequested || Input::GetKeyDown(KEY_R)) { resetRequested = false; Clear(); Load(); }
+        if (gravityRequested || Input::GetKeyDown(KEY_G)) {
+            gravityRequested = false;
             gravityEnabled = !gravityEnabled;
             for (const auto& obj : GetAllGameObjects()) obj->GetComponent<Rigidbody>()->useGravity = gravityEnabled;
         }
@@ -72,7 +74,12 @@ public:
         ExampleUI::Header(ExampleUI::Width(), "BOUNCING BALLS", "PHYSICS PLAYGROUND");
         ExampleUI::Stat(ExampleUI::Width() - 180.0f, "BALLS", TextFormat("%03d / %d", (int)GetAllGameObjects().size(), MAX_BALLS), UI::accentColor);
         ExampleUI::Stat(ExampleUI::Width() - 32.0f, "GRAVITY", gravityEnabled ? "ON" : "OFF", ExampleUI::gold);
-        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "SPACE / CLICK  ADD    G  GRAVITY    R  RESET");
+        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "SPACE / CLICK  ADD    G  GRAVITY    R  RESET", "");
+#if defined(__ANDROID__)
+        if (UI::Button({28, ExampleUI::Height() - 46, 110, 34}, "RESET", 18)) resetRequested = true;
+        if (UI::Button({150, ExampleUI::Height() - 46, 120, 34}, "GRAVITY", 18)) gravityRequested = true;
+        UI::Label(290, ExampleUI::Height() - 38, "TAP TO ADD", 16);
+#endif
     }
 
     void AddRandomBall(Vector2 position = {-1, -1}) {

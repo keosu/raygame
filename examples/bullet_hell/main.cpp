@@ -257,7 +257,7 @@ public:
         ExampleUI::Stat(ExampleUI::Width() - 190.0f, "SCORE", TextFormat("%06d", score), ExampleUI::gold);
         ExampleUI::Stat(ExampleUI::Width() - 32.0f, "BULLETS", TextFormat("%04d",
             (enemyField ? enemyField->Count() : 0) + (playerField ? playerField->Count() : 0)), ExampleUI::pink);
-        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "WASD  MOVE    Z / SPACE  FIRE    SHIFT  FOCUS");
+        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "WASD  MOVE    Z / SPACE  FIRE    SHIFT  FOCUS", "DRAG TO MOVE / AUTO FIRE");
 
         if (boss && !gameOver) {
             auto enemy = boss->GetComponent<Boss>();
@@ -323,6 +323,12 @@ void Player::Update() {
     Vector2 mv = Input::GetMovementInput();
     // Focus (slow) mode with shift
     float s = (Input::GetKey(KEY_LEFT_SHIFT)) ? speed * 0.45f : speed;
+#if defined(__ANDROID__)
+    bool touch = ExampleUI::MoveWithTouch(pos, s);
+    if (touch) mv = {0, 0};
+#else
+    bool touch = false;
+#endif
     pos.x += mv.x * s * GameTime::DeltaTime();
     pos.y += mv.y * s * GameTime::DeltaTime();
     pos.x = Clamp(pos.x, 12.0f, ExampleUI::Width() - 12.0f);
@@ -330,7 +336,7 @@ void Player::Update() {
 
     // Fire
     fireTimer -= GameTime::DeltaTime();
-    if ((Input::GetKey(KEY_SPACE) || Input::GetKey(KEY_Z)) && fireTimer <= 0 && playerField) {
+    if ((Input::GetKey(KEY_SPACE) || Input::GetKey(KEY_Z) || touch) && fireTimer <= 0 && playerField) {
         fireTimer = 0.06f;
         playerField->Spawn({pos.x - 8, pos.y - 10}, {0, -680}, 5, Color{120, 240, 255, 255});
         playerField->Spawn({pos.x + 8, pos.y - 10}, {0, -680}, 5, Color{120, 240, 255, 255});

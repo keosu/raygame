@@ -32,6 +32,9 @@ void Input::CaptureFrame() {
     next.mouseDelta = ::GetMouseDelta();
     next.mouseWheel = ::GetMouseWheelMove();
     if (next.focused) {
+        next.touchCount = std::min(8, ::GetTouchPointCount());
+        for (int i = 0; i < next.touchCount; ++i)
+            next.touches[i] = {::GetTouchPointId(i), ::GetTouchPosition(i)};
         for (int i = 1; i < 512; ++i) {
             next.keys.held[i] = IsKeyDown(i);
             next.keys.pressed[i] = IsKeyPressed(i);
@@ -68,6 +71,7 @@ void Input::SetFrame(const InputFrame& value) {
         return;
     }
     InferEdges(next.keys, frame.keys);
+    next.touchCount = std::max(0, std::min(8, next.touchCount));
     InferEdges(next.mouse, frame.mouse);
     for (size_t i = 0; i < next.gamepads.size(); ++i) {
         auto& pad = next.gamepads[i];
@@ -79,6 +83,8 @@ void Input::SetFrame(const InputFrame& value) {
     frame = next;
     pending.focused = next.focused;
     pending.mousePosition = next.mousePosition;
+    pending.touchCount = next.touchCount;
+    pending.touches = next.touches;
     pending.mouseDelta.x += next.mouseDelta.x; pending.mouseDelta.y += next.mouseDelta.y;
     pending.mouseWheel += next.mouseWheel;
     Accumulate(pending.keys, next.keys); Accumulate(pending.mouse, next.mouse);

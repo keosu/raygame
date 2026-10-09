@@ -1,4 +1,5 @@
 #include "FileSystem.h"
+#include "AndroidPlatform.h"
 #include <atomic>
 #include <algorithm>
 #include <mutex>
@@ -85,6 +86,8 @@ std::filesystem::path FileSystem::UserDataDirectory(const std::string& appId) {
     PWSTR folder = nullptr;
     if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &folder))) base = folder;
     CoTaskMemFree(folder);
+#elif defined(__ANDROID__)
+    if (auto* directory = detail::AndroidDataDirectory()) base = directory;
 #else
     const char* homeDirectory = std::getenv("HOME");
 #ifdef __APPLE__
@@ -99,6 +102,16 @@ std::filesystem::path FileSystem::UserDataDirectory(const std::string& appId) {
     auto result = base / appId;
     fs::create_directories(result);
     return result;
+}
+
+bool FileSystem::AssetExists(const std::string& path) {
+    std::error_code error;
+    if (fs::is_regular_file(fs::u8path(path), error)) return true;
+#if defined(__ANDROID__)
+    return detail::AndroidAssetExists(path.c_str());
+#else
+    return false;
+#endif
 }
 
 bool FileSystem::ReadText(const fs::path& path, std::string& text, size_t maxBytes) {

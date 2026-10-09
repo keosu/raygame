@@ -17,6 +17,7 @@ public:
     static Color panelColor;
 
     static void ResetFonts() { font = nullptr; headingFont = nullptr; }
+    static void ResetInteraction() { hasPress = false; }
 
     static void Title(float x, float y, const std::string& text, int size = 36, Color color = RAYWHITE) {
         DrawTextCustom(text, x, y, size, color, true);
@@ -59,7 +60,8 @@ public:
     static bool Button(Rectangle rect, const std::string& label, int size = 20) {
         Vector2 m = Input::GetMousePosition();
         bool acceptsInput = inputEnabled && Input::GetFrame().focused;
-        if (!acceptsInput) hasPress = false;
+        // A disabled background widget must not cancel a foreground menu's press.
+        if (!Input::GetFrame().focused) hasPress = false;
         if (acceptsInput && Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             pressPosition = m;
             hasPress = true;
