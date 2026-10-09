@@ -234,7 +234,7 @@ public:
         
         // Destroy if off screen
         if (gameObject->transform->position.y > 700) {
-            gameObject->active = false;
+            gameObject->MarkDestroyed();
         }
     }
 };
@@ -253,7 +253,7 @@ public:
         // Destroy if off screen
         if (gameObject->transform->position.y < -10 || 
             gameObject->transform->position.y > 700) {
-            gameObject->active = false;
+            gameObject->MarkDestroyed();
         }
     }
 };
@@ -287,6 +287,7 @@ public:
         rb->drag = 0.9f;
         
         auto collider = player->AddComponent<CircleCollider>(16.0f);
+        collider->isTrigger = true;
         
         // Add controller
         auto controller = player->AddComponent<PlayerController>();
@@ -344,12 +345,12 @@ public:
             
             for (auto& enemy : enemies) {
                 auto enemyCollider = enemy->GetComponent<Collider>();
-                if (!enemyCollider) continue;
+                if (!enemyCollider || enemy->IsDestroyed()) continue;
                 
                 if (bulletCollider->CheckCollision(enemyCollider.get())) {
                     // Destroy both
-                    bullet->active = false;
-                    enemy->active = false;
+                    bullet->MarkDestroyed();
+                    enemy->MarkDestroyed();
                     score += 10;
                     
                     // Spawn explosion particles
@@ -366,12 +367,13 @@ public:
             if (playerCollider) {
                 for (auto& enemy : enemies) {
                     auto enemyCollider = enemy->GetComponent<Collider>();
-                    if (!enemyCollider) continue;
+                    if (!enemyCollider || enemy->IsDestroyed()) continue;
                     
                     if (playerCollider->CheckCollision(enemyCollider.get())) {
                         // Game over effect
                         SpawnExplosion(player->transform->position);
-                        player->active = false;
+                        player->MarkDestroyed();
+                        break;
                     }
                 }
             }
@@ -396,7 +398,7 @@ public:
             if (Input::GetKeyDown(KEY_R)) {
                 // Reload scene
                 OnUnload();
-                gameObjects.clear();
+                Clear();
                 score = 0;
                 enemySpawnRate = 2.0f;
                 OnLoad();
@@ -418,6 +420,7 @@ public:
         
         // Add collider
         auto collider = enemy->AddComponent<CircleCollider>(18.0f);
+        collider->isTrigger = true;
         
         // Add AI
         auto ai = enemy->AddComponent<EnemyAI>();
@@ -466,8 +469,7 @@ public:
         
         particles->Burst(50);
         
-        // Auto-destroy after 2 seconds
-        // In a real engine, you'd have a component for this
+        explosion->AddComponent<DestroyAfter>(1.0f);
     }
 };
 

@@ -1,224 +1,230 @@
 # RayGame Engine
 
-A lightweight 2D game engine built on top of raylib-cpp, featuring ECS architecture, physics, particles, and more.
+A lightweight 2D game engine with inline C++17 headers and an xmake static-library
+target, built on top of raylib-cpp, featuring a
+Unity-style GameObject/Component architecture, a working physics layer with collision
+callbacks, particles, tweening, an event bus, tilemaps, immediate-mode UI and more.
+
+Version 0.2.0 · C++17 · MIT
 
 ## Features
 
-### Core Systems
-- **Entity-Component System (ECS)**: Flexible GameObject and Component architecture
-- **Scene Management**: Easy scene loading and switching
-- **Resource Manager**: Centralized texture and resource management
-- **Time System**: Delta time, frame counting, and timing utilities
+### Core
+- **GameObject/Component architecture** with `Awake`/`Start`/`Update`/`FixedUpdate`/`Render` lifecycle
+- **Transform hierarchy**: parent/child with local ↔ world position, rotation and scale
+- **Deferred destruction & safe spawning**: `Destroy()` is queued; objects spawned at runtime are started automatically
+- **Scene management** with deferred scene switching
+- **Fixed timestep** loop for game logic and rigidbody physics (`FixedUpdate`)
+- **Resource Manager**: textures, fonts, shaders, procedural textures, individual unload
+- **Time** utilities: delta time, elapsed time, frame count
 
 ### Rendering
-- **Sprite Rendering**: Texture rendering with transform support
-- **Sprite Animation**: Frame-based animation system with customizable timing
-- **Camera System**: 2D camera with following, zoom, and smooth movement
-- **Layer System**: Render order control
+- **Sprite & animation** components with pivot, flip and tint
+- **Global layer sorting**: components draw in `layer`/`renderOrder` order across all objects
+- **Camera2D** with smooth follow, zoom, world/screen conversion, opt-in render integration
 
-### Physics Engine
-- **Rigidbody**: Velocity, acceleration, mass, drag, and gravity
-- **Colliders**: AABB (Box) and Circle collision detection
-- **Physics World**: Automatic collision detection and response
-- **Trigger Support**: Event-based collision callbacks
+### Physics
+- **Rigidbody**: velocity, acceleration, mass, drag, gravity, restitution, impulses/forces
+- **Colliders**: axis-aligned Box and Circle, auto-registered with the physics world
+- **All pair types** collide: Box-Box, Circle-Circle, Box-Circle
+- **Collision & trigger callbacks**: `OnCollisionEnter/Stay/Exit`, `OnTriggerEnter/Stay/Exit`
+- **Collision layers & masks**
+- **Impulse-based resolution** with contact normals, penetration correction and static/dynamic handling
 
-### Particle System
-- **Flexible Emitters**: Point, Circle, Box, and Cone emission shapes
-- **Particle Properties**: Lifetime, velocity, acceleration, size, rotation, color
-- **Emission Control**: Continuous emission and burst modes
-- **Performance**: Efficient particle pooling and culling
+### Gameplay systems
+- **Tween** engine with 14 easing functions, loop/pingpong/delay, callbacks
+- **Event bus**: string-keyed pub/sub with a small payload
+- **Object pool**: generic free-list pool (`ObjectPool<T>`)
+- **Timers**: `DestroyAfter`, repeating/one-shot `TimerComponent`
+- **Particle system**: point/circle/box/cone emitters, burst & continuous
+- **Tilemap**: grid tiles, tileset rendering, per-tile solidity queries
 
-### Input & Audio
-- **Input Manager**: Keyboard, mouse, and axis-based input
-- **Audio Manager**: Sound effects and music streaming
-- **Easy Integration**: Simple API for common input patterns
+### Input, Audio, UI, Save
+- **Input**: keyboard, mouse, gamepad, axis helpers, and named **action mapping**
+- **Audio**: sound/music with master volume (own `Audio.h`)
+- **Immediate-mode UI**: labels, panels, buttons, progress bars
+- **Save system**: dependency-free key/value persistence
 
 ## Architecture
 
 ```
-GameObject
-├── Transform (position, rotation, scale)
-└── Components
-    ├── SpriteRenderer
-    ├── SpriteAnimation
-    ├── Rigidbody
-    ├── Collider (Box/Circle)
-    ├── ParticleEmitter
-    └── Custom Components
+GameEngine ── Scene ── GameObject
+                           ├── Transform (hierarchy)
+                           └── Components
+                               ├── SpriteRenderer / SpriteAnimation
+                               ├── Rigidbody, BoxCollider / CircleCollider
+                               ├── ParticleEmitter
+                               ├── Camera2DComponent
+                               ├── Tilemap
+                               ├── DestroyAfter / TimerComponent
+                               └── your own Component subclasses
 ```
+
+Cross-cutting services are static/singleton: `PhysicsWorld`, `TweenManager`,
+`EventBus`, `ResourceManager`, `AudioManager`, `Input`, `UI`, `GameTime`.
 
 ## Quick Start
 
-### 1. Create a Scene
-
 ```cpp
+#include "RayGame.h"
+using namespace RayGame;
+
 class MyScene : public Scene {
-public:
     void OnLoad() override {
-        // Create a game object
+        auto tex = ResourceManager::CreateCircleTexture("player", 16, SKYBLUE);
         auto player = CreateGameObject("Player");
         player->transform->position = {400, 300};
-        
-        // Add components
-        auto sprite = player->AddComponent<SpriteRenderer>(texture);
-        auto rb = player->AddComponent<Rigidbody>();
-        auto collider = player->AddComponent<CircleCollider>(16.0f);
-    }
-    
-    void Update() override {
-        Scene::Update();
-        // Custom update logic
+        player->AddComponent<SpriteRenderer>(tex);
+        player->AddComponent<Rigidbody>();
+        player->AddComponent<CircleCollider>(16.0f);
     }
 };
-```
 
-### 2. Create Custom Components
-
-```cpp
-class PlayerController : public Component {
-public:
-    float speed = 200.0f;
-    
-    void Update() override {
-        Vector2 input = Input::GetMovementInput();
-        auto rb = gameObject->GetComponent<Rigidbody>();
-        if (rb) {
-            rb->SetVelocity({input.x * speed, input.y * speed});
-        }
-    }
-};
-```
-
-### 3. Initialize the Engine
-
-```cpp
 class MyGame : public GameEngine {
 public:
     MyGame() : GameEngine("My Game", 800, 600) {}
-    
-    void OnInit() override {
-        auto scene = CreateRef<MyScene>();
-        LoadScene(scene);
-    }
+    void OnInit() override { LoadScene(CreateRef<MyScene>()); }
 };
 
-int main() {
-    MyGame game;
-    game.Run();
-    return 0;
-}
+int main() { MyGame().Run(); }
 ```
+
+## Selected APIs
+
+### Lifecycle and timing
+
+`AddComponent` attaches the component and calls `Awake` immediately. Configure its
+fields after adding it; `Start` runs once before its first update or render. Disabled
+components start when enabled. Runtime spawns are queued during scene traversal.
+`active = false` pauses an object; use `Scene::Destroy` or `MarkDestroyed` to remove
+it. Deferred cleanup runs `OnDestroy` once even if another `Ref` retains the object.
+
+Use `GameTime::DeltaTime()` in `Update` and `GameTime::FixedDeltaTime()` in
+`FixedUpdate`. Rigidbody integration and collision processing run at the fixed
+interval (1/60 second by default), with at most eight catch-up steps per frame.
+Set it with `GameEngine::SetFixedTimeStep`; zero and negative intervals are ignored.
+Collision layers are numbered 0–31; a nonpositive rigidbody mass is treated as static.
+
+`LoadScene` takes effect on the next frame. The engine unloads and clears the old
+scene, its physics registrations, tweens and event subscriptions before loading
+the new one. Resource and audio caches persist until shutdown. `Scene::Clear`
+also supports rebuilding a scene in place; call `OnLoad` and `Start` afterward.
+
+### Transform hierarchy
+
+`position`, `rotation` and `scale` are local values. Use `GetWorldPosition`,
+`SetWorldPosition`, `TransformPoint` and `InverseTransformPoint` for world-space
+operations. Reparenting preserves world position/rotation/scale by default and
+rejects cycles. Removing a parent detaches children while preserving their world
+pose. Sprites, camera following and tilemap queries use the hierarchy. Box colliders
+remain axis aligned; sprite rendering represents rotation and scale without shear.
+
+### Collision callbacks
+```cpp
+class Bullet : public Component {
+    void OnTriggerEnter(Collider* other) override {
+        if (other->GetGameObject()->tag == "Enemy")
+            gameObject->MarkDestroyed();
+    }
+};
+```
+
+### Tween
+```cpp
+Tween::To(0, 1, 0.5f, Ease::BackOut, [obj](float v){ obj->transform->scale = {v, v}; });
+Tween::Delay(2.0f, [](){ /* fire later */ });
+```
+
+### Events
+```cpp
+EventBus::Subscribe("score", [&](const EventData& d){ score += d.i; });
+EventBus::Emit("score", EventData{10});
+```
+
+Store the subscription id and unsubscribe in `OnDestroy` when a handler captures
+a component. Handlers removed during dispatch are skipped; newly added handlers
+wait until the next emission. Tweens created inside callbacks likewise start on
+the next update; callbacks may safely cancel or clear tweens.
+
+### Object pool
+```cpp
+ObjectPool<Bullet> pool(256);
+Bullet* b = pool.Acquire();
+pool.Release(b);
+```
+
+### Input actions
+```cpp
+Input::BindAction("jump", {KEY_SPACE, KEY_W}, {GAMEPAD_BUTTON_RIGHT_FACE_DOWN});
+if (Input::GetActionDown("jump")) { /* ... */ }
+```
+
+### Save
+```cpp
+SaveSystem save;
+save.SetInt("highscore", 4200);
+save.Save("save.txt");
+```
+
+## Examples
+
+| Target | Showcases |
+| --- | --- |
+| `space_shooter` | Custom renderers, particles, enemy AI |
+| `bouncing_balls` | Rigidbodies, circle colliders, physics resolution |
+| `neon_breakout` | Layered neon rendering, tweens, timers, trigger callbacks, camera shake, HUD, save |
+| `bullet_hell` | Object pooling (thousands of bullets), parent-child turrets, bullet patterns, HUD |
 
 ## Building
 
 ```bash
-cd raygame
-xmake build
-xmake run
+xmake            # build the library and all four examples
+xmake run neon_breakout
+xmake run bullet_hell
+xmake build tests
+xmake run tests   # unit tests (no window)
 ```
 
-## Example Game
+On Windows, install Visual Studio 2022 with the **Desktop development with C++**
+workload and configure MSVC explicitly (works in PowerShell and POSIX shells):
 
-The included `main.cpp` demonstrates a complete Space Shooter game featuring:
-- Player movement and shooting
-- Enemy AI with sine wave patterns
-- Particle effects for explosions and engine trails
-- Collision detection between bullets and enemies
-- Score tracking and game over system
-- Debug visualization (F1 to toggle)
-
-### Controls
-- **WASD / Arrow Keys**: Move
-- **Space**: Shoot
-- **F1**: Toggle debug view
-- **R**: Restart (when game over)
-- **ESC**: Quit
-
-## Engine Components Reference
-
-### Transform
-```cpp
-transform->position = {x, y};
-transform->rotation = degrees;
-transform->scale = {sx, sy};
-transform->Translate({dx, dy});
-transform->Rotate(degrees);
+```bash
+xmake f -p windows -a x64 --toolchain=msvc -m debug -y
+xmake
 ```
 
-### SpriteRenderer
-```cpp
-auto sprite = obj->AddComponent<SpriteRenderer>(texture);
-sprite->tint = RED;
-sprite->pivot = {0.5f, 0.5f};  // Center
-sprite->flipX = false;
-sprite->layer = 0;
+Use `-m release` for an optimized build. xmake downloads raylib-cpp/raylib and
+compiles the dependencies for the selected toolchain. Targets use UTF-8 source
+encoding and put executables in `bin`.
+
+When including individual headers, replace the old `#include "Time.h"` with
+`#include "GameTime.h"`. Windows treats `Time.h` and the C runtime's `time.h` as
+the same filename, so keeping the old header on the include path breaks `<ctime>`
+and other standard headers. Including `RayGame.h` needs no change.
+
+## Tests & CI
+
+`tests/main.cpp` and `tests/regressions.h` cover math, lifecycle and deferred
+destruction, render ordering, fixed physics, scene switching, transform hierarchy,
+tilemaps, tween callback mutation, timers, pooling, events and saves.
+`tests/header_compat.cpp` checks standard-library header interoperability.
+GitHub Actions builds and runs the logic suite in Debug and Release on Linux and
+Windows; Windows explicitly selects MSVC (`.github/workflows/ci.yml`).
+
+An optional integration test runs all four examples in a hidden window, including
+runtime spawning, collisions, scene changes, restarts and resource cleanup:
+
+```bash
+xmake build smoke
+xmake run smoke
 ```
 
-### SpriteAnimation
-```cpp
-auto anim = obj->AddComponent<SpriteAnimation>();
-anim->spriteSheet = texture;
-anim->CreateFramesFromGrid(32, 32, 8, 0.1f);  // 8 frames, 0.1s each
-anim->loop = true;
-anim->Play();
-```
-
-### Rigidbody
-```cpp
-auto rb = obj->AddComponent<Rigidbody>();
-rb->mass = 1.0f;
-rb->drag = 0.99f;
-rb->useGravity = true;
-rb->gravity = 500.0f;
-rb->AddForce({100, 0});
-rb->AddImpulse({0, -200});
-```
-
-### Colliders
-```cpp
-// Box collider
-auto box = obj->AddComponent<BoxCollider>(Vector2{32, 32});
-box->isTrigger = false;
-
-// Circle collider
-auto circle = obj->AddComponent<CircleCollider>(16.0f);
-circle->isTrigger = true;
-```
-
-### ParticleEmitter
-```cpp
-auto particles = obj->AddComponent<ParticleEmitter>();
-particles->emissionRate = 50;
-particles->maxParticles = 100;
-particles->shape = EmitterShape::Circle;
-particles->startVelocityMin = {-100, -100};
-particles->startVelocityMax = {100, 100};
-particles->lifetimeMin = 1.0f;
-particles->lifetimeMax = 2.0f;
-particles->Burst(50);  // Emit 50 particles immediately
-```
-
-### Camera2D
-```cpp
-auto camera = cameraObj->AddComponent<Camera2DComponent>();
-camera->SetTarget(player.get());
-camera->zoom = 1.5f;
-camera->smoothSpeed = 5.0f;
-```
-
-## Performance Tips
-
-1. **Object Pooling**: Reuse game objects instead of creating/destroying
-2. **Particle Limits**: Set appropriate `maxParticles` limits
-3. **Collider Count**: Minimize number of active colliders
-4. **Texture Atlas**: Use sprite sheets for multiple sprites
-5. **Debug Mode**: Disable physics debug drawing in release builds
+It requires an OpenGL 3.3-capable display even though the window is hidden.
 
 ## License
 
-MIT License - feel free to use in your projects!
+MIT License.
 
 ## Credits
 
-Built with [raylib](https://www.raylib.com/) and [raylib-cpp](https://github.com/RobLoach/raylib-cpp)
-
+Built with [raylib](https://www.raylib.com/) and [raylib-cpp](https://github.com/RobLoach/raylib-cpp).

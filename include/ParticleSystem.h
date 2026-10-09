@@ -3,7 +3,7 @@
 #include "Core.h"
 #include "Component.h"
 #include "GameObject.h"
-#include "Time.h"
+#include "GameTime.h"
 
 namespace RayGame {
 
@@ -104,7 +104,7 @@ public:
         }
         
         // Emit particles
-        if (emitting) {
+        if (emitting && emissionRate > 0) {
             emissionTimer += dt;
             float interval = 1.0f / emissionRate;
             
@@ -112,6 +112,7 @@ public:
                 EmitParticle();
                 emissionTimer -= interval;
             }
+            emissionTimer = std::fmod(emissionTimer, interval);
         }
         
         // Update particles
@@ -136,7 +137,7 @@ public:
     }
     
     void EmitParticle() {
-        if (particles.size() >= maxParticles) return;
+        if (!gameObject || maxParticles <= 0 || particles.size() >= (size_t)maxParticles) return;
         
         Particle p;
         p.position = GetEmissionPosition();
@@ -173,7 +174,7 @@ private:
     float durationTimer = 0;
     
     Vector2 GetEmissionPosition() {
-        Vector2 pos = gameObject->transform->position;
+        Vector2 pos = gameObject->transform->GetWorldPosition();
         
         switch (shape) {
             case EmitterShape::Point:
@@ -192,7 +193,7 @@ private:
                 };
                 
             case EmitterShape::Cone: {
-                float baseAngle = gameObject->transform->rotation;
+                float baseAngle = gameObject->transform->GetWorldRotation();
                 float angle = (baseAngle + Random(-coneAngle/2, coneAngle/2)) * DEG2RAD;
                 float r = Random(0, radius);
                 return {pos.x + cos(angle) * r, pos.y + sin(angle) * r};

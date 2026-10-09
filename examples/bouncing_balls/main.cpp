@@ -53,8 +53,8 @@ public:
         }
     }
     
-    void Update() override {
-        Scene::Update();
+    void FixedUpdate() override {
+        Scene::FixedUpdate();
         
         // Keep balls in bounds (bounce off walls)
         for (auto& obj : GetAllGameObjects()) {
@@ -89,7 +89,7 @@ public:
         
         // Draw UI
         DrawText("RAYGAME ENGINE - Bouncing Balls Demo", 10, 10, 20, WHITE);
-        DrawText(TextFormat("Objects: %d", GetAllGameObjects().size()), 10, 35, 20, YELLOW);
+        DrawText(TextFormat("Objects: %d", (int)GetAllGameObjects().size()), 10, 35, 20, YELLOW);
         DrawText("F1: Toggle Debug", 10, 60, 15, GRAY);
         DrawText("ESC: Quit", 10, 75, 15, GRAY);
         DrawText("SPACE: Add Ball", 10, 90, 15, GRAY);

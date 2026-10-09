@@ -3,9 +3,24 @@
 #include "Core.h"
 #include "Component.h"
 #include "GameObject.h"
-#include "Time.h"
+#include "GameTime.h"
 
 namespace RayGame {
+
+namespace detail {
+inline void DrawSprite(Texture2D texture, Rectangle source, const Transform& transform,
+                       Vector2 pivot, bool flipX, bool flipY, Color tint) {
+    Vector2 position = transform.GetWorldPosition();
+    Vector2 scale = transform.GetWorldScale();
+    Rectangle dest = {position.x, position.y,
+                      std::fabs(source.width * scale.x), std::fabs(source.height * scale.y)};
+    if (flipX != (scale.x < 0)) source.width = -source.width;
+    if (flipY != (scale.y < 0)) source.height = -source.height;
+    DrawTexturePro(texture, source, dest, {dest.width * pivot.x, dest.height * pivot.y},
+                   transform.GetWorldRotation(), tint);
+}
+}
+
 
 class RAYGAME_API SpriteRenderer : public Component {
 public:
@@ -25,28 +40,15 @@ public:
         }
     }
     
-    SpriteRenderer(Texture2D* tex, Rectangle src) 
+    SpriteRenderer(Texture2D* tex, Rectangle src)
         : texture(tex), sourceRect(src) {}
-    
+
+    int RenderLayer() const override { return layer; }
+
     void Render() override {
         if (!texture || !gameObject) return;
         
-        auto tf = gameObject->transform;
-        
-        Rectangle dest = {
-            tf->position.x,
-            tf->position.y,
-            sourceRect.width * tf->scale.x * (flipX ? -1 : 1),
-            sourceRect.height * tf->scale.y * (flipY ? -1 : 1)
-        };
-        
-        Vector2 origin = {
-            sourceRect.width * pivot.x * tf->scale.x,
-            sourceRect.height * pivot.y * tf->scale.y
-        };
-        
-        DrawTexturePro(*texture, sourceRect, dest, origin, 
-                      tf->rotation, tint);
+        detail::DrawSprite(*texture, sourceRect, *gameObject->transform, pivot, flipX, flipY, tint);
     }
     
     Vector2 GetSize() const {
@@ -73,7 +75,10 @@ public:
     Vector2 pivot = {0.5f, 0.5f};
     bool flipX = false;
     bool flipY = false;
-    
+    int layer = 0;
+
+    int RenderLayer() const override { return layer; }
+
     SpriteAnimation() = default;
     
     void AddFrame(Rectangle rect, float duration = 0.1f) {
@@ -82,9 +87,10 @@ public:
     
     void CreateFramesFromGrid(int frameWidth, int frameHeight, 
                             int frameCount, float frameDuration = 0.1f) {
-        if (!spriteSheet) return;
+        if (!spriteSheet || frameWidth <= 0 || frameHeight <= 0) return;
         
         int columns = spriteSheet->width / frameWidth;
+        if (columns <= 0) return;
         
         for (int i = 0; i < frameCount; i++) {
             int x = (i % columns) * frameWidth;
@@ -100,11 +106,12 @@ public:
     
     void Update() override {
         if (!playing || frames.empty()) return;
+        if (currentFrame < 0 || currentFrame >= (int)frames.size()) currentFrame = 0;
         
         frameTimer += GameTime::DeltaTime();
         
-        if (frameTimer >= frames[currentFrame].duration) {
-            frameTimer = 0;
+        while (playing && frameTimer >= std::max(0.0001f, frames[currentFrame].duration)) {
+            frameTimer -= std::max(0.0001f, frames[currentFrame].duration);
             currentFrame++;
             
             if (currentFrame >= frames.size()) {
@@ -121,23 +128,9 @@ public:
     void Render() override {
         if (!spriteSheet || frames.empty() || !gameObject) return;
         
-        auto tf = gameObject->transform;
-        auto& frame = frames[currentFrame];
-        
-        Rectangle dest = {
-            tf->position.x,
-            tf->position.y,
-            frame.sourceRect.width * tf->scale.x * (flipX ? -1 : 1),
-            frame.sourceRect.height * tf->scale.y * (flipY ? -1 : 1)
-        };
-        
-        Vector2 origin = {
-            frame.sourceRect.width * pivot.x * tf->scale.x,
-            frame.sourceRect.height * pivot.y * tf->scale.y
-        };
-        
-        DrawTexturePro(*spriteSheet, frame.sourceRect, dest, origin,
-                      tf->rotation, tint);
+        if (currentFrame < 0 || currentFrame >= (int)frames.size()) return;
+        detail::DrawSprite(*spriteSheet, frames[currentFrame].sourceRect,
+                           *gameObject->transform, pivot, flipX, flipY, tint);
     }
 };
 

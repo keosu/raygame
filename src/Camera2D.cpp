@@ -1,5 +1,5 @@
 #include "Camera2D.h"
-#include "Time.h"
+#include "GameTime.h"
 
 namespace RayGame {
 

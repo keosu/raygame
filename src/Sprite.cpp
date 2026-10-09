@@ -1,5 +1,5 @@
 #include "Sprite.h"
-#include "Time.h"
+#include "GameTime.h"
 
 namespace RayGame {
 

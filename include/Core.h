@@ -9,9 +9,12 @@
 #include <functional>
 #include <algorithm>
 #include <cmath>
+#include <type_traits>
+#include <utility>
 
-// DLL Export/Import macros
-#ifdef _WIN32
+// Export/Import macros. Empty for static builds (the default); define
+// RAYGAME_SHARED when building/consuming RayGame as a shared library.
+#if defined(_WIN32) && defined(RAYGAME_SHARED)
     #ifdef RAYGAME_EXPORTS
         #define RAYGAME_API __declspec(dllexport)
     #else
@@ -39,18 +42,11 @@ namespace RayGame {
     }
     
     // Math utilities
-    inline float Lerp(float a, float b, float t) {
-        return a + (b - a) * t;
-    }
+    using ::Lerp;
+    using ::Clamp;
     
     inline Vector2 Lerp(const Vector2& a, const Vector2& b, float t) {
         return { Lerp(a.x, b.x, t), Lerp(a.y, b.y, t) };
-    }
-    
-    inline float Clamp(float value, float min, float max) {
-        if (value < min) return min;
-        if (value > max) return max;
-        return value;
     }
     
     inline float Random(float min, float max) {

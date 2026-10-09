@@ -9,96 +9,188 @@ namespace RayGame {
 class RAYGAME_API Scene {
 public:
     std::string name;
-    
-    Scene(const std::string& sceneName = "New Scene") 
+
+    Scene(const std::string& sceneName = "New Scene")
         : name(sceneName), started(false) {}
-    
-    virtual ~Scene() = default;
-    
+
+    virtual ~Scene() { Clear(); }
+
     virtual void OnLoad() {}
     virtual void OnUnload() {}
+
     virtual void Update() {
-        // Update all objects first (use index-based loop to avoid iterator invalidation)
+        if (!started) Start();
+        FlushPending();
+        updating = true;
         for (size_t i = 0; i < gameObjects.size(); i++) {
-            if (gameObjects[i] && gameObjects[i]->active) {
+            if (gameObjects[i] && gameObjects[i]->active && !gameObjects[i]->IsDestroyed()) {
                 gameObjects[i]->Update();
             }
         }
-        
-        // Remove inactive objects after all updates are done
-        gameObjects.erase(
-            std::remove_if(gameObjects.begin(), gameObjects.end(),
-                [](const Ref<GameObject>& obj) { return !obj || !obj->active; }),
-            gameObjects.end()
-        );
+        updating = false;
+
+        FlushPending();
     }
-    
-    virtual void Render() {
-        for (auto& obj : gameObjects) {
-            obj->Render();
+
+    virtual void FixedUpdate() {
+        if (!started) Start();
+        FlushPending();
+        updating = true;
+        for (size_t i = 0; i < gameObjects.size(); i++) {
+            if (gameObjects[i] && gameObjects[i]->active && !gameObjects[i]->IsDestroyed()) {
+                gameObjects[i]->FixedUpdate();
+            }
         }
+        updating = false;
+        FlushPending();
     }
-    
+
+    virtual void Render() {
+        if (!started) Start();
+        updating = true;
+        auto camera = activeCamera.lock();
+        bool cam = camera && camera->GetGameObject() && camera->GetGameObject()->active
+                   && camera->IsEnabled();
+        if (cam) camera->Begin();
+
+        // Build a flat, layer-sorted draw list across all objects.
+        drawList.clear();
+        for (auto& obj : gameObjects) {
+            if (!obj || !obj->active || obj->IsDestroyed()) continue;
+            obj->Start();
+            for (auto& comp : obj->GetAllComponents()) {
+                if (comp && comp->IsEnabled() && comp->HasStarted()) drawList.push_back(comp);
+            }
+        }
+        std::stable_sort(drawList.begin(), drawList.end(),
+            [](const Ref<Component>& a, const Ref<Component>& b) {
+                if (a->RenderLayer() != b->RenderLayer()) return a->RenderLayer() < b->RenderLayer();
+                return a->renderOrder < b->renderOrder;
+            });
+        for (const auto& comp : drawList) {
+            auto* obj = comp->GetGameObject();
+            if (obj && obj->active && !obj->IsDestroyed() && comp->IsEnabled()) comp->Render();
+        }
+        drawList.clear();
+
+        if (cam) camera->End();
+        updating = false;
+        FlushPending();
+    }
+
     Ref<GameObject> CreateGameObject(const std::string& name = "GameObject") {
         auto obj = CreateRef<GameObject>(name);
-        gameObjects.push_back(obj);
+        obj->scene = this;
+        if (updating) {
+            pendingAdd.push_back(obj);
+        } else {
+            gameObjects.push_back(obj);
+        }
         return obj;
     }
-    
-    void DestroyGameObject(Ref<GameObject> obj) {
-        auto it = std::find(gameObjects.begin(), gameObjects.end(), obj);
-        if (it != gameObjects.end()) {
-            gameObjects.erase(it);
-        }
+
+    // Deferred destruction — safe to call during Update.
+    void Destroy(Ref<GameObject> obj) {
+        Destroy(obj.get());
     }
-    
+    void Destroy(GameObject* obj) {
+        if (obj && obj->scene == this) obj->MarkDestroyed();
+    }
+
+    // Backward-compatible alias.
+    void DestroyGameObject(Ref<GameObject> obj) { Destroy(obj); }
+
+    // Also finalizes externally retained objects before releasing scene resources.
+    void Clear() {
+        for (auto& obj : gameObjects) if (obj) obj->MarkDestroyed();
+        for (auto& obj : pendingAdd) if (obj) obj->MarkDestroyed();
+        activeCamera.reset();
+        started = false;
+        if (!updating) FlushPending();
+    }
+
     template<typename T>
     std::vector<Ref<GameObject>> FindGameObjectsWithComponent() {
         std::vector<Ref<GameObject>> result;
         for (auto& obj : gameObjects) {
-            if (obj->GetComponent<T>()) {
-                result.push_back(obj);
-            }
+            if (obj && !obj->IsDestroyed() && obj->GetComponent<T>()) result.push_back(obj);
         }
         return result;
     }
-    
+
     std::vector<Ref<GameObject>> FindGameObjectsByTag(const std::string& tag) {
         std::vector<Ref<GameObject>> result;
         for (auto& obj : gameObjects) {
-            if (obj->tag == tag) {
-                result.push_back(obj);
-            }
+            if (obj && obj->tag == tag && !obj->IsDestroyed()) result.push_back(obj);
         }
         return result;
     }
-    
+
     Ref<GameObject> FindGameObjectByName(const std::string& name) {
         for (auto& obj : gameObjects) {
-            if (obj->name == name) {
-                return obj;
-            }
+            if (obj && obj->name == name && !obj->IsDestroyed()) return obj;
         }
         return nullptr;
     }
-    
+
     void Start() {
         if (!started) {
-            for (auto& obj : gameObjects) {
-                obj->Start();
-            }
             started = true;
+            updating = true;
+            // Index-based: components may spawn new objects during Start().
+            for (size_t i = 0; i < gameObjects.size(); i++) {
+                if (gameObjects[i]) gameObjects[i]->Start();
+            }
+            updating = false;
+            FlushPending();
         }
     }
-    
+
+    void SetActiveCamera(Camera2DComponent* cam) {
+        activeCamera.reset();
+        if (!cam || !cam->GetGameObject()) return;
+        for (const auto& comp : cam->GetGameObject()->GetAllComponents()) {
+            if (comp.get() == cam) activeCamera = std::static_pointer_cast<Camera2DComponent>(comp);
+        }
+    }
+    Camera2DComponent* GetActiveCamera() const {
+        auto cam = activeCamera.lock();
+        return cam && cam->GetGameObject() && !cam->GetGameObject()->IsDestroyed() ? cam.get() : nullptr;
+    }
+
     const std::vector<Ref<GameObject>>& GetAllGameObjects() const {
         return gameObjects;
     }
-    
+
 protected:
     std::vector<Ref<GameObject>> gameObjects;
     bool started;
+
+    void FlushPending() {
+        if (updating) return;
+        updating = true;
+        std::vector<Ref<GameObject>> additions;
+        additions.swap(pendingAdd);
+        for (const auto& obj : additions) {
+            gameObjects.push_back(obj);
+            if (started && obj) obj->Start();
+        }
+        // Separate removals before callbacks, which may create more objects.
+        std::vector<Ref<GameObject>> removed;
+        for (const auto& obj : gameObjects) {
+            if (obj && obj->IsDestroyed()) removed.push_back(obj);
+        }
+        gameObjects.erase(std::remove_if(gameObjects.begin(), gameObjects.end(),
+            [](const Ref<GameObject>& obj) { return !obj || obj->IsDestroyed(); }), gameObjects.end());
+        for (const auto& obj : removed) obj->DestroyNow();
+        updating = false;
+    }
+
+private:
+    std::vector<Ref<GameObject>> pendingAdd;
+    std::vector<Ref<Component>> drawList;
+    std::weak_ptr<Camera2DComponent> activeCamera;
+    bool updating = false;
 };
 
 }
-

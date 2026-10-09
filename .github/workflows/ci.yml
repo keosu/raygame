@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        mode: [debug, release]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux deps (raylib runtime libs)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libx11-dev libxrandr-dev \
+            libxi-dev libxcursor-dev libxinerama-dev libxext-dev libwayland-dev \
+            libxkbcommon-dev
+
+      - name: Setup xmake
+        uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: latest
+
+      - name: Configure Windows (MSVC)
+        # Configure Windows explicitly to avoid picking up a MinGW toolchain.
+        if: runner.os == 'Windows'
+        run: xmake f -p windows -a x64 --toolchain=msvc -m ${{ matrix.mode }} -y
+
+      - name: Configure Linux
+        if: runner.os == 'Linux'
+        run: xmake f -m ${{ matrix.mode }} -y
+
+      - name: Build examples
+        run: xmake build -y
+
+      - name: Build tests
+        run: xmake build -y tests
+
+      - name: Run tests
+        run: xmake run tests

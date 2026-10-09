@@ -3,7 +3,7 @@
 #include "Core.h"
 #include "Component.h"
 #include "GameObject.h"
-#include "Time.h"
+#include "GameTime.h"
 
 namespace RayGame {
 
@@ -17,24 +17,30 @@ public:
     
     Camera2DComponent() {
         camera.target = {0, 0};
-        camera.offset = {400, 300};  // Screen center by default
+        camera.offset = offset;
         camera.rotation = 0.0f;
         camera.zoom = 1.0f;
     }
     
     void SetTarget(GameObject* obj) {
         target = obj;
+        followTransform = obj ? obj->transform : std::weak_ptr<Transform>{};
         followEnabled = (obj != nullptr);
     }
     
     void Update() override {
-        if (followEnabled && target && target->active) {
-            Vector2 targetPos = target->transform->position;
+        auto follow = followTransform.lock();
+        auto* owner = follow ? follow->GetGameObject() : nullptr;
+        if (followEnabled && owner && owner->active && !owner->IsDestroyed()) {
+            Vector2 targetPos = follow->GetWorldPosition();
             Vector2 currentTarget = camera.target;
             
             // Smooth follow
             camera.target = Lerp(currentTarget, targetPos, 
-                               smoothSpeed * GameTime::DeltaTime());
+                               1.0f - std::exp(-std::max(0.0f, smoothSpeed) * GameTime::DeltaTime()));
+        } else if (!owner) {
+            target = nullptr;
+            followEnabled = false;
         }
         
         camera.zoom = zoom;
@@ -61,6 +67,7 @@ public:
     
 private:
     Camera2D camera;
+    std::weak_ptr<Transform> followTransform;
 };
 
 }
