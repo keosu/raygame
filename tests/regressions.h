@@ -356,8 +356,8 @@ static void TestFixedLoopAndSceneSwitch() {
     engine.Tick(0);
     CHECK(first->probe->fixed == 11);
     int staleCalls = 0;
-    Tween::Delay(1, [&] { ++staleCalls; });
-    EventBus::Subscribe("stale", [&](const EventData&) { ++staleCalls; });
+    Tween::Delay(1, [&] { ++staleCalls; }, first->GetCallbackScope());
+    EventBus::Subscribe("stale", [&](const EventData&) { ++staleCalls; }, first->GetCallbackScope());
     first->probe->onUpdate = [&] { engine.LoadScene(second); };
     engine.Tick(0);
     CHECK(engine.GetCurrentScene() == first && first->unloads == 0);

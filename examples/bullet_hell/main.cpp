@@ -193,7 +193,6 @@ public:
 
     void OnLoad() override {
         ExampleUI::Initialize(ExampleUI::pink);
-        EventBus::Clear();
         EventBus::Subscribe("shake", [this](const EventData& d){ shake = Clamp(shake + d.f, 0.0f, 1.0f); });
 
         auto camObj = CreateGameObject("Camera");
@@ -241,10 +240,8 @@ public:
 
     void Restart() {
         Clear();
-        TweenManager::Clear();
         score = 0; shake = 0; gameOver = false; won = false; restartRequested = false;
-        OnLoad();
-        Start();
+        Load();
     }
 
     void EndGame(bool victory) { if (!gameOver) { gameOver = true; won = victory; } }

@@ -2,39 +2,70 @@
 
 #include "Core.h"
 #include "Display.h"
+#include <array>
 
 namespace RayGame {
 
+template<size_t N> struct InputButtons {
+    std::array<bool, N> held{}, pressed{}, released{};
+};
+struct InputGamepad {
+    bool available = false;
+    InputButtons<32> buttons;
+    std::array<float, 8> axes{};
+};
+struct InputFrame {
+    InputButtons<512> keys;
+    InputButtons<8> mouse;
+    std::array<InputGamepad, 4> gamepads;
+    Vector2 mousePosition{}, mouseDelta{}; // Raw window coordinates.
+    float mouseWheel = 0;
+    bool focused = true;
+};
+
 class RAYGAME_API Input {
 public:
+    static void CaptureFrame();
+    static void SetFrame(const InputFrame& value);
+    static const InputFrame& GetFrame() { return inFixedTick ? fixedFrame : frame; }
+    static void Reset(); // Preserves action bindings and configured deadzone.
+    static void DiscardPending();
+    class FixedTickScope {
+    public:
+        FixedTickScope();
+        ~FixedTickScope();
+        FixedTickScope(const FixedTickScope&) = delete;
+        FixedTickScope& operator=(const FixedTickScope&) = delete;
+    };
     // ---- Keyboard ----
-    static bool GetKey(int key) { return IsKeyDown(key); }
-    static bool GetKeyDown(int key) { return IsKeyPressed(key); }
-    static bool GetKeyUp(int key) { return IsKeyReleased(key); }
+    static bool GetKey(int key) { return Read(GetFrame().keys.held, key); }
+    static bool GetKeyDown(int key) { return Read(GetFrame().keys.pressed, key); }
+    static bool GetKeyUp(int key) { return Read(GetFrame().keys.released, key); }
 
     // ---- Mouse ----
-    static bool GetMouseButton(int button) { return IsMouseButtonDown(button); }
-    static bool GetMouseButtonDown(int button) { return IsMouseButtonPressed(button); }
-    static bool GetMouseButtonUp(int button) { return IsMouseButtonReleased(button); }
-    static Vector2 GetMousePosition() { return Display::ScreenToCanvas(::GetMousePosition()); }
+    static bool GetMouseButton(int button) { return Read(GetFrame().mouse.held, button); }
+    static bool GetMouseButtonDown(int button) { return Read(GetFrame().mouse.pressed, button); }
+    static bool GetMouseButtonUp(int button) { return Read(GetFrame().mouse.released, button); }
+    static Vector2 GetMousePosition() { return Display::ScreenToCanvas(GetFrame().mousePosition); }
     static Vector2 GetMouseDelta() {
-        Vector2 delta = ::GetMouseDelta();
+        Vector2 delta = GetFrame().mouseDelta;
         float scale = Display::GetViewport().scale;
         return {delta.x / scale, delta.y / scale};
     }
-    static bool IsMouseInCanvas() { return Display::GetViewport().Contains(::GetMousePosition()); }
-    static float GetMouseWheelMove() { return ::GetMouseWheelMove(); }
+    static bool IsMouseInCanvas() { return Display::GetViewport().Contains(GetFrame().mousePosition); }
+    static float GetMouseWheelMove() { return GetFrame().mouseWheel; }
 
     // ---- Gamepad ----
-    static bool GamepadAvailable(int pad = 0) { return IsGamepadAvailable(pad); }
-    static bool GetGamepadButton(int button, int pad = 0) { return IsGamepadButtonDown(pad, button); }
-    static bool GetGamepadButtonDown(int button, int pad = 0) { return IsGamepadButtonPressed(pad, button); }
-    static bool GetGamepadButtonUp(int button, int pad = 0) { return IsGamepadButtonReleased(pad, button); }
+    static bool GamepadAvailable(int pad = 0) { return pad >= 0 && pad < 4 && GetFrame().gamepads[pad].available; }
+    static bool GetGamepadButton(int button, int pad = 0) { return GamepadAvailable(pad) && Read(GetFrame().gamepads[pad].buttons.held, button); }
+    static bool GetGamepadButtonDown(int button, int pad = 0) { return GamepadAvailable(pad) && Read(GetFrame().gamepads[pad].buttons.pressed, button); }
+    static bool GetGamepadButtonUp(int button, int pad = 0) { return pad >= 0 && pad < 4 && Read(GetFrame().gamepads[pad].buttons.released, button); }
     static float GetGamepadAxis(int axis, int pad = 0) {
-        float v = GetGamepadAxisMovement(pad, axis);
+        if (!GamepadAvailable(pad) || axis < 0 || axis >= 8) return 0;
+        float v = GetFrame().gamepads[pad].axes[axis];
         return (v > -deadzone && v < deadzone) ? 0.0f : v;
     }
-    static void SetGamepadDeadzone(float dz) { deadzone = dz; }
+    static void SetGamepadDeadzone(float dz) { if (std::isfinite(dz)) deadzone = Clamp(dz, 0.0f, 1.0f); }
 
     // ---- Axis (keyboard + gamepad) ----
     static float GetAxis(const std::string& axis) {
@@ -85,6 +116,11 @@ public:
     }
 
 private:
+    template<size_t N> static bool Read(const std::array<bool, N>& values, int index) {
+        return index >= 0 && (size_t)index < N && values[index];
+    }
+    static InputFrame frame, pending, fixedFrame;
+    static bool inFixedTick;
     struct ActionBinding { std::vector<int> keys; std::vector<int> buttons; };
     static inline std::unordered_map<std::string, ActionBinding> actions;
     static inline float deadzone = 0.2f;

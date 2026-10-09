@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core.h"
+#include "CallbackScope.h"
 
 namespace RayGame {
 
@@ -16,9 +17,19 @@ class RAYGAME_API EventBus {
 public:
     using Handler = std::function<void(const EventData&)>;
 
-    static unsigned long Subscribe(const std::string& event, Handler handler) {
+    static unsigned long Subscribe(const std::string& event, Handler handler,
+                                   ScopeToken owner = ScopeToken::Current()) {
         unsigned long id = ++nextId;
-        handlers[event].push_back({id, std::move(handler)});
+        if (!owner.IsAlive() || !handler) return id;
+        auto entry = std::make_shared<Entry>();
+        entry->id = id;
+        entry->owner = owner;
+        entry->handler = std::make_shared<Handler>(std::move(handler));
+        entry->cancellation = owner.OnCancel([event, id] { Unsubscribe(event, id); });
+        auto& list = handlers[event];
+        list.erase(std::remove_if(list.begin(), list.end(),
+            [](const auto& value) { return !value->handler; }), list.end());
+        list.push_back(entry);
         return id;
     }
 
@@ -26,8 +37,14 @@ public:
         auto it = handlers.find(event);
         if (it == handlers.end()) return;
         auto& list = it->second;
-        list.erase(std::remove_if(list.begin(), list.end(),
-            [id](const Entry& e) { return e.id == id; }), list.end());
+        auto found = std::find_if(list.begin(), list.end(), [id](const auto& e) { return e->id == id; });
+        if (found == list.end()) return;
+        auto removed = std::move(*found);
+        list.erase(found);
+        if (list.empty()) handlers.erase(it);
+        // Detach first: destroying captured values can itself cancel an owner.
+        removed->cancellation.Reset();
+        removed->handler.reset();
     }
 
     static void Emit(const std::string& event, const EventData& data = {}) {
@@ -36,19 +53,31 @@ public:
         // Copy so handlers may subscribe/unsubscribe during dispatch.
         auto listeners = it->second;
         for (auto& e : listeners) {
-            auto live = handlers.find(event);
-            if (live == handlers.end()) break;
-            bool subscribed = std::any_of(live->second.begin(), live->second.end(),
-                [&](const Entry& entry) { return entry.id == e.id; });
-            if (subscribed && e.handler) e.handler(data);
+            // Retain the callable itself during self-unsubscribe/owner destruction.
+            auto callback = e->handler;
+            if (callback && e->owner.IsAlive()) {
+                ScopeActivation scope(e->owner);
+                (*callback)(data);
+            }
         }
     }
 
-    static void Clear() { handlers.clear(); }
+    static void Clear() {
+        auto removed = std::move(handlers);
+        handlers.clear();
+        for (auto& list : removed) for (auto& entry : list.second) {
+            entry->cancellation.Reset(); entry->handler.reset();
+        }
+    }
 
 private:
-    struct Entry { unsigned long id; Handler handler; };
-    static inline std::unordered_map<std::string, std::vector<Entry>> handlers;
+    struct Entry {
+        unsigned long id = 0;
+        std::shared_ptr<Handler> handler;
+        ScopeToken owner;
+        CancellationLink cancellation;
+    };
+    static inline std::unordered_map<std::string, std::vector<std::shared_ptr<Entry>>> handlers;
     static inline unsigned long nextId = 0;
 };
 

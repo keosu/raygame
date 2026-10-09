@@ -18,7 +18,7 @@ See the [product readiness review and roadmap](docs/PRODUCT_READINESS_REVIEW.md)
 - **Deferred destruction & safe spawning**: `Destroy()` is queued; objects spawned at runtime are started automatically
 - **Scene management** with deferred scene switching
 - **Fixed timestep** loop for game logic and rigidbody physics (`FixedUpdate`)
-- **Resource Manager**: textures, fonts, shaders, procedural textures, individual unload
+- **Resource Manager**: typed texture/font/shader handles, safe unload, explicit replacement and failure diagnostics
 - **Time** utilities: delta time, elapsed time, frame count
 
 ### Rendering
@@ -39,14 +39,14 @@ See the [product readiness review and roadmap](docs/PRODUCT_READINESS_REVIEW.md)
 
 ### Gameplay systems
 - **Tween** engine with 14 easing functions, loop/pingpong/delay, callbacks
-- **Event bus**: string-keyed pub/sub with a small payload
+- **Event bus**: string-keyed pub/sub with automatic owner cancellation for scenes and components
 - **Object pool**: generic free-list pool (`ObjectPool<T>`)
 - **Timers**: `DestroyAfter`, repeating/one-shot `TimerComponent`
 - **Particle system**: point/circle/box/cone emitters, burst & continuous
 - **Tilemap**: grid tiles, tileset rendering, per-tile solidity queries
 
 ### Input, Audio, UI, Save
-- **Input**: keyboard, mouse, gamepad, axis helpers, and named **action mapping**
+- **Input**: injectable keyboard/mouse/gamepad snapshots, fixed-tick edge buffering, axis helpers and named **action mapping**
 - **Audio**: sound/music with master volume (own `Audio.h`)
 - **Immediate-mode UI**: labels, panels, buttons, progress bars
 - **Save system**: dependency-free key/value persistence
@@ -69,6 +69,9 @@ GameEngine ── Scene ── GameObject
 
 Cross-cutting services are static/singleton: `PhysicsWorld`, `TweenManager`,
 `EventBus`, `ResourceManager`, `AudioManager`, `Input`, `UI`, `GameTime`.
+Events and tweens have application/scene/object/component lifetime scopes. Scene
+changes cancel the old scene's callbacks while preserving application services.
+Physics still uses one global world; independent simultaneous worlds are pending.
 
 ## Quick Start
 
@@ -158,10 +161,37 @@ EventBus::Subscribe("score", [&](const EventData& d){ score += d.i; });
 EventBus::Emit("score", EventData{10});
 ```
 
-Store the subscription id and unsubscribe in `OnDestroy` when a handler captures
-a component. Handlers removed during dispatch are skipped; newly added handlers
-wait until the next emission. Tweens created inside callbacks likewise start on
-the next update; callbacks may safely cancel or clear tweens.
+Registrations made in engine-dispatched component callbacks automatically belong
+to that component; scene callbacks belong to the scene, and engine hooks belong
+to the application. Dispatching an event/tween inherits its registered owner.
+Destroying an object immediately cancels its component callbacks and releases
+captured values (a callable already executing stays alive until it returns).
+Disabled components keep subscriptions until destruction or explicit cancellation.
+
+Outside those callbacks, pass the intended owner's token explicitly:
+
+```cpp
+EventBus::Subscribe("score", handler, component->GetCallbackScope());
+Tween::Delay(2.0f, callback, scene->GetCallbackScope());
+EventBus::Subscribe("settings", handler, engine.GetCallbackScope()); // survives scene changes
+CallbackScope menuScope;
+EventBus::Subscribe("menu", handler, menuScope.Token());
+menuScope.Cancel();
+```
+
+An empty token (`ScopeToken{}`) has global lifetime, until unsubscribe/clear or
+engine shutdown. Unscoped registrations made outside runtime callbacks use that
+lifetime. `EventBus::Clear()` and `TweenManager::Clear()` still clear the entire
+service; ordinary scene changes no longer call them. `Scene::Clear()` cancels its
+old scope and prepares a fresh empty scene. For manual restart, use `Clear()` then
+`Load()` (which runs scoped `OnLoad()` and `Start()`), as the examples do.
+Direct calls to user overrides do not automatically activate an owner: use
+`ScopeActivation(owner->GetCallbackScope())` around custom dispatch.
+
+Handlers removed during dispatch are skipped; newly added handlers wait until
+the next emission. Tweens created inside callbacks start on the next update.
+Self-cancellation, owner destruction and throwing callbacks restore dispatch
+context correctly. Scope and service operations run on the runtime thread.
 
 ### Object pool
 ```cpp
@@ -175,6 +205,64 @@ pool.Release(b);
 Input::BindAction("jump", {KEY_SPACE, KEY_W}, {GAMEPAD_BUTTON_RIGHT_FACE_DOWN});
 if (Input::GetActionDown("jump")) { /* ... */ }
 ```
+
+`GameEngine` captures raylib input once before its per-frame shortcuts/update.
+`GetKeyDown`/`GetActionDown` and mouse/gamepad equivalents read pressed edges;
+`GetKey` reads the held state. In `FixedUpdate` and physics callbacks, edges and
+mouse delta/wheel accumulate across frames with no fixed tick, then are consumed
+by the first fixed tick. Additional catch-up ticks see held state without repeated
+edges. Ordinary update/render still see the original frame snapshot.
+
+Buffering coalesces each button's pressed/released flags: a short press and release
+can both be true in one tick. Repeated transitions between ticks are not an ordered
+event stream or a full replay system. Pause/resume, focus loss and scene changes
+discard pending edges; held input can resume without a synthetic press. Focus loss
+also clears held input. Real time and unscaled UI updates continue during pause.
+
+For headless tests or a custom loop, set one snapshot per frame (or call
+`CaptureFrame()` after pumping raylib events). `SetFrame` derives edges from held
+transitions and also accepts explicit edges. Mouse positions remain in window
+coordinates and are converted through the current viewport on read.
+
+```cpp
+InputFrame frame;
+frame.keys.held[KEY_SPACE] = true;
+Input::SetFrame(frame);
+// Advance your engine tick; standalone fixed loops use Input::FixedTickScope.
+```
+
+### Resource handles and migration
+
+```cpp
+auto texture = ResourceManager::LoadTexture("player", "assets/player.png");
+object->AddComponent<SpriteRenderer>(texture);
+if (!texture) { /* inspect texture.Error() and texture.State() */ }
+bool replaced = ResourceManager::ReloadTexture("player", "assets/player-v2.png");
+ResourceManager::UnloadTextureNamed("player"); // all copies now test false
+```
+
+Texture/font/shader APIs return `TextureHandle`, `FontHandle`, `ShaderHandle`.
+Migrate `auto*` variables to `auto`, raw resource fields to the corresponding
+handle, and manual `OnLoad(); Start();` restart sequences to `Load()`.
+SpriteRenderer, SpriteAnimation, Tilemap and UI store handles directly. Empty or
+unloaded sprite/tile resources draw magenta placeholders; fonts fall back to
+raylib's default font. Missing/invalid shaders produce a failed handle: select a
+fallback before entering shader mode. Default raylib resources are never owned
+or unloaded by the resource manager.
+
+`Load*` reuses a ready named entry; `ReloadTexture/ReloadFont/ReloadShader` explicitly
+replace it. A successful replacement updates all live handles and increments
+`Revision()`; failure returns false, records `Error()` and preserves the previous
+resource. Failed first loads have `ResourceState::Failed` and can be retried.
+Unload/shutdown marks every retained handle `Unloaded`. Reusing a name creates a
+new slot and never revives old handles. Sprite/animation source rectangles remain
+explicit gameplay data; update them if a replacement changes atlas layout.
+
+A handle retains metadata, not the GPU allocation. `Get()` returns a short-lived
+borrowed pointer; do not cache it or copied native IDs across reload/unload.
+Checked `operator->`/`operator*` throw on invalid handles. Upload, replacement,
+unload and handle reads must run on the graphics thread while the owning window
+is alive. Asynchronous loading and full asset dependency tracking are pending.
 
 ### Save
 ```cpp

@@ -20,6 +20,16 @@ public:
     virtual void OnUnload() {}
     virtual void OnViewportChanged(Vector2 previous, Vector2 current) {}
 
+    ScopeToken GetCallbackScope() const { return callbacks.Token(); }
+    void AttachCallbackScope(ScopeToken parent) { parentScope = parent; callbacks.SetParent(parent); }
+    // Use this wrapper for loading/restarting so registrations inherit the scene.
+    void Load() {
+        if (clearing) throw std::logic_error("Cannot load a clearing scene");
+        ScopeActivation scope(GetCallbackScope());
+        OnLoad();
+        Start();
+    }
+
     bool IsClearing() const { return clearing; }
 
     virtual void Update() {
@@ -77,7 +87,10 @@ public:
             });
         for (const auto& comp : drawList) {
             auto* obj = comp->GetGameObject();
-            if (obj && obj->active && !obj->IsDestroyed() && comp->IsEnabled()) comp->Render();
+            if (obj && obj->active && !obj->IsDestroyed() && comp->IsEnabled()) {
+                ScopeActivation scope(comp->GetCallbackScope());
+                comp->Render();
+            }
         }
         drawList.clear();
 
@@ -90,6 +103,7 @@ public:
         if (clearing) throw std::logic_error("Cannot create objects in a scene being cleared");
         auto obj = CreateRef<GameObject>(name);
         obj->scene = this;
+        obj->callbacks.SetParent(GetCallbackScope());
         if (updating) {
             pendingAdd.push_back(obj);
         } else {
@@ -113,6 +127,7 @@ public:
     void Clear() {
         if (clearing) { if (!updating) FlushPending(); return; }
         clearing = true;
+        callbacks.Cancel();
         for (auto& obj : gameObjects) if (obj) obj->MarkDestroyed();
         for (auto& obj : pendingAdd) if (obj) obj->MarkDestroyed();
         activeCamera.reset();
@@ -217,8 +232,11 @@ private:
         for (const auto& obj : objects) if (obj) obj->DestroyNow();
         for (const auto& obj : pending) if (obj) obj->DestroyNow();
         clearing = false;
+        callbacks.Renew(parentScope);
     }
 
+    CallbackScope callbacks;
+    ScopeToken parentScope;
     std::vector<Ref<GameObject>> pendingAdd;
     std::vector<Ref<Component>> drawList;
     std::weak_ptr<Camera2DComponent> activeCamera;

@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cmath>
 #include <filesystem>
+#include <fstream>
+#include <chrono>
 
 #define main example_main
 namespace shooter {
@@ -36,9 +38,102 @@ public:
     }
 
     void OnInit() override {
+        TestResources();
         Expect(NativeWindowThemeMatchesSystem(GetWindowHandle()), "native title bar follows the system theme");
         SetCanvasSize(800, 600);
         LoadScene(CreateRef<shooter::SpaceShooterScene>());
+    }
+
+    TextureHandle retainedTexture;
+    FontHandle retainedFont;
+    ShaderHandle retainedShader;
+    void TestResources() {
+        namespace fs = std::filesystem;
+        auto root = fs::temp_directory_path() / ("raygame-resources-" +
+            std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+        fs::create_directory(root);
+        auto imagePath = (root / "replacement.png").string();
+        Image source = GenImageColor(16, 16, GREEN);
+        Expect(ExportImage(source, imagePath.c_str()), "prepare replacement texture");
+        UnloadImage(source);
+        auto texture = ResourceManager::CreateColorTexture("handle-test", 8, 8, WHITE);
+        auto copy = texture;
+        auto revision = texture.Revision();
+        auto id = texture->id;
+        Expect(!ResourceManager::ReloadTexture("handle-test", (root / "absent.png").string()), "missing texture replacement fails");
+        Expect(copy && copy->id == id && copy.Revision() == revision && !copy.Error().empty(), "failed texture replacement preserves all live references");
+        Expect(ResourceManager::ReloadTexture("handle-test", imagePath), "texture replacement succeeds");
+        Expect(copy && copy->width == 16 && copy.Revision() > revision && copy.Error().empty(), "live handles observe successful replacement");
+        Scene resources;
+        auto object = resources.CreateGameObject();
+        object->transform->position = {16, 16};
+        auto sprite = object->AddComponent<SpriteRenderer>(texture);
+        auto tileObject = resources.CreateGameObject();
+        tileObject->transform->position = {40, 8};
+        auto tilemap = tileObject->AddComponent<Tilemap>();
+        tilemap->tileset = texture; tilemap->tileWidth = tilemap->tileHeight = 16;
+        tilemap->Resize(1, 1, 0);
+        auto animated = resources.CreateGameObject();
+        animated->transform->position = {80, 16};
+        auto animation = animated->AddComponent<SpriteAnimation>();
+        animation->spriteSheet = texture; animation->AddFrame({0, 0, 16, 16});
+        ResourceManager::UnloadTextureNamed("handle-test");
+        retainedTexture = ResourceManager::CreateColorTexture("handle-test", 8, 8, WHITE);
+        Expect(!texture && !copy && !sprite->texture && !tilemap->tileset && !animation->spriteSheet,
+            "unload invalidates every resource consumer");
+        Expect(texture.State() == ResourceState::Unloaded && retainedTexture && texture != retainedTexture,
+            "same-name recreation never revives old handles");
+        bool caught = false;
+        try { (void)texture->id; } catch (const std::logic_error&) { caught = true; }
+        Expect(caught && texture.Get() == nullptr, "invalid handle access is checked");
+        auto failed = ResourceManager::LoadTexture("failed-texture", (root / "absent.png").string());
+        Expect(!failed && failed.State() == ResourceState::Failed && !failed.Error().empty(), "failed handles carry a diagnostic");
+        ResourceManager::LoadTexture("failed-texture", imagePath);
+        Expect(failed && failed->width == 16, "a failed load can be retried through the same handle");
+
+        std::string fontPath = std::string(GetApplicationDirectory()) + "assets/fonts/Barlow-Medium.ttf";
+        auto font = ResourceManager::LoadFontResource("font-handle-test", fontPath, 32);
+        Expect((bool)font, "font handle loads");
+        auto fontId = font->texture.id;
+        Expect(!ResourceManager::ReloadFont("font-handle-test", (root / "absent.ttf").string()), "missing font is a failure, not an owned default font");
+        Expect(font && font->texture.id == fontId, "failed font replacement retains the old font");
+        Expect(ResourceManager::ReloadFont("font-handle-test", fontPath, 48) && font->baseSize == 48, "font references observe successful replacement");
+        UI::font = font; UI::headingFont = font;
+        ResourceManager::UnloadFontNamed("font-handle-test");
+        retainedFont = ResourceManager::LoadFontResource("font-handle-test", fontPath, 32);
+        Expect(!UI::font && !UI::headingFont && retainedFont && font != retainedFont, "UI safely detects font unload and same-name recreation");
+        auto target = LoadRenderTexture(96, 64);
+        BeginTextureMode(target); ClearBackground(BLACK);
+        resources.Render(); UI::Label(0, 36, "fallback", 16);
+        EndTextureMode();
+        Image result = LoadImageFromTexture(target.texture);
+        ImageFlipVertical(&result);
+        for (int x : {16, 48, 80}) {
+            Color pixel = GetImageColor(result, x, 16);
+            Expect(pixel.r == MAGENTA.r && pixel.b == MAGENTA.b, "unloaded sprite/animation/tilemap draw a visible placeholder");
+        }
+        UnloadImage(result); UnloadRenderTexture(target); resources.Clear();
+        Expect(GetFontDefault().texture.id != 0, "failed loads never unload raylib's default font");
+        UI::ResetFonts();
+
+        auto shaderPath = root / "test.fs";
+        { std::ofstream file(shaderPath); file << "#version 330\nout vec4 finalColor;\nvoid main(){ finalColor = vec4(1.0); }\n"; }
+        auto shader = ResourceManager::LoadShaderResource("shader-handle-test", "", shaderPath.string());
+        Expect((bool)shader, "shader handle loads");
+        auto shaderId = shader->id;
+        Expect(!ResourceManager::ReloadShader("shader-handle-test", "", (root / "absent.fs").string())
+            && shader->id == shaderId, "failed shader replacement retains the old shader");
+        { std::ofstream file(shaderPath); file << "this is invalid GLSL"; }
+        Expect(!ResourceManager::ReloadShader("shader-handle-test", "", shaderPath.string())
+            && shader->id == shaderId, "compiler fallback is not accepted as a successful shader replacement");
+        { std::ofstream file(shaderPath); file << "#version 330\nout vec4 finalColor;\nvoid main(){ finalColor = vec4(0.5); }\n"; }
+        revision = shader.Revision();
+        Expect(ResourceManager::ReloadShader("shader-handle-test", "", shaderPath.string())
+            && shader.Revision() > revision, "shader references observe successful replacement");
+        ResourceManager::UnloadShaderNamed("shader-handle-test");
+        retainedShader = ResourceManager::LoadShaderResource("shader-handle-test", "", shaderPath.string());
+        Expect(!shader && retainedShader && shader != retainedShader, "shader unload invalidates retained references");
+        fs::remove(imagePath); fs::remove(shaderPath); fs::remove(root);
     }
 
     void Capture(const char* name) {
@@ -178,6 +273,13 @@ public:
             Expect(std::fabs(view.bounds.x) < 0.01f && std::fabs(view.bounds.y) < 0.01f
                 && std::fabs(view.bounds.width - ::GetScreenWidth()) < 0.01f
                 && std::fabs(view.bounds.height - ::GetScreenHeight()) < 0.01f, "adaptive canvas fills each window ratio");
+            InputFrame injected;
+            injected.mousePosition = {(float)::GetScreenWidth() / 2, (float)::GetScreenHeight() / 2};
+            Input::SetFrame(injected);
+            auto mapped = Input::GetMousePosition();
+            Expect(std::fabs(mapped.x - Display::GetWidth() / 2) < 0.01f
+                && std::fabs(mapped.y - Display::GetHeight() / 2) < 0.01f && Input::IsMouseInCanvas(),
+                "injected input uses the current adaptive viewport");
             auto end = Display::ScreenToCanvas({(float)::GetScreenWidth(), (float)::GetScreenHeight()});
             Expect(std::fabs(end.x - Display::GetWidth()) < 0.01f && std::fabs(end.y - Display::GetHeight()) < 0.01f,
                 "adaptive mouse reaches the entire canvas");
@@ -222,9 +324,11 @@ int main() {
     SetConfigFlags(FLAG_WINDOW_HIDDEN);
     SmokeGame game;
     game.Run();
+    game.Expect(!game.retainedTexture && !game.retainedFont && !game.retainedShader,
+        "shutdown invalidates all externally retained GPU handles");
     game.Expect(PhysicsWorld::GetColliderCount() == 0, "shutdown clears physics");
     game.Expect(TweenManager::Count() == 0, "shutdown clears tweens");
-    game.Expect(UI::font == nullptr && UI::headingFont == nullptr, "shutdown resets cached UI font pointers");
+    game.Expect(UI::font == nullptr && UI::headingFont == nullptr, "shutdown resets cached UI font handles");
     game.Expect(Display::GetCanvasTexture().id == 0, "shutdown releases the game canvas");
     for (bool failInit : {true, false}) {
         SetConfigFlags(FLAG_WINDOW_HIDDEN);

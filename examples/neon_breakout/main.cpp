@@ -215,7 +215,6 @@ public:
         }
         if (save.Load(savePath)) highscore = save.GetInt("highscore", 0);
 
-        EventBus::Clear();
         EventBus::Subscribe("score", [this](const EventData& d) { score += d.i; });
 
         CreateGameObject("Grid")->AddComponent<NeonGrid>();
@@ -313,10 +312,8 @@ public:
 
     void Restart() {
         Clear();
-        TweenManager::Clear();
         score = 0; lives = 3; gameOver = false; won = false; restartRequested = false;
-        OnLoad();
-        Start();
+        Load();
     }
 
     void Update() override {

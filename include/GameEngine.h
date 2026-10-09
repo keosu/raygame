@@ -30,6 +30,9 @@ public:
     void Init() {
         if (initialized) return;
         try {
+            if (!applicationCallbacks.Token().IsAlive()) applicationCallbacks.Renew();
+            ScopeActivation scope(GetCallbackScope());
+            Input::Reset();
             InitWindow(screenWidth, screenHeight, windowTitle.c_str());
             if (!IsWindowReady()) throw std::runtime_error("Cannot initialize the game window");
             initialized = true;
@@ -81,14 +84,19 @@ public:
 
     void Shutdown() noexcept {
         if (shuttingDown) return;
-        if (!initialized && !currentScene && !hasPendingScene) return;
+        if (!initialized && !currentScene && !hasPendingScene) {
+            applicationCallbacks.Cancel();
+            return;
+        }
         shuttingDown = true;
         running = false;
+        applicationCallbacks.Cancel();
         UnloadCurrentScene();
         if (pendingScene) pendingScene->Clear();
         pendingScene.reset();
         hasPendingScene = false;
         fixedAccumulator = 0;
+        Input::Reset();
 
         PhysicsWorld::Clear();
         TweenManager::Clear();
@@ -113,6 +121,7 @@ public:
     }
 
     Ref<Scene> GetCurrentScene() { return currentScene; }
+    ScopeToken GetCallbackScope() const { return applicationCallbacks.Token(); }
 
     void Quit() { running = false; }
 
@@ -129,7 +138,12 @@ public:
     }
     void ToggleFullscreen() { SetFullscreen(!IsFullscreen()); }
 
-    void SetPaused(bool value) { paused = value; }
+    void SetPaused(bool value) {
+        if (paused == value) return;
+        paused = value;
+        fixedAccumulator = 0;
+        Input::DiscardPending();
+    }
     bool IsPaused() const { return paused; }
 
     void ToggleDebug() { showDebug = !showDebug; }
@@ -162,20 +176,32 @@ protected:
 
     // Advance logic without drawing; also useful for deterministic simulations.
     void Tick(float dt) {
+        ScopeActivation scope(GetCallbackScope());
         ApplyPendingScene();
         float realDelta = std::isfinite(dt) ? std::max(0.0f, dt) : 0.0f;
         GameTime::Advance(realDelta, paused ? 0 : std::min(realDelta, fixedDelta * 8));
         OnUnscaledUpdate();
-        if (paused) return;
+        if (paused) { Input::DiscardPending(); return; }
         GameTime::SetFixedDeltaTime(fixedDelta);
         TweenManager::Update(GameTime::DeltaTime());
-        if (currentScene) currentScene->Update();
+        if (paused) return;
+        if (currentScene) {
+            ScopeActivation sceneScope(currentScene->GetCallbackScope());
+            currentScene->Update();
+        }
+        if (paused) return;
         fixedAccumulator += GameTime::DeltaTime();
         int steps = 0;
         while (fixedAccumulator >= fixedDelta && steps++ < 8) {
-            if (currentScene) currentScene->FixedUpdate();
-            PhysicsWorld::Step();
             fixedAccumulator -= fixedDelta;
+            Input::FixedTickScope inputTick;
+            if (currentScene) {
+                ScopeActivation sceneScope(currentScene->GetCallbackScope());
+                currentScene->FixedUpdate();
+            }
+            if (paused) return;
+            PhysicsWorld::Step();
+            if (paused) return;
         }
         OnUpdate();
     }
@@ -185,6 +211,7 @@ protected:
     float fixedDelta = 1.0f / 60.0f;
 
 private:
+    CallbackScope applicationCallbacks;
     std::string windowTitle;
     int screenWidth, screenHeight;
     Ref<Scene> currentScene;
@@ -208,13 +235,16 @@ private:
         if (size.x == lastCanvasSize.x && size.y == lastCanvasSize.y) return;
         Vector2 previous = lastCanvasSize;
         lastCanvasSize = size;
-        if (currentScene && previous.x > 0 && previous.y > 0) currentScene->OnViewportChanged(previous, size);
+        if (currentScene && previous.x > 0 && previous.y > 0) {
+            ScopeActivation sceneScope(currentScene->GetCallbackScope());
+            currentScene->OnViewportChanged(previous, size);
+        }
     }
 
     void UnloadCurrentScene() noexcept {
         auto old = std::move(currentScene);
         if (!old) return;
-        try { old->OnUnload(); }
+        try { ScopeActivation sceneScope(old->GetCallbackScope()); old->OnUnload(); }
         catch (...) { Diagnostics::Write(LogLevel::Error, "Scene OnUnload failed; continuing cleanup"); }
         old->Clear();
     }
@@ -226,19 +256,19 @@ private:
 
         UnloadCurrentScene();
         PhysicsWorld::Clear();
-        TweenManager::Clear();
-        EventBus::Clear();
+        Input::DiscardPending();
         fixedAccumulator = 0;
 
         currentScene = std::move(next);
 
         if (currentScene) {
-            currentScene->OnLoad();
-            currentScene->Start();
+            currentScene->AttachCallbackScope(GetCallbackScope());
+            currentScene->Load();
         }
     }
 
     void Update() {
+        Input::CaptureFrame();
         RefreshWindowTheme();
         if (Input::GetKeyDown(KEY_F11) || (Input::GetKeyDown(KEY_ENTER)
             && (Input::GetKey(KEY_LEFT_ALT) || Input::GetKey(KEY_RIGHT_ALT)))) ToggleFullscreen();
@@ -246,7 +276,7 @@ private:
             if (IsFullscreen()) SetFullscreen(false);
             else Quit();
         }
-        if (Input::GetKeyDown(KEY_P)) paused = !paused;
+        if (Input::GetKeyDown(KEY_P)) SetPaused(!paused);
         RefreshCanvas();
         AudioManager::UpdateMusic();
 
@@ -255,6 +285,7 @@ private:
     }
 
     void Render() {
+        ScopeActivation scope(GetCallbackScope());
         Display::Begin();
         struct FrameScope {
             ~FrameScope() { UI::inputEnabled = true; Display::End(); }
@@ -262,7 +293,10 @@ private:
         ClearBackground(clearColor);
         UI::inputEnabled = !paused;
 
-        if (currentScene) currentScene->Render();
+        if (currentScene) {
+            ScopeActivation sceneScope(currentScene->GetCallbackScope());
+            currentScene->Render();
+        }
 
         OnRender();
 

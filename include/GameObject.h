@@ -29,7 +29,9 @@ public:
         if (destroyed) return nullptr;
         auto component = CreateRef<T>(std::forward<Args>(args)...);
         component->gameObject = this;
+        component->callbacks.SetParent(callbacks.Token());
         components.push_back(component);
+        ScopeActivation scope(component->GetCallbackScope());
         component->Awake();
         if (component->IsEnabled() && !destroyed) component->OnEnable();
         // Start is deferred so callers can configure the component first.
@@ -64,6 +66,7 @@ public:
             if (!active || destroyed) break;
             if (comp->IsEnabled() && !comp->HasStarted()) {
                 comp->started = true;
+                ScopeActivation scope(comp->GetCallbackScope());
                 comp->Start();
             }
         }
@@ -82,7 +85,8 @@ public:
     }
 
     bool IsDestroyed() const { return destroyed; }
-    void MarkDestroyed() { destroyed = true; active = false; }
+    void MarkDestroyed() { destroyed = true; active = false; callbacks.Cancel(); }
+    ScopeToken GetCallbackScope() const { return callbacks.Token(); }
 
     Ref<Transform> transform;
     Scene* scene = nullptr;
@@ -95,7 +99,10 @@ private:
         const auto snapshot = components;
         for (const auto& comp : snapshot) {
             if (!active || destroyed) break;
-            if (comp->IsEnabled() && comp->HasStarted()) (comp.get()->*callback)();
+            if (comp->IsEnabled() && comp->HasStarted()) {
+                ScopeActivation scope(comp->GetCallbackScope());
+                (comp.get()->*callback)();
+            }
         }
     }
 
@@ -104,6 +111,7 @@ private:
         finalized = true;
         MarkDestroyed();
         for (const auto& comp : components) {
+            ScopeActivation scope(comp->GetCallbackScope());
             try { if (comp->IsEnabled()) comp->SetEnabled(false); }
             catch (...) { Diagnostics::Write(LogLevel::Error, "Component OnDisable failed during destruction"); }
             try { comp->OnDestroy(); }
@@ -114,6 +122,7 @@ private:
         scene = nullptr;
     }
 
+    CallbackScope callbacks;
     std::vector<Ref<Component>> components;
     bool destroyed = false;
     bool finalized = false;

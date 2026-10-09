@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core.h"
+#include "CallbackScope.h"
 
 namespace RayGame {
 
@@ -36,9 +37,12 @@ public:
     void SetEnabled(bool value) {
         if (enabled == value) return;
         enabled = value;
+        ScopeActivation scope(GetCallbackScope());
         if (enabled) OnEnable();
         else OnDisable();
     }
+
+    ScopeToken GetCallbackScope() const { return callbacks.Token(); }
 
     bool HasStarted() const { return started; }
 
@@ -48,6 +52,7 @@ public:
 
 protected:
     friend class GameObject;
+    CallbackScope callbacks;
     GameObject* gameObject;
     bool enabled;
     bool started;

@@ -235,6 +235,7 @@ private:
             if (generation != clearGeneration || !self->GetGameObject()) break;
             if (!obj->active || obj->IsDestroyed() || !self->IsEnabled()) break;
             if (!comp->IsEnabled() || !comp->HasStarted()) continue;
+            ScopeActivation scope(comp->GetCallbackScope());
             if (trigger) {
                 if (phase == Phase::Enter) comp->OnTriggerEnter(other);
                 else if (phase == Phase::Stay) comp->OnTriggerStay(other);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core.h"
+#include "ResourceHandle.h"
 #include "Component.h"
 #include "GameObject.h"
 #include <set>
@@ -11,7 +12,7 @@ namespace RayGame {
 // laid out left-to-right, top-to-bottom.
 class RAYGAME_API Tilemap : public Component {
 public:
-    Texture2D* tileset = nullptr;
+    TextureHandle tileset = nullptr;
     int tileWidth = 32;
     int tileHeight = 32;
     int columns = 0;   // grid columns
@@ -55,8 +56,8 @@ public:
     }
 
     void Render() override {
-        if (!tileset || columns <= 0 || rows <= 0 || tileWidth <= 0 || tileHeight <= 0) return;
-        int tilesetCols = tileset->width / tileWidth;
+        if (columns <= 0 || rows <= 0 || tileWidth <= 0 || tileHeight <= 0) return;
+        int tilesetCols = tileset ? tileset->width / tileWidth : 1;
         if (tilesetCols <= 0) return;
 
         Vector2 scale = gameObject ? gameObject->transform->GetWorldScale() : Vector2{1, 1};
@@ -73,7 +74,8 @@ public:
                 if (scale.y < 0) src.height = -src.height;
                 Rectangle dest = {pos.x, pos.y, std::fabs(tileWidth * scale.x), std::fabs(tileHeight * scale.y)};
                 Vector2 origin = {scale.x < 0 ? dest.width : 0, scale.y < 0 ? dest.height : 0};
-                DrawTexturePro(*tileset, src, dest, origin, rotation, tint);
+                if (tileset) DrawTexturePro(*tileset, src, dest, origin, rotation, tint);
+                else DrawRectanglePro(dest, origin, rotation, MAGENTA);
             }
         }
     }

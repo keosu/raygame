@@ -57,11 +57,11 @@ inline void Triangle(Vector2 a, Vector2 b, Vector2 c, Color color) {
     DrawTriangle(a, b, c, color);
 }
 
-inline Font* LoadFont(const std::string& file, int size) {
+inline RayGame::FontHandle LoadFont(const std::string& file, int size) {
     std::string path = std::string(GetApplicationDirectory()) + "assets/fonts/" + file;
     if (!FileExists(path.c_str())) path = "assets/fonts/" + file;
     if (!FileExists(path.c_str())) return nullptr;
-    auto* font = RayGame::ResourceManager::LoadFontResource(file, path, size);
+    auto font = RayGame::ResourceManager::LoadFontResource(file, path, size);
     if (font) SetTextureFilter(font->texture, TEXTURE_FILTER_BILINEAR);
     return font;
 }

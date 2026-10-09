@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core.h"
+#include "ResourceHandle.h"
 #include "Input.h"
 
 namespace RayGame {
@@ -8,8 +9,8 @@ namespace RayGame {
 // Immediate-mode UI helpers. Call per-frame during a Scene's Render (screen space).
 class RAYGAME_API UI {
 public:
-    static Font* font;              // optional custom font
-    static inline Font* headingFont = nullptr;
+    static FontHandle font;              // optional custom font
+    static inline FontHandle headingFont = nullptr;
     static inline bool inputEnabled = true;
     static Color textColor;
     static Color accentColor;
@@ -57,12 +58,13 @@ public:
     // Returns true on click (mouse released inside while pressed inside).
     static bool Button(Rectangle rect, const std::string& label, int size = 20) {
         Vector2 m = Input::GetMousePosition();
-        if (!inputEnabled) hasPress = false;
-        if (inputEnabled && Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        bool acceptsInput = inputEnabled && Input::GetFrame().focused;
+        if (!acceptsInput) hasPress = false;
+        if (acceptsInput && Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             pressPosition = m;
             hasPress = true;
         }
-        bool hover = inputEnabled && Input::IsMouseInCanvas() && CheckCollisionPointRec(m, rect);
+        bool hover = acceptsInput && Input::IsMouseInCanvas() && CheckCollisionPointRec(m, rect);
         Color bg = hover ? Fade(accentColor, 0.4f) : Fade(accentColor, 0.15f);
         DrawRectangleRounded(rect, 0.25f, 8, bg);
         DrawRectangleRoundedLines(rect, 0.25f, 8, Fade(accentColor, hover ? 1.0f : 0.4f));
@@ -79,14 +81,14 @@ private:
     static inline Vector2 pressPosition = {0, 0};
     static inline bool hasPress = false;
     static float MeasureWidth(const std::string& text, int size, bool heading = false) {
-        Font* selected = heading && headingFont ? headingFont : font;
+        auto selected = heading && headingFont ? headingFont : font;
         if (selected && selected->texture.id != 0)
             return MeasureTextEx(*selected, text.c_str(), (float)size, 0.5f).x;
         return (float)MeasureText(text.c_str(), size);
     }
 
     static void DrawTextCustom(const std::string& text, float x, float y, int size, Color color, bool heading = false) {
-        Font* selected = heading && headingFont ? headingFont : font;
+        auto selected = heading && headingFont ? headingFont : font;
         if (selected && selected->texture.id != 0)
             DrawTextEx(*selected, text.c_str(), {x, y}, (float)size, 0.5f, color);
         else
@@ -94,7 +96,7 @@ private:
     }
 };
 
-inline Font* UI::font = nullptr;
+inline FontHandle UI::font = nullptr;
 inline Color UI::textColor = {226, 234, 248, 255};
 inline Color UI::accentColor = {80, 180, 255, 255};
 inline Color UI::panelColor = {12, 19, 34, 235};

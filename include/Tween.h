@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core.h"
+#include "CallbackScope.h"
 
 namespace RayGame {
 
@@ -60,10 +61,24 @@ struct TweenInstance {
 
 class RAYGAME_API TweenManager {
 public:
-    static unsigned long Add(const TweenInstance& t) {
-        auto inst = CreateRef<TweenInstance>(t);
+    static unsigned long Add(const TweenInstance& t, ScopeToken owner = ScopeToken::Current()) {
+        auto inst = CreateRef<ManagedTween>(t);
+        inst->owner = owner;
+        // Copyable wrappers preserve mutable callback state across invocations.
+        if (t.onUpdate) {
+            auto callback = std::make_shared<std::function<void(float)>>(t.onUpdate);
+            inst->onUpdate = [callback](float value) { (*callback)(value); };
+        }
+        if (t.onComplete) {
+            auto callback = std::make_shared<std::function<void()>>(t.onComplete);
+            inst->onComplete = [callback] { (*callback)(); };
+        }
         inst->id = ++nextId;
-        tweens.push_back(inst);
+        std::weak_ptr<ManagedTween> weak = inst;
+        inst->cancellation = owner.OnCancel([weak] {
+            if (auto value = weak.lock()) Stop(*value);
+        });
+        if (inst->active) tweens.push_back(inst);
         return inst->id;
     }
 
@@ -74,7 +89,8 @@ public:
         const auto snapshot = tweens;
         for (const auto& instance : snapshot) {
             auto& t = *instance;
-            if (!t.active) continue;
+            if (!t.active || !t.owner.IsAlive()) { Stop(t); continue; }
+            ScopeActivation ownerScope(t.owner);
             float remaining = dt;
             if (t.delay > 0) {
                 float consumed = std::min(t.delay, remaining);
@@ -95,33 +111,50 @@ public:
             }
             float p = t.reversed ? 1.0f - raw : raw;
             float v = Lerp(t.from, t.to, ApplyEase(t.ease, p));
-            if (t.onUpdate) t.onUpdate(v);
+            auto update = t.onUpdate;
+            if (update) update(v);
 
             if (t.active && complete) {
-                t.active = false;
-                if (t.onComplete) t.onComplete();
+                auto completeCallback = t.onComplete;
+                Stop(t);
+                if (completeCallback) completeCallback();
             }
         }
         tweens.erase(std::remove_if(tweens.begin(), tweens.end(),
-            [](const Ref<TweenInstance>& t) { return !t->active; }), tweens.end());
+            [](const Ref<ManagedTween>& t) { return !t->active; }), tweens.end());
         updating = false;
     }
 
     static void Cancel(unsigned long id) {
-        for (auto& t : tweens) if (t->id == id) t->active = false;
+        auto found = std::find_if(tweens.begin(), tweens.end(), [id](const auto& t) { return t->id == id; });
+        if (found == tweens.end()) return;
+        auto removed = *found;
+        Stop(*removed);
     }
 
     static void Clear() {
-        for (const auto& t : tweens) t->active = false;
+        auto removed = std::move(tweens);
         tweens.clear();
+        for (const auto& t : removed) Stop(*t);
     }
     static int Count() {
         return (int)std::count_if(tweens.begin(), tweens.end(),
-            [](const Ref<TweenInstance>& t) { return t->active; });
+            [](const Ref<ManagedTween>& t) { return t->active; });
     }
 
 private:
-    static inline std::vector<Ref<TweenInstance>> tweens;
+    struct ManagedTween : TweenInstance {
+        explicit ManagedTween(const TweenInstance& value) : TweenInstance(value) {}
+        ScopeToken owner;
+        CancellationLink cancellation;
+    };
+    static void Stop(ManagedTween& value) {
+        value.active = false;
+        value.cancellation.Reset();
+        auto update = std::move(value.onUpdate);
+        auto complete = std::move(value.onComplete);
+    }
+    static inline std::vector<Ref<ManagedTween>> tweens;
     static inline unsigned long nextId = 0;
     static inline bool updating = false;
 };
@@ -130,18 +163,20 @@ private:
 struct Tween {
     static unsigned long To(float from, float to, float duration, Ease ease,
                             std::function<void(float)> onUpdate,
-                            std::function<void()> onComplete = nullptr) {
+                            std::function<void()> onComplete = nullptr,
+                            ScopeToken owner = ScopeToken::Current()) {
         TweenInstance t;
         t.from = from; t.to = to; t.duration = duration; t.ease = ease;
         t.onUpdate = std::move(onUpdate); t.onComplete = std::move(onComplete);
-        return TweenManager::Add(t);
+        return TweenManager::Add(t, owner);
     }
 
-    static unsigned long Delay(float seconds, std::function<void()> onComplete) {
+    static unsigned long Delay(float seconds, std::function<void()> onComplete,
+                               ScopeToken owner = ScopeToken::Current()) {
         TweenInstance t;
         t.from = 0; t.to = 1; t.duration = 0; t.delay = std::max(0.0f, seconds);
         t.onComplete = std::move(onComplete);
-        return TweenManager::Add(t);
+        return TweenManager::Add(t, owner);
     }
 };
 

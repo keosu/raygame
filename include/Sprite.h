@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core.h"
+#include "ResourceHandle.h"
 #include "Component.h"
 #include "GameObject.h"
 #include "GameTime.h"
@@ -8,6 +9,15 @@
 namespace RayGame {
 
 namespace detail {
+inline void DrawMissingSprite(Rectangle source, const Transform& transform, Vector2 pivot) {
+    auto position = transform.GetWorldPosition();
+    auto scale = transform.GetWorldScale();
+    Rectangle dest = {position.x, position.y,
+        std::fabs((source.width != 0 ? source.width : 16) * scale.x),
+        std::fabs((source.height != 0 ? source.height : 16) * scale.y)};
+    DrawRectanglePro(dest, {dest.width * pivot.x, dest.height * pivot.y},
+                     transform.GetWorldRotation(), MAGENTA);
+}
 inline void DrawSprite(Texture2D texture, Rectangle source, const Transform& transform,
                        Vector2 pivot, bool flipX, bool flipY, Color tint) {
     Vector2 position = transform.GetWorldPosition();
@@ -24,7 +34,7 @@ inline void DrawSprite(Texture2D texture, Rectangle source, const Transform& tra
 
 class RAYGAME_API SpriteRenderer : public Component {
 public:
-    Texture2D* texture = nullptr;
+    TextureHandle texture = nullptr;
     Rectangle sourceRect = {0, 0, 0, 0};
     Color tint = WHITE;
     Vector2 pivot = {0.5f, 0.5f};  // Center by default
@@ -34,19 +44,20 @@ public:
     
     SpriteRenderer() = default;
     
-    SpriteRenderer(Texture2D* tex) : texture(tex) {
+    SpriteRenderer(TextureHandle tex) : texture(tex) {
         if (texture) {
             sourceRect = {0, 0, (float)texture->width, (float)texture->height};
         }
     }
     
-    SpriteRenderer(Texture2D* tex, Rectangle src)
+    SpriteRenderer(TextureHandle tex, Rectangle src)
         : texture(tex), sourceRect(src) {}
 
     int RenderLayer() const override { return layer; }
 
     void Render() override {
-        if (!texture || !gameObject) return;
+        if (!gameObject) return;
+        if (!texture) { detail::DrawMissingSprite(sourceRect, *gameObject->transform, pivot); return; }
         
         detail::DrawSprite(*texture, sourceRect, *gameObject->transform, pivot, flipX, flipY, tint);
     }
@@ -64,7 +75,7 @@ struct AnimationFrame {
 
 class RAYGAME_API SpriteAnimation : public Component {
 public:
-    Texture2D* spriteSheet = nullptr;
+    TextureHandle spriteSheet = nullptr;
     std::vector<AnimationFrame> frames;
     bool loop = true;
     bool playing = true;
@@ -126,9 +137,13 @@ public:
     }
     
     void Render() override {
-        if (!spriteSheet || frames.empty() || !gameObject) return;
+        if (frames.empty() || !gameObject) return;
         
         if (currentFrame < 0 || currentFrame >= (int)frames.size()) return;
+        if (!spriteSheet) {
+            detail::DrawMissingSprite(frames[currentFrame].sourceRect, *gameObject->transform, pivot);
+            return;
+        }
         detail::DrawSprite(*spriteSheet, frames[currentFrame].sourceRect,
                            *gameObject->transform, pivot, flipX, flipY, tint);
     }
