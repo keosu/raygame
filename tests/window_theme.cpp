@@ -7,6 +7,16 @@
 #include <cstdio>
 #endif
 
+bool NativeWindowHasIcon(void* window) {
+#ifdef _WIN32
+    return SendMessageW(static_cast<HWND>(window), WM_GETICON, ICON_BIG, 0) != 0
+        && SendMessageW(static_cast<HWND>(window), WM_GETICON, ICON_SMALL, 0) != 0;
+#else
+    (void)window;
+    return true;
+#endif
+}
+
 bool NativeWindowThemeMatchesSystem(void* window) {
 #ifdef _WIN32
     BOOL dark = FALSE;

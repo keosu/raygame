@@ -17,6 +17,8 @@ public:
     virtual void Start() {}
     virtual void Update() {}
     virtual void FixedUpdate() {}
+    virtual void PostFixedUpdate() {} // After integration, collision resolution and callbacks.
+    virtual void LateUpdate() {}      // Once per frame, after all fixed ticks.
     virtual void Render() {}
     virtual void OnDestroy() {}
     virtual void OnEnable() {}
@@ -121,6 +123,44 @@ public:
             SetWorldRotation(worldRot);
             SetWorldScale(worldScl);
         }
+        ResetInterpolation();
+    }
+
+    // Simulation always reads the authoritative TRS above. Renderers use these
+    // accessors for optional interpolation, including the interpolated hierarchy.
+    void SetInterpolationEnabled(bool value) { interpolate = value; ResetInterpolation(); }
+    bool IsInterpolationEnabled() const { return interpolate; }
+    void ResetInterpolation() { hasPrevious = false; }
+    void Teleport(Vector2 worldPosition) { SetWorldPosition(worldPosition); ResetInterpolation(); }
+    void CapturePreviousPose() {
+        previousPosition = position; previousRotation = rotation; previousScale = scale;
+        hasPrevious = interpolate;
+    }
+    void SetRenderAlpha(float alpha) { renderAlpha = std::isfinite(alpha) ? Clamp(alpha, 0.0f, 1.0f) : 1.0f; }
+    Vector2 GetRenderPosition() const {
+        Vector2 local = RenderPosition();
+        return parent ? parent->TransformRenderPoint(local) : local;
+    }
+    float GetRenderRotation() const {
+        float local = interpolate && hasPrevious
+            ? previousRotation + std::remainder(rotation - previousRotation, 360.0f) * renderAlpha : rotation;
+        return parent ? parent->GetRenderRotation() + local : local;
+    }
+    Vector2 GetRenderScale() const {
+        Vector2 local = RenderScale();
+        if (!parent) return local;
+        Vector2 p = parent->GetRenderScale();
+        return {p.x * local.x, p.y * local.y};
+    }
+    Vector2 TransformRenderPoint(Vector2 local) const {
+        Vector2 pos = RenderPosition(), scl = RenderScale();
+        float rot = interpolate && hasPrevious
+            ? previousRotation + std::remainder(rotation - previousRotation, 360.0f) * renderAlpha : rotation;
+        float rad = rot * DEG2RAD;
+        Vector2 scaled = {local.x * scl.x, local.y * scl.y};
+        Vector2 point = {pos.x + scaled.x * std::cos(rad) - scaled.y * std::sin(rad),
+                         pos.y + scaled.x * std::sin(rad) + scaled.y * std::cos(rad)};
+        return parent ? parent->TransformRenderPoint(point) : point;
     }
 
     Vector2 GetWorldPosition() const {
@@ -177,6 +217,15 @@ public:
     ~Transform() override { DetachHierarchy(); }
 
 private:
+    Vector2 RenderPosition() const {
+        return interpolate && hasPrevious ? Lerp(previousPosition, position, renderAlpha) : position;
+    }
+    Vector2 RenderScale() const {
+        return interpolate && hasPrevious ? Lerp(previousScale, scale, renderAlpha) : scale;
+    }
+    Vector2 previousPosition{}, previousScale{1, 1};
+    float previousRotation = 0, renderAlpha = 1;
+    bool interpolate = false, hasPrevious = false;
     Transform* parent = nullptr;
     std::vector<Transform*> children;
 };

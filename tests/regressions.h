@@ -18,7 +18,6 @@ struct LifecycleProbe : Component {
 
 static void TestLifecycle() {
     printf("[lifecycle and rendering]\n");
-    PhysicsWorld::Clear();
     Scene scene;
     auto object = scene.CreateGameObject();
     auto probe = object->AddComponent<LifecycleProbe>();
@@ -63,11 +62,11 @@ static void TestLifecycle() {
     CHECK(spawned->updates == 1);
     object->AddComponent<CircleCollider>();
     scene.Update();
-    CHECK(PhysicsWorld::GetColliderCount() == 1);
+    CHECK(scene.GetPhysicsWorld().GetColliderCount() == 1);
     scene.Destroy(object);
     scene.Update();
     CHECK(probe->destroys == 1 && probe->GetGameObject() == nullptr);
-    CHECK(object->scene == nullptr && PhysicsWorld::GetColliderCount() == 0);
+    CHECK(object->scene == nullptr && scene.GetPhysicsWorld().GetColliderCount() == 0);
     object.reset();
     CHECK(probe->destroys == 1);
     scene.Clear();
@@ -150,10 +149,10 @@ static void TestTransformAndTilemap() {
     auto camera = cameraObject->AddComponent<Camera2DComponent>();
     camera->SetTarget(child.get());
     GameTime::Update(1);
-    camera->Update();
+    camera->LateUpdate();
     CHECK(camera->GetCamera().target.x > 0);
     child.reset();
-    camera->Update();
+    camera->LateUpdate();
     CHECK(!camera->followEnabled && camera->target == nullptr);
 }
 
@@ -206,7 +205,6 @@ static void TestTweenMutationAndTiming() {
 
 static void TestPhysicsResolutionAndMutation() {
     printf("[physics resolution and callback mutation]\n");
-    PhysicsWorld::Clear();
     for (int shape = 0; shape < 3; ++shape) {
         Scene scene;
         auto a = scene.CreateGameObject();
@@ -220,12 +218,12 @@ static void TestPhysicsResolutionAndMutation() {
         ra->restitution = rb->restitution = 1;
         ra->velocity = {10, 0}; rb->velocity = {-10, 0};
         scene.Start();
-        PhysicsWorld::Step();
+        scene.GetPhysicsWorld().Step();
         CHECK(Approx(ra->velocity.x, -10) && Approx(rb->velocity.x, 10));
         CHECK(b->transform->position.x - a->transform->position.x > 19.99f);
-        PhysicsWorld::Step();
+        scene.GetPhysicsWorld().Step();
         CHECK(Approx(ra->velocity.x, -10) && Approx(rb->velocity.x, 10));
-        scene.Clear(); PhysicsWorld::Clear();
+        scene.Clear();
     }
     {
         Scene scene;
@@ -237,14 +235,13 @@ static void TestPhysicsResolutionAndMutation() {
         auto body = a->AddComponent<Rigidbody>();
         body->velocity = {-20, 7}; body->restitution = 1;
         scene.Start();
-        PhysicsWorld::Step();
+        scene.GetPhysicsWorld().Step();
         CHECK(Approx(body->velocity.x, 20) && Approx(body->velocity.y, 7));
         CHECK(a->transform->position.x > 14.99f);
         a->transform->position = {9, 20}; body->velocity = {0, 0};
-        PhysicsWorld::Step();
+        scene.GetPhysicsWorld().Step();
         CHECK(a->transform->position.x > 14.99f);
     }
-    PhysicsWorld::Clear();
     {
         Scene scene;
         auto a = scene.CreateGameObject();
@@ -254,21 +251,20 @@ static void TestPhysicsResolutionAndMutation() {
         auto hits = a->AddComponent<HitCounter>();
         scene.Start();
         b->active = false;
-        PhysicsWorld::Step(); CHECK(hits->enters == 0);
+        scene.GetPhysicsWorld().Step(); CHECK(hits->enters == 0);
         b->active = true; cb->layer = 32;
-        PhysicsWorld::Step(); CHECK(hits->enters == 0);
+        scene.GetPhysicsWorld().Step(); CHECK(hits->enters == 0);
         cb->layer = 1; ca->mask = 1;
-        PhysicsWorld::Step(); CHECK(hits->enters == 0);
+        scene.GetPhysicsWorld().Step(); CHECK(hits->enters == 0);
         ca->mask = 2;
-        PhysicsWorld::Step(); CHECK(hits->enters == 1);
+        scene.GetPhysicsWorld().Step(); CHECK(hits->enters == 1);
         cb->SetEnabled(false);
-        PhysicsWorld::Step(); CHECK(hits->exits == 1);
+        scene.GetPhysicsWorld().Step(); CHECK(hits->exits == 1);
         cb->SetEnabled(true);
-        PhysicsWorld::Step(); CHECK(hits->enters == 2);
+        scene.GetPhysicsWorld().Step(); CHECK(hits->enters == 2);
         scene.Destroy(b); scene.Update();
-        PhysicsWorld::Step(); CHECK(hits->exits == 2);
+        scene.GetPhysicsWorld().Step(); CHECK(hits->exits == 2);
     }
-    PhysicsWorld::Clear();
     {
         Scene scene;
         auto a = scene.CreateGameObject();
@@ -289,13 +285,12 @@ static void TestPhysicsResolutionAndMutation() {
             ca->SetEnabled(false);
         };
         scene.Start();
-        PhysicsWorld::Step();
-        CHECK(calls == 1 && PhysicsWorld::GetColliderCount() == 65);
-        PhysicsWorld::Step();
+        scene.GetPhysicsWorld().Step();
+        CHECK(calls == 1 && scene.GetPhysicsWorld().GetColliderCount() == 65);
+        scene.GetPhysicsWorld().Step();
         CHECK(calls == 1);
         scene.Clear();
     }
-    PhysicsWorld::Clear();
     {
         Scene scene;
         auto a = scene.CreateGameObject();
@@ -303,12 +298,11 @@ static void TestPhysicsResolutionAndMutation() {
         a->AddComponent<CircleCollider>();
         b->AddComponent<CircleCollider>()->isTrigger = true;
         auto clear = a->AddComponent<LifecycleProbe>();
-        clear->onHit = [&] { PhysicsWorld::Clear(); scene.Clear(); };
+        clear->onHit = [&] { scene.GetPhysicsWorld().Clear(); scene.Clear(); };
         scene.Start();
-        PhysicsWorld::Step();
-        CHECK(PhysicsWorld::GetColliderCount() == 0 && scene.GetAllGameObjects().empty());
+        scene.GetPhysicsWorld().Step();
+        CHECK(scene.GetPhysicsWorld().GetColliderCount() == 0 && scene.GetAllGameObjects().empty());
     }
-    PhysicsWorld::Clear();
 }
 
 class LogicEngine : public GameEngine {
@@ -367,11 +361,11 @@ static void TestFixedLoopAndSceneSwitch() {
     CHECK(engine.GetCurrentScene() == second && second->loads == 1);
     CHECK(first->unloads == 1 && first->probe->destroys == 1);
     CHECK(first->retained->IsDestroyed() && first->retained->scene == nullptr);
-    CHECK(staleCalls == 0 && PhysicsWorld::GetColliderCount() == 1);
+    CHECK(staleCalls == 0 && second->GetPhysicsWorld().GetColliderCount() == 1);
     engine.Shutdown();
     engine.Shutdown();
     CHECK(second->unloads == 1 && second->probe->destroys == 1);
-    CHECK(PhysicsWorld::GetColliderCount() == 0);
+    CHECK(second->GetPhysicsWorld().GetColliderCount() == 0);
 }
 
 static void TestUtilities() {

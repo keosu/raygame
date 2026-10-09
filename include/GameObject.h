@@ -80,6 +80,9 @@ public:
         Visit(&Component::FixedUpdate);
     }
 
+    void PostFixedUpdate() { Visit(&Component::PostFixedUpdate); }
+    void LateUpdate() { Visit(&Component::LateUpdate); }
+
     void Render() {
         Visit(&Component::Render);
     }
@@ -93,6 +96,7 @@ public:
 
 private:
     friend class Scene;
+    void IntegratePhysics(float dt);
 
     void Visit(void (Component::*callback)()) {
         Start();

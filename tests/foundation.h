@@ -67,7 +67,7 @@ static void Lifecycle() {
         engine.Tick(0);
     }
     CHECK(loaded->unloads == 1 && loaded->probe->destroys == 1);
-    CHECK(loaded->retained->scene == nullptr && PhysicsWorld::GetColliderCount() == 0);
+    CHECK(loaded->retained->scene == nullptr && loaded->GetPhysicsWorld().GetColliderCount() == 0);
 
     // A throwing callback must not permanently latch a global scheduler's guard.
     Tween::Delay(0, [] { throw std::runtime_error("tween failure"); });
@@ -83,12 +83,12 @@ static void Lifecycle() {
     trigger->onHit = [] { throw std::runtime_error("physics callback failure"); };
     scene.CreateGameObject()->AddComponent<CircleCollider>();
     scene.Start();
-    try { PhysicsWorld::Step(); } catch (const std::runtime_error&) {}
+    try { scene.GetPhysicsWorld().Step(); } catch (const std::runtime_error&) {}
     trigger->onHit = [&] { ++completed; };
-    PhysicsWorld::Step();
+    scene.GetPhysicsWorld().Step();
     CHECK(completed == 2);
     scene.Clear();
-    PhysicsWorld::Clear();
+    scene.GetPhysicsWorld().Clear();
 }
 
 static void TimingAndAspect() {

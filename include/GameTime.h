@@ -20,7 +20,23 @@ public:
         frameCount++;
     }
     
-    static float DeltaTime() { return deltaTime; }
+    // Fixed callbacks observe the fixed interval and the current tick's time.
+    // The frame view is restored even when a callback throws.
+    class FixedStepScope {
+    public:
+        FixedStepScope(float dt, double time) : previousFixed(inFixedStep), previousDelta(fixedDeltaTime), previousTime(fixedTime) {
+            inFixedStep = true; fixedDeltaTime = dt; fixedTime = time;
+        }
+        ~FixedStepScope() { inFixedStep = previousFixed; fixedDeltaTime = previousDelta; fixedTime = previousTime; }
+        FixedStepScope(const FixedStepScope&) = delete;
+        FixedStepScope& operator=(const FixedStepScope&) = delete;
+    private:
+        bool previousFixed;
+        float previousDelta;
+        double previousTime;
+    };
+    static bool IsFixedStep() { return inFixedStep; }
+    static float DeltaTime() { return inFixedStep ? fixedDeltaTime : deltaTime; }
     static float UnscaledDeltaTime() { return unscaledDeltaTime; }
     static double UnscaledTime() { return unscaledTime; }
     static float FixedDeltaTime() { return fixedDeltaTime; }
@@ -28,11 +44,13 @@ public:
         if (std::isfinite(dt) && dt > 0) fixedDeltaTime = dt;
     }
     static void Reset() { deltaTime = 0; time = 0; frameCount = 0; unscaledDeltaTime = 0; unscaledTime = 0; }
-    static float GetTime() { return time; }
+    static float GetTime() { return inFixedStep ? (float)fixedTime : time; }
     static int GetFrameCount() { return frameCount; }
     static float FPS() { return GetFPS(); }
     
 private:
+    static inline bool inFixedStep = false;
+    static inline double fixedTime = 0;
     static inline float deltaTime = 0.0f;
     static inline float unscaledDeltaTime = 0.0f;
     static inline double unscaledTime = 0.0;

@@ -9,6 +9,8 @@
 
 namespace RayGame {
 
+class PhysicsWorld;
+
 enum class ColliderType { Box, Circle };
 
 class RAYGAME_API Collider : public Component {
@@ -29,7 +31,12 @@ public:
     void Start() override;
     void OnDestroy() override;
     void OnEnable() override;
-    void OnDisable() override;
+    void OnDisable() override {} // Keep the binding; inactive contacts exit on the next step.
+    PhysicsWorld* GetPhysicsWorld() const { return world; }
+
+private:
+    friend class PhysicsWorld;
+    PhysicsWorld* world = nullptr;
 
 protected:
     explicit Collider(ColliderType t) : type(t) {}
@@ -94,6 +101,7 @@ public:
     float gravity = 0.0f;
     bool useGravity = false;
     bool isKinematic = false;
+    bool interpolate = true;
     float restitution = 0.8f;
 
     float InverseMass() const {
@@ -110,9 +118,12 @@ public:
         velocity.y += impulse.y * InverseMass();
     }
 
-    void FixedUpdate() override {
+    void Start() override { if (gameObject) gameObject->transform->SetInterpolationEnabled(interpolate); }
+
+    // Called by the scene after all pre-physics FixedUpdate callbacks.
+    void Integrate(float dt) {
         if (!gameObject || InverseMass() == 0) { acceleration = {0, 0}; return; }
-        float dt = GameTime::FixedDeltaTime();
+        if (!std::isfinite(dt) || dt <= 0) return;
         velocity.x += acceleration.x * dt;
         velocity.y += (acceleration.y + (useGravity ? gravity : 0.0f)) * dt;
         float damping = std::pow(Clamp(drag, 0.0f, 1.0f), dt * 60.0f);
@@ -130,29 +141,19 @@ public:
 
 class RAYGAME_API PhysicsWorld {
 public:
-    static void AddCollider(Collider* collider) {
-        if (!collider || !collider->GetGameObject() || registered.count(collider)) return;
-        for (const auto& comp : collider->GetGameObject()->GetAllComponents()) {
-            if (comp.get() == collider) {
-                colliders.push_back(std::static_pointer_cast<Collider>(comp));
-                registered.insert(collider);
-                break;
-            }
-        }
-    }
+    explicit PhysicsWorld(Scene* owner = nullptr) : owner(owner) {}
+    ~PhysicsWorld() { Clear(); }
+    PhysicsWorld(const PhysicsWorld&) = delete;
+    PhysicsWorld& operator=(const PhysicsWorld&) = delete;
 
-    static void RemoveCollider(Collider* collider) {
-        registered.erase(collider);
-        colliders.erase(std::remove_if(colliders.begin(), colliders.end(),
-            [collider](const Ref<Collider>& c) { return c.get() == collider; }), colliders.end());
-        // Keep contact references until Step sends Exit to surviving objects.
-    }
+    void AddCollider(Collider* collider);
+    void RemoveCollider(Collider* collider);
 
     // Detection/resolution runs after each fixed-timestep integration.
-    static void Step() {
+    void Step() {
         if (stepping) return;
         stepping = true;
-        struct StepScope { ~StepScope() { stepping = false; } } scope;
+        struct StepScope { PhysicsWorld& world; ~StepScope() { world.stepping = false; } } scope{*this};
         const auto snapshot = colliders;
         const auto previous = activePairs;
         const auto generation = clearGeneration;
@@ -187,15 +188,20 @@ public:
         stepping = false;
     }
 
-    static void CheckCollisions() { Step(); }
-    static void DebugDraw() { for (const auto& c : colliders) if (IsActive(c.get())) c->DebugDraw(); }
-    static void Clear() {
+    void CheckCollisions() { Step(); }
+    void DebugDraw() { for (const auto& c : colliders) if (IsActive(c.get())) c->DebugDraw(); }
+    void Clear() {
         ++clearGeneration;
+        for (const auto& collider : colliders) if (collider->world == this) collider->world = nullptr;
         registered.clear();
         colliders.clear();
         activePairs.clear();
     }
-    static int GetColliderCount() { return (int)colliders.size(); }
+    int GetColliderCount() const {
+        return (int)std::count_if(colliders.begin(), colliders.end(),
+            [](const Ref<Collider>& c) { return c->IsEnabled(); });
+    }
+    size_t GetContactCount() const { return activePairs.size(); }
 
 private:
     enum class Phase { Enter, Stay, Exit };
@@ -208,25 +214,27 @@ private:
     };
     struct Contact { Ref<Collider> a, b; bool trigger; };
     struct Manifold { Vector2 normal; float depth; };
-    static inline std::vector<Ref<Collider>> colliders;
-    static inline std::unordered_set<Collider*> registered;
-    static inline std::map<Key, Contact, KeyLess> activePairs;
-    static inline unsigned long clearGeneration = 0;
-    static inline bool stepping = false;
+    std::vector<Ref<Collider>> colliders;
+    std::unordered_set<Collider*> registered;
+    std::map<Key, Contact, KeyLess> activePairs;
+    unsigned long clearGeneration = 0;
+    bool stepping = false;
+    Scene* owner = nullptr;
 
     static Key MakeKey(Collider* a, Collider* b) {
         return std::less<Collider*>{}(a, b) ? Key{a, b} : Key{b, a};
     }
-    static bool IsActive(Collider* c) {
+    bool IsActive(Collider* c) {
         return registered.count(c) && c->IsEnabled() && c->GetGameObject()
             && c->GetGameObject()->active && !c->GetGameObject()->IsDestroyed();
     }
-    static void Dispatch(const Contact& c, Phase phase) {
+    void Dispatch(const Contact& c, Phase phase) {
         const auto generation = clearGeneration;
         NotifyAll(c.a.get(), c.b.get(), c.trigger, phase);
         if (generation == clearGeneration) NotifyAll(c.b.get(), c.a.get(), c.trigger, phase);
     }
-    static void NotifyAll(Collider* self, Collider* other, bool trigger, Phase phase) {
+    void NotifyAll(Collider* self, Collider* other, bool trigger, Phase phase) {
+        if (self->world && self->world != this) return;
         auto* obj = self->GetGameObject();
         if (!obj || !obj->active || obj->IsDestroyed() || !self->IsEnabled()) return;
         const auto components = obj->GetAllComponents();
@@ -313,9 +321,5 @@ private:
 };
 
 inline bool Collider::CheckCollision(Collider* other) { return Collide(this, other); }
-inline void Collider::Start() { if (IsEnabled()) PhysicsWorld::AddCollider(this); }
-inline void Collider::OnDestroy() { PhysicsWorld::RemoveCollider(this); }
-inline void Collider::OnEnable() { if (HasStarted()) PhysicsWorld::AddCollider(this); }
-inline void Collider::OnDisable() { PhysicsWorld::RemoveCollider(this); }
 
 }

@@ -41,7 +41,7 @@ public:
 
     void OnDestroy() override { EventBus::Unsubscribe("shake", subscription); }
 
-    void Update() override {
+    void LateUpdate() override {
         if (!cam) return;
         float shake = trauma * trauma;
         float mag = 14.0f * shake;
@@ -84,8 +84,8 @@ public:
     Brick() { renderOrder = 0; }
 
     void Render() override {
-        Vector2 p = gameObject->transform->GetWorldPosition();
-        Vector2 scale = gameObject->transform->GetWorldScale();
+        Vector2 p = gameObject->transform->GetRenderPosition();
+        Vector2 scale = gameObject->transform->GetRenderScale();
         Vector2 extent = {size.x * scale.x, size.y * scale.y};
         Rectangle r = {p.x - extent.x/2, p.y - extent.y/2, extent.x, extent.y};
         DrawGlowRect(r, color);
@@ -119,8 +119,9 @@ public:
     Vector2 size = {120, 18};
 
     Paddle() { renderOrder = 10; }
+    void Start() override { gameObject->transform->SetInterpolationEnabled(true); }
 
-    void Update() override {
+    void FixedUpdate() override {
         auto& pos = gameObject->transform->position;
         float move = Input::GetAxis("Horizontal");
         pos.x += move * speed * GameTime::DeltaTime();
@@ -137,7 +138,7 @@ public:
     }
 
     void Render() override {
-        Vector2 p = gameObject->transform->position;
+        Vector2 p = gameObject->transform->GetRenderPosition();
         Rectangle r = {p.x - size.x/2, p.y - size.y/2, size.x, size.y};
         DrawGlowRect(r, Color{80, 220, 255, 255}, 0.6f);
     }
@@ -157,9 +158,10 @@ public:
 
     Ball() { renderOrder = 20; }
 
-    void Update() override;   // defined after scene
+    void Start() override { gameObject->transform->SetInterpolationEnabled(true); }
+    void FixedUpdate() override;   // defined after scene
     void Render() override {
-        Vector2 p = gameObject->transform->position;
+        Vector2 p = gameObject->transform->GetRenderPosition();
         for (size_t i = 0; i < trail.size(); i++) {
             float a = (float)i / trail.size();
             DrawCircleV(trail[i], radius * a, Fade(Color{120, 240, 255, 255}, a * 0.4f));
@@ -205,7 +207,7 @@ public:
     }
 
     void OnLoad() override {
-        ExampleUI::Initialize(ExampleUI::cyan);
+        ExampleUI::Initialize(ExampleUI::cyan, "neon_breakout");
         SaveSystem save;
         if (savePath.empty()) {
             savePath = FileSystem::UserDataDirectory("raygame.neon_breakout") / "breakout_save.txt";
@@ -344,7 +346,7 @@ public:
 };
 
 // ---- Ball methods (need full scene) ----
-void Ball::Update() {
+void Ball::FixedUpdate() {
     if (game && game->gameOver) return;
     auto& pos = gameObject->transform->position;
 

@@ -18,7 +18,7 @@ static void DrawGlowCircle(Vector2 p, float r, Color c) {
 
 // ---- Pooled bullet field (data-oriented) ----
 struct Bullet {
-    Vector2 pos{0,0};
+    Vector2 pos{0,0}, previous{0,0};
     Vector2 vel{0,0};
     float radius = 6;
     Color color = WHITE;
@@ -34,7 +34,7 @@ public:
 
     void Spawn(Vector2 pos, Vector2 vel, float radius, Color color) {
         Bullet* b = pool.Acquire();
-        b->pos = pos; b->vel = vel; b->radius = radius; b->color = color; b->active = true;
+        b->pos = b->previous = pos; b->vel = vel; b->radius = radius; b->color = color; b->active = true;
         live.push_back(b);
     }
 
@@ -45,10 +45,11 @@ public:
 
     int Count() const { return (int)live.size(); }
 
-    void Update() override {
+    void FixedUpdate() override {
         float dt = GameTime::DeltaTime();
         for (size_t i = 0; i < live.size();) {
             Bullet* b = live[i];
+            b->previous = b->pos;
             b->pos.x += b->vel.x * dt;
             b->pos.y += b->vel.y * dt;
             if (b->pos.x < -40 || b->pos.x > ExampleUI::Width() + 40 ||
@@ -62,7 +63,8 @@ public:
     }
 
     void Render() override {
-        for (auto* b : live) DrawGlowCircle(b->pos, b->radius, b->color);
+        for (auto* b : live) DrawGlowCircle(Lerp(b->previous, b->pos,
+            gameObject->scene->GetInterpolationAlpha()), b->radius, b->color);
     }
 
     // Returns true and removes the first bullet overlapping the circle.
@@ -89,8 +91,9 @@ public:
     float fireInterval = 0.08f;
     float timer = 0;
     Color color = {255, 90, 160, 255};
+    void Start() override { gameObject->transform->SetInterpolationEnabled(true); }
 
-    void Update() override {
+    void FixedUpdate() override {
         gameObject->transform->rotation += spinSpeed * GameTime::DeltaTime();
         timer += GameTime::DeltaTime();
         if (timer >= fireInterval && field) {
@@ -103,7 +106,7 @@ public:
     }
 
     void Render() override {
-        Vector2 wp = gameObject->transform->GetWorldPosition();
+        Vector2 wp = gameObject->transform->GetRenderPosition();
         DrawGlowCircle(wp, 10, color);
     }
 };
@@ -124,9 +127,9 @@ public:
     Boss() { renderOrder = 20; }
 
     void Start() override;   // builds turret children
-    void Update() override;  // movement + patterns
+    void FixedUpdate() override;  // movement + patterns
     void Render() override {
-        Vector2 p = gameObject->transform->GetWorldPosition();
+        Vector2 p = gameObject->transform->GetRenderPosition();
         float pulse = 1.0f + 0.08f * sinf(GameTime::GetTime() * 4);
         DrawGlowCircle(p, 44 * pulse, Color{180, 60, 255, 255});
         DrawGlowCircle(p, 22, Color{255, 120, 220, 255});
@@ -149,9 +152,11 @@ public:
 
     Player() { renderOrder = 25; }
 
-    void Update() override;
+    void Start() override { gameObject->transform->SetInterpolationEnabled(true); }
+    void FixedUpdate() override;
+    void PostFixedUpdate() override;
     void Render() override {
-        Vector2 p = gameObject->transform->position;
+        Vector2 p = gameObject->transform->GetRenderPosition();
         Color c = invuln > 0 && ((int)(GameTime::GetTime()*20) % 2) ? Fade(SKYBLUE, 0.3f)
                                                                     : Color{120, 220, 255, 255};
         // ship triangle
@@ -182,7 +187,7 @@ public:
             if (!object->transform->GetParent())
                 object->transform->position = ExampleUI::Remap(object->transform->position, previous, current);
             if (auto field = object->GetComponent<BulletField>())
-                for (auto* bullet : field->live) bullet->pos = ExampleUI::Remap(bullet->pos, previous, current);
+                for (auto* bullet : field->live) bullet->previous = bullet->pos = ExampleUI::Remap(bullet->pos, previous, current);
         }
         if (player) {
             auto& p = player->transform->position;
@@ -192,7 +197,7 @@ public:
     }
 
     void OnLoad() override {
-        ExampleUI::Initialize(ExampleUI::pink);
+        ExampleUI::Initialize(ExampleUI::pink, "bullet_hell");
         EventBus::Subscribe("shake", [this](const EventData& d){ shake = Clamp(shake + d.f, 0.0f, 1.0f); });
 
         auto camObj = CreateGameObject("Camera");
@@ -223,6 +228,14 @@ public:
     void Update() override {
         if (!gameOver) Scene::Update();
 
+        if (gameOver && (restartRequested || Input::GetKeyDown(KEY_R))) Restart();
+    }
+
+    void FixedUpdate() override { if (!gameOver) Scene::FixedUpdate(); }
+    void PostFixedUpdate() override { if (!gameOver) Scene::PostFixedUpdate(); }
+
+    void LateUpdate() override {
+        Scene::LateUpdate();
         // camera shake
         if (activeCam) {
             float s = shake * shake * 16.0f;
@@ -233,9 +246,6 @@ public:
             shake = std::max(0.0f, shake - GameTime::DeltaTime() * 1.6f);
         }
 
-        if (gameOver && (restartRequested || Input::GetKeyDown(KEY_R))) {
-            Restart();
-        }
     }
 
     void Restart() {
@@ -244,7 +254,13 @@ public:
         Load();
     }
 
-    void EndGame(bool victory) { if (!gameOver) { gameOver = true; won = victory; } }
+    void EndGame(bool victory) {
+        if (gameOver) return;
+        gameOver = true; won = victory;
+        for (auto* field : {enemyField, playerField})
+            if (field) for (auto* bullet : field->live) bullet->previous = bullet->pos;
+        ResetInterpolation();
+    }
 
     void Render() override {
         DrawRectangleGradientV(0, 0, ExampleUI::Width(), ExampleUI::Height(), {19, 12, 36, 255}, {6, 12, 24, 255});
@@ -273,6 +289,7 @@ public:
 
 // ---- Boss impl ----
 void Boss::Start() {
+    gameObject->transform->SetInterpolationEnabled(true);
     // Three turrets parented to the boss (parent-child transform demo).
     for (int i = 0; i < 3; i++) {
         auto t = gameObject->scene->CreateGameObject("Turret");
@@ -285,7 +302,7 @@ void Boss::Start() {
     }
 }
 
-void Boss::Update() {
+void Boss::FixedUpdate() {
     if (game && game->gameOver) return;
     // Tweened side-to-side sweep via sine.
     float t = GameTime::GetTime();
@@ -315,7 +332,7 @@ void Boss::Damage(float d) {
 }
 
 // ---- Player impl ----
-void Player::Update() {
+void Player::FixedUpdate() {
     if (game && game->gameOver) return;
     auto& pos = gameObject->transform->position;
     if (invuln > 0) invuln -= GameTime::DeltaTime();
@@ -342,6 +359,11 @@ void Player::Update() {
         playerField->Spawn({pos.x + 8, pos.y - 10}, {0, -680}, 5, Color{120, 240, 255, 255});
     }
 
+}
+
+void Player::PostFixedUpdate() {
+    if (game && game->gameOver) return;
+    auto pos = gameObject->transform->position;
     // Player bullets hit boss
     if (game && game->boss && game->boss->GetComponent<Boss>()) {
         Vector2 bp = game->boss->transform->GetWorldPosition();

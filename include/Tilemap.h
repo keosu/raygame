@@ -60,8 +60,8 @@ public:
         int tilesetCols = tileset ? tileset->width / tileWidth : 1;
         if (tilesetCols <= 0) return;
 
-        Vector2 scale = gameObject ? gameObject->transform->GetWorldScale() : Vector2{1, 1};
-        float rotation = gameObject ? gameObject->transform->GetWorldRotation() : 0;
+        Vector2 scale = gameObject ? gameObject->transform->GetRenderScale() : Vector2{1, 1};
+        float rotation = gameObject ? gameObject->transform->GetRenderRotation() : 0;
         for (int y = 0; y < rows; y++) {
             for (int x = 0; x < columns; x++) {
                 int id = tiles[Index(x, y)];
@@ -69,7 +69,8 @@ public:
                 int sx = (id % tilesetCols) * tileWidth;
                 int sy = (id / tilesetCols) * tileHeight;
                 Rectangle src = {(float)sx, (float)sy, (float)tileWidth, (float)tileHeight};
-                Vector2 pos = TileToWorld(x, y);
+                Vector2 local = {(float)(x * tileWidth), (float)(y * tileHeight)};
+                Vector2 pos = gameObject ? gameObject->transform->TransformRenderPoint(local) : local;
                 if (scale.x < 0) src.width = -src.width;
                 if (scale.y < 0) src.height = -src.height;
                 Rectangle dest = {pos.x, pos.y, std::fabs(tileWidth * scale.x), std::fabs(tileHeight * scale.y)};

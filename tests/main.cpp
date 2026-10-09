@@ -119,10 +119,10 @@ public:
 
 static void TestPhysicsCallbacks() {
     printf("[physics]\n");
-    PhysicsWorld::Clear();
+    Scene scene;
 
-    auto a = CreateRef<GameObject>("a");
-    auto b = CreateRef<GameObject>("b");
+    auto a = scene.CreateGameObject("a");
+    auto b = scene.CreateGameObject("b");
     a->transform->position = {0, 0};
     b->transform->position = {10, 0};
     auto ca = a->AddComponent<CircleCollider>(20.0f);
@@ -131,19 +131,19 @@ static void TestPhysicsCallbacks() {
     // Register colliders (normally done by Scene::Start).
     a->Start(); b->Start();
 
-    PhysicsWorld::Step();              // overlapping -> enter
+    scene.GetPhysicsWorld().Step();              // overlapping -> enter
     CHECK(counter->enters == 1);
-    PhysicsWorld::Step();              // still overlapping -> stay (no new enter)
+    scene.GetPhysicsWorld().Step();              // still overlapping -> stay (no new enter)
     CHECK(counter->enters == 1);
 
     b->transform->position = {100, 0}; // move apart
-    PhysicsWorld::Step();              // exit
+    scene.GetPhysicsWorld().Step();              // exit
     CHECK(counter->exits == 1);
 
     // Box vs Circle
-    PhysicsWorld::Clear();
-    auto boxObj = CreateRef<GameObject>("box");
-    auto cirObj = CreateRef<GameObject>("cir");
+    scene.GetPhysicsWorld().Clear();
+    auto boxObj = scene.CreateGameObject("box");
+    auto cirObj = scene.CreateGameObject("cir");
     boxObj->transform->position = {0, 0};
     cirObj->transform->position = {15, 0};
     auto box = boxObj->AddComponent<BoxCollider>(Vector2{40, 40});
@@ -151,14 +151,15 @@ static void TestPhysicsCallbacks() {
     cir->isTrigger = true;
     auto tc = cirObj->AddComponent<HitCounter>();
     boxObj->Start(); cirObj->Start();
-    PhysicsWorld::Step();
+    scene.GetPhysicsWorld().Step();
     CHECK(tc->triggers == 1);
-    PhysicsWorld::Clear();
+    scene.GetPhysicsWorld().Clear();
 }
 
 #include "regressions.h"
 #include "foundation.h"
 #include "runtime_contracts.h"
+#include "worlds_and_timing.h"
 
 int main() {
     printf("RayGame tests\n=============\n");
@@ -172,6 +173,7 @@ int main() {
     TestRegressions();
     TestFoundation();
     TestRuntimeContracts();
+    world_tests::Run();
 
     printf("=============\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

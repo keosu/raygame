@@ -81,6 +81,7 @@ function add_example(name, dir)
             add_rules("android.native_app", {
                 android_sdk_version = "35",
                 android_manifest = "android/" .. name .. "/AndroidManifest.xml",
+                android_res = "android/" .. name .. "/res",
                 android_assets = "assets",
                 keystore = get_config("android_keystore"),
                 keystore_pass = "android",
@@ -94,6 +95,10 @@ function add_example(name, dir)
         else
             add_deps("example_assets")
             set_targetdir("$(projectdir)/bin")
+            if is_plat("windows", "mingw") then
+                add_files("resources/windows/" .. name .. ".rc")
+                add_includedirs("resources/windows")
+            end
         end
         if not has_config("example_console") then
             add_defines("RAYGAME_QUIET_EXAMPLE")

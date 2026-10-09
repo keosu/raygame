@@ -97,7 +97,7 @@ public:
     void Render() override {
         if (!gameObject || !gameObject->transform) return;
         
-        Vector2 pos = gameObject->transform->position;
+        Vector2 pos = gameObject->transform->GetRenderPosition();
         
         // Draw player ship as a triangle with wings
         Vector2 nose = {pos.x, pos.y - 20};
@@ -141,7 +141,7 @@ public:
     void Render() override {
         if (!gameObject || !gameObject->transform) return;
         
-        Vector2 pos = gameObject->transform->position;
+        Vector2 pos = gameObject->transform->GetRenderPosition();
         
         // Draw enemy ship as alien-looking craft
         // Main body (wider, more menacing)
@@ -183,7 +183,7 @@ public:
     void Render() override {
         if (!gameObject || !gameObject->transform) return;
         
-        Vector2 pos = gameObject->transform->position;
+        Vector2 pos = gameObject->transform->GetRenderPosition();
         
         if (isPlayerBullet) {
             // Player bullet - blue energy bolt
@@ -207,7 +207,8 @@ public:
     float fireRate = 0.2f;
     float fireTimer = 0.0f;
     
-    void Update() override;
+    void FixedUpdate() override;
+    void PostFixedUpdate() override;
     void Shoot();
     
     Scene* scene = nullptr;  // Reference to scene for spawning bullets
@@ -222,10 +223,11 @@ public:
     float startX = 0;
     
     void Start() override {
+        gameObject->transform->SetInterpolationEnabled(true);
         startX = gameObject->transform->position.x;
     }
     
-    void Update() override {
+    void FixedUpdate() override {
         if (!gameObject) return;
         
         // Move down
@@ -247,8 +249,9 @@ class Bullet : public Component {
 public:
     float speed = 500.0f;
     bool isPlayerBullet = true;
+    void Start() override { gameObject->transform->SetInterpolationEnabled(true); }
     
-    void Update() override {
+    void FixedUpdate() override {
         if (!gameObject) return;
         
         gameObject->transform->position.y += (isPlayerBullet ? -speed : speed) * GameTime::DeltaTime();
@@ -289,7 +292,7 @@ public:
     }
     
     void OnLoad() override {
-        ExampleUI::Initialize();
+        ExampleUI::Initialize(ExampleUI::cyan, "space_shooter");
         // Create starfield background (first, so it renders behind everything)
         auto background = CreateGameObject("Starfield");
         background->AddComponent<StarfieldBackground>();
@@ -348,6 +351,11 @@ public:
             return;
         }
 
+    }
+
+    void PostFixedUpdate() override {
+        Scene::PostFixedUpdate();
+        if (!player || player->IsDestroyed()) return;
         // Spawn enemies
         enemySpawnTimer += GameTime::DeltaTime();
         if (enemySpawnTimer >= enemySpawnRate) {
@@ -494,7 +502,7 @@ public:
 };
 
 // PlayerController implementations (after SpaceShooterScene is defined)
-void PlayerController::Update() {
+void PlayerController::FixedUpdate() {
     if (!gameObject) return;
     
     // Movement
@@ -525,6 +533,10 @@ void PlayerController::Update() {
         fireTimer = fireRate;
     }
     
+}
+
+void PlayerController::PostFixedUpdate() {
+    if (!gameObject) return;
     // Keep in bounds
     float margin = 20;
     if (gameObject->transform->position.x < margin) 

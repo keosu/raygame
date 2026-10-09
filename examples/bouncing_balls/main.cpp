@@ -27,7 +27,7 @@ public:
 
     void OnLoad() override {
         arena = {24, 92, ExampleUI::Width() - 48, ExampleUI::Height() - 146};
-        ExampleUI::Initialize({132, 233, 181, 255});
+        ExampleUI::Initialize({132, 233, 181, 255}, "bouncing_balls");
         for (int i = 0; i < 10; ++i) {
             AddRandomBall({Random(arena.x + 24, arena.x + arena.width - 24),
                            Random(arena.y + 24, arena.y + arena.height * 0.6f)});
@@ -48,8 +48,8 @@ public:
         Scene::Update();
     }
 
-    void FixedUpdate() override {
-        Scene::FixedUpdate();
+    void PostFixedUpdate() override {
+        Scene::PostFixedUpdate();
         for (const auto& obj : GetAllGameObjects()) {
             auto body = obj->GetComponent<Rigidbody>();
             if (!body) continue;

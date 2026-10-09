@@ -67,11 +67,13 @@ GameEngine ── Scene ── GameObject
                                └── your own Component subclasses
 ```
 
-Cross-cutting services are static/singleton: `PhysicsWorld`, `TweenManager`,
+Each `Scene` owns an independent `PhysicsWorld`, including registrations, contacts
+and callback traversal state. Cross-cutting services are static/singleton: `TweenManager`,
 `EventBus`, `ResourceManager`, `AudioManager`, `Input`, `UI`, `GameTime`.
 Events and tweens have application/scene/object/component lifetime scopes. Scene
 changes cancel the old scene's callbacks while preserving application services.
-Physics still uses one global world; independent simultaneous worlds are pending.
+Physics worlds can be stepped and cleared independently. Graphics, input and time
+services still assume one active application loop; this is not multi-window support.
 
 ## Quick Start
 
@@ -115,20 +117,60 @@ Exceptions from initialization, updating or rendering propagate after `Run` clea
 up the scene, resources and native devices. `Shutdown` is idempotent, with a
 destructor fallback for an engine initialized without calling `Run`.
 
-Use `GameTime::DeltaTime()` in `Update` and `GameTime::FixedDeltaTime()` in
-`FixedUpdate`. Rigidbody integration and collision processing run at the fixed
-interval (1/60 second by default), with at most eight catch-up steps per frame.
+The engine runs these phases in order:
+
+| Phase | Callback / operation | Purpose |
+| --- | --- | --- |
+| Frame | `OnUnscaledUpdate`, tweens, `Scene/Component::Update` | Application work, frame input and non-physics updates |
+| Fixed tick | `FixedUpdate` for all objects | Set velocities/forces and advance fixed simulation logic |
+| Fixed tick | Rigidbody integration, then the scene's `PhysicsWorld::Step` | Move bodies, resolve contacts and dispatch collision callbacks |
+| Fixed tick | `PostFixedUpdate` | Bounds correction and logic that needs completed collision results |
+| Presentation | `GameEngine::OnUpdate`, `Scene/Component::LateUpdate` | Once per frame after fixed ticks; camera following uses `LateUpdate` |
+| Drawing | `Render` | Read interpolated poses and draw UI |
+
+Use `GameTime::DeltaTime()` in callbacks: inside a fixed tick it returns the fixed
+interval, and `GetTime()` returns the current tick's simulation time. The frame
+view is restored afterward, including on exceptions. `FixedDeltaTime()` remains
+available explicitly. The interval defaults to 1/60 second, with at most eight
+catch-up steps per frame. Integration runs after **all** `FixedUpdate` callbacks,
+so a controller may be attached before or after its Rigidbody.
 The simulation delta used by ordinary updates and tweens is capped to the same
 eight-step budget, so a long stall does not advance animations far ahead of physics.
 `GameTime::UnscaledDeltaTime/UnscaledTime` retain actual elapsed time, including while
 paused. Override `GameEngine::OnUnscaledUpdate` for work that must continue during pause.
-Set it with `GameEngine::SetFixedTimeStep`; zero and negative intervals are ignored.
+Set the interval between frames with `GameEngine::SetFixedTimeStep`; invalid values
+are ignored and changing it during `Tick` throws. `GetFrameTiming()` exposes this
+frame's fixed step count, interpolation alpha, fixed simulation time, discarded
+long-frame seconds and their running total. Paused time is not counted as discarded.
+The F1 overlay displays step count and discarded time. Pause, scene reload and
+exceptions discard remaining catch-up work; partially applied simulation is not
+transactionally rolled back. Re-entering the same engine's `Tick` is rejected.
 Collision layers are numbered 0–31; a nonpositive rigidbody mass is treated as static.
 
 `LoadScene` takes effect on the next frame. The engine unloads and clears the old
 scene, its physics registrations, tweens and event subscriptions before loading
 the new one. Resource and audio caches persist until shutdown. `Scene::Clear`
-also supports rebuilding a scene in place; call `OnLoad` and `Start` afterward.
+also supports rebuilding a scene in place; call `Clear(); Load();` outside component
+traversal. A clear during a component callback drains after traversal, and remaining
+fixed phases are skipped. Clearing one scene does not clear another scene's world.
+
+### Physics world migration
+
+The former static `PhysicsWorld::Step/Clear/GetColliderCount` calls now use an
+instance: `scene.GetPhysicsWorld().Step()` and the corresponding instance methods.
+`CheckCollisions()` remains an instance alias of `Step()`. Normal games let the
+engine perform the steps; `Step()` only detects/resolves contacts, it does not
+integrate bodies. `Scene::FixedUpdate()` is now the pre-physics phase; manual loops
+must also run `Scene::IntegratePhysics(dt)`, collision processing and `PostFixedUpdate`.
+`Rigidbody::Integrate(dt)` replaces direct calls to its old `FixedUpdate` implementation.
+
+Scene colliders register automatically on `Start`. A standalone `GameObject` has
+no implicit world: explicitly add its collider to a `PhysicsWorld` instance.
+Registering a scene collider in a different world is rejected. Disabled colliders
+retain their binding and stop participating; surviving contacts receive Exit on
+the next step. `GetColliderCount()` counts enabled registrations, and
+`GetContactCount()` exposes the current contact table. Clear/destruction detaches
+bindings and clears contacts without dispatching teardown collision events.
 
 ### Transform hierarchy
 
@@ -138,6 +180,17 @@ operations. Reparenting preserves world position/rotation/scale by default and
 rejects cycles. Removing a parent detaches children while preserving their world
 pose. Sprites, camera following and tilemap queries use the hierarchy. Box colliders
 remain axis aligned; sprite rendering represents rotation and scale without shear.
+
+Rigidbody enables render interpolation at `Start` by default (set its `interpolate`
+field to false to opt out). Fixed logic without a body can call
+`transform->SetInterpolationEnabled(true)`. Sprites, animations, tilemaps and example
+renderers use `GetRenderPosition/Rotation/Scale` or `TransformRenderPoint`; physics
+continues to use authoritative `GetWorld*` values. Interpolation blends the previous
+and current fixed poses, with up to one fixed interval of visual latency, and follows
+the parent hierarchy without modifying simulation state. Custom renderers should use
+these render accessors too. Use `Teleport(worldPosition)` or `ResetInterpolation()`
+after discontinuous movement; the engine resets history on pause/resume and viewport
+changes. Frame-based animation can leave interpolation disabled.
 
 ### Collision callbacks
 ```cpp
@@ -370,6 +423,10 @@ and logs for debugging, run `xmake f --example_console=y` and rebuild. Use
 `xmake f --example_console=n` to return to quiet launches. The `tests` and `smoke`
 targets always keep their console and diagnostic output.
 
+Each game has its own embedded EXE icon, native window icon and Android launcher
+icon, including adaptive and themed Android variants. Editable SVG sources and
+regeneration instructions are in [artwork/icons](artwork/icons/README.md).
+
 Quiet examples write raylib diagnostics to per-user rotating logs instead:
 `%LOCALAPPDATA%/raygame.<example>/logs/game.log` on Windows and
 `$XDG_DATA_HOME/raygame.<example>/logs/game.log` (default `~/.local/share`) on Linux.
@@ -427,7 +484,8 @@ xmake run smoke
 
 It requires an OpenGL 3.3-capable display even though the window is hidden.
 It also checks fullscreen/window restoration, the native Windows title-bar theme,
-font loading, initialization/render failure cleanup, and a 16-case matrix of four
+window icons, interpolated sprite pixels, font loading, initialization/render failure
+cleanup, and a 16-case matrix of four
 games at 4:3, 16:9, 21:9 and 9:16. Rendered previews are saved to `bin/screenshots`.
 The logic suite covers viewport conversion, pause/long-frame timing, callback failure
 recovery, Unicode save paths, backup recovery, write failures and log rotation.

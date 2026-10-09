@@ -244,12 +244,12 @@ static void Scopes() {
     phaseProbe->onHit = registerEvent;
     phased->AddComponent<CircleCollider>()->isTrigger = true;
     phaseScene.CreateGameObject()->AddComponent<CircleCollider>();
-    phaseScene.Update(); phaseScene.Render(); PhysicsWorld::Step();
+    phaseScene.Update(); phaseScene.Render(); phaseScene.GetPhysicsWorld().Step();
     calls = 0; EventBus::Emit("phase");
     CHECK(calls == 4);
     phaseScene.Destroy(phased); EventBus::Emit("phase");
     CHECK(calls == 4);
-    phaseScene.Clear(); PhysicsWorld::Clear();
+    phaseScene.Clear(); phaseScene.GetPhysicsWorld().Clear();
 
     // Cancellation releases captured owners even when their destructors cancel services.
     struct ClearOnDestroy {

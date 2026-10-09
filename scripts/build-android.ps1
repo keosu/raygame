@@ -78,6 +78,13 @@ try {
                                   'assets/fonts/Barlow-OFL.txt','assets/fonts/Rajdhani-OFL.txt')) {
                 if (-not $archive.GetEntry($asset)) { throw "Missing APK asset: $asset" }
             }
+            foreach ($resource in @('res/mipmap-mdpi-v4/ic_launcher.png',
+                                    'res/mipmap-anydpi-v26/ic_launcher.xml',
+                                    'res/mipmap-anydpi-v33/ic_launcher.xml',
+                                    'res/mipmap-xxxhdpi-v4/ic_launcher_foreground.png',
+                                    'res/mipmap-xxxhdpi-v4/ic_launcher_monochrome.png')) {
+                if (-not $archive.GetEntry($resource)) { throw "Missing Android launcher icon: $resource" }
+            }
             $native = $archive.GetEntry("lib/arm64-v8a/lib$name.so")
             if (-not $native) { throw "Missing NativeActivity library: $name" }
             $stream = $native.Open()

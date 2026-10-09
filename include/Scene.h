@@ -3,6 +3,7 @@
 #include "Core.h"
 #include "GameObject.h"
 #include "Camera2D.h"
+#include "Physics.h"
 #include <stdexcept>
 
 namespace RayGame {
@@ -31,6 +32,19 @@ public:
     }
 
     bool IsClearing() const { return clearing; }
+    PhysicsWorld& GetPhysicsWorld() { return physics; }
+    const PhysicsWorld& GetPhysicsWorld() const { return physics; }
+    unsigned long GetGeneration() const { return generation; }
+
+    // Engine phases are separate from virtual callbacks, so every object's
+    // pre-physics logic completes before any rigidbody integrates.
+    void BeginFixedStep();
+    void IntegratePhysics(float dt);
+    virtual void PostFixedUpdate();
+    virtual void LateUpdate();
+    void SetInterpolationAlpha(float alpha);
+    float GetInterpolationAlpha() const { return interpolationAlpha; }
+    void ResetInterpolation();
 
     virtual void Update() {
         if (!started) Start();
@@ -127,6 +141,8 @@ public:
     void Clear() {
         if (clearing) { if (!updating) FlushPending(); return; }
         clearing = true;
+        ++generation;
+        physics.Clear();
         callbacks.Cancel();
         for (auto& obj : gameObjects) if (obj) obj->MarkDestroyed();
         for (auto& obj : pendingAdd) if (obj) obj->MarkDestroyed();
@@ -214,6 +230,9 @@ protected:
     }
 
 private:
+    PhysicsWorld physics{this};
+    unsigned long generation = 0;
+    float interpolationAlpha = 1;
     struct Traversal {
         Scene& scene;
         explicit Traversal(Scene& value) : scene(value) {

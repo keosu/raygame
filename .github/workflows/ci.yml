@@ -57,6 +57,10 @@ jobs:
       - name: Run tests
         run: xmake run tests
 
+      - name: Verify Windows embedded icons
+        if: runner.os == 'Windows'
+        run: ./scripts/verify-windows-icons.ps1
+
       - name: Upload Windows games and assets
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4

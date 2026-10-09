@@ -69,10 +69,20 @@ inline RayGame::FontHandle LoadFont(const std::string& file, int size) {
     return font;
 }
 
-inline void Initialize(Color accent = cyan) {
+inline void Initialize(Color accent = cyan, const std::string& iconName = "") {
     RayGame::UI::font = LoadFont("Barlow-Medium.ttf", 64);
     RayGame::UI::headingFont = LoadFont("Rajdhani-SemiBold.ttf", 96);
     RayGame::UI::accentColor = accent;
+#if !defined(__ANDROID__)
+    if (!iconName.empty()) {
+        std::string path = std::string(GetApplicationDirectory()) + "assets/icons/" + iconName + ".png";
+        Image icon = LoadImage(path.c_str());
+        if (IsImageValid(icon)) SetWindowIcon(icon);
+        UnloadImage(icon);
+    }
+#else
+    (void)iconName; // Launcher icons are Android resources in the manifest.
+#endif
 }
 
 inline void Header(float width, const std::string& title, const std::string& subtitle) {

@@ -25,6 +25,7 @@ namespace bullethell {
 using namespace RayGame;
 
 bool NativeWindowThemeMatchesSystem(void* window);
+bool NativeWindowHasIcon(void* window);
 
 class SmokeGame : public GameEngine {
 public:
@@ -127,6 +128,23 @@ public:
             Expect(pixel.r == MAGENTA.r && pixel.b == MAGENTA.b, "unloaded sprite/animation/tilemap draw a visible placeholder");
         }
         UnloadImage(result); UnloadRenderTexture(target); resources.Clear();
+        // Render interpolation must change pixels without moving collision geometry.
+        auto rendered = CreateRef<Scene>();
+        auto marker = rendered->CreateGameObject();
+        marker->transform->position = {16, 16};
+        marker->transform->SetInterpolationEnabled(true);
+        marker->AddComponent<SpriteRenderer>(ResourceManager::CreateColorTexture("interpolation-marker", 8, 8, GREEN));
+        auto collider = marker->AddComponent<CircleCollider>(4.0f);
+        rendered->Start(); rendered->BeginFixedStep();
+        marker->transform->position = {48, 16};
+        rendered->SetInterpolationAlpha(0.5f);
+        target = LoadRenderTexture(64, 32);
+        BeginTextureMode(target); ClearBackground(BLACK); rendered->Render(); EndTextureMode();
+        result = LoadImageFromTexture(target.texture); ImageFlipVertical(&result);
+        Expect(GetImageColor(result, 32, 16).g == GREEN.g && GetImageColor(result, 48, 16).g == 0,
+            "sprite pixels use the interpolated pose");
+        Expect(std::fabs(collider->GetWorldPosition().x - 48) < 0.01f, "drawing leaves collision geometry at the simulated pose");
+        UnloadImage(result); UnloadRenderTexture(target); rendered->Clear();
         Expect(GetFontDefault().texture.id != 0, "failed loads never unload raylib's default font");
         UI::ResetFonts();
 
@@ -165,6 +183,7 @@ public:
     void OnUpdate() override {
         int frame = GameTime::GetFrameCount();
         if (frame == 2) {
+            Expect(NativeWindowHasIcon(GetWindowHandle()), "custom game icon is assigned to the native window");
             Expect(UI::font && UI::font->baseSize == 64, "bundled body font loads");
             Expect(UI::headingFont && UI::headingFont->baseSize == 96, "bundled heading font loads");
             SetWindowSize(1280, 720);
@@ -345,7 +364,7 @@ int main() {
     game.Run();
     game.Expect(!game.retainedTexture && !game.retainedFont && !game.retainedShader,
         "shutdown invalidates all externally retained GPU handles");
-    game.Expect(PhysicsWorld::GetColliderCount() == 0, "shutdown clears physics");
+    game.Expect(!game.GetCurrentScene(), "shutdown clears physics");
     game.Expect(TweenManager::Count() == 0, "shutdown clears tweens");
     game.Expect(UI::font == nullptr && UI::headingFont == nullptr, "shutdown resets cached UI font handles");
     game.Expect(Display::GetCanvasTexture().id == 0, "shutdown releases the game canvas");

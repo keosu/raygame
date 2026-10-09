@@ -28,11 +28,11 @@ public:
         followEnabled = (obj != nullptr);
     }
     
-    void Update() override {
+    void LateUpdate() override {
         auto follow = followTransform.lock();
         auto* owner = follow ? follow->GetGameObject() : nullptr;
         if (followEnabled && owner && owner->active && !owner->IsDestroyed()) {
-            Vector2 targetPos = follow->GetWorldPosition();
+            Vector2 targetPos = follow->GetRenderPosition();
             Vector2 currentTarget = camera.target;
             
             // Smooth follow

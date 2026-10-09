@@ -13,6 +13,14 @@
 
 namespace RayGame {
 
+struct FrameTiming {
+    int fixedSteps = 0;
+    double droppedSeconds = 0;
+    double totalDroppedSeconds = 0;
+    double fixedTime = 0;
+    float interpolationAlpha = 1;
+};
+
 class RAYGAME_API GameEngine {
 public:
     GameEngine(const std::string& title, int width, int height)
@@ -55,6 +63,8 @@ public:
             RefreshCanvas();
             if (startFullscreen) SetFullscreen(true);
             GameTime::Reset();
+            timing = {};
+            fixedAccumulator = 0;
             SetTargetFPS(targetFPS);
 
             AudioManager::Init();
@@ -105,7 +115,6 @@ public:
         fixedAccumulator = 0;
         Input::Reset();
 
-        PhysicsWorld::Clear();
         TweenManager::Clear();
         EventBus::Clear();
         if (initialized) {
@@ -159,6 +168,8 @@ public:
         UI::ResetInteraction();
         fixedAccumulator = 0;
         Input::DiscardPending();
+        timing.interpolationAlpha = 1;
+        if (currentScene) currentScene->ResetInterpolation();
     }
     bool IsPaused() const { return paused; }
 
@@ -167,8 +178,14 @@ public:
 
     void SetClearColor(Color c) { clearColor = c; }
     void SetFixedTimeStep(float dt) {
-        if (std::isfinite(dt) && dt > 0) fixedDelta = dt;
+        if (!std::isfinite(dt) || dt <= 0 || dt == fixedDelta) return;
+        if (ticking) throw std::logic_error("Change the fixed timestep between frames");
+        fixedDelta = dt;
+        fixedAccumulator = 0;
+        timing.interpolationAlpha = 1;
+        if (currentScene) currentScene->ResetInterpolation();
     }
+    const FrameTiming& GetFrameTiming() const { return timing; }
 
     int GetScreenWidth() const { return initialized ? (int)std::lround(Display::GetWidth()) : screenWidth; }
     int GetScreenHeight() const { return initialized ? (int)std::lround(Display::GetHeight()) : screenHeight; }
@@ -191,36 +208,7 @@ protected:
     virtual void OnRender() {}
 
     // Advance logic without drawing; also useful for deterministic simulations.
-    void Tick(float dt) {
-        ScopeActivation scope(GetCallbackScope());
-        ApplyPendingScene();
-        float realDelta = std::isfinite(dt) ? std::max(0.0f, dt) : 0.0f;
-        GameTime::Advance(realDelta, paused ? 0 : std::min(realDelta, fixedDelta * 8));
-        OnUnscaledUpdate();
-        if (paused) { Input::DiscardPending(); return; }
-        GameTime::SetFixedDeltaTime(fixedDelta);
-        TweenManager::Update(GameTime::DeltaTime());
-        if (paused) return;
-        if (currentScene) {
-            ScopeActivation sceneScope(currentScene->GetCallbackScope());
-            currentScene->Update();
-        }
-        if (paused) return;
-        fixedAccumulator += GameTime::DeltaTime();
-        int steps = 0;
-        while (fixedAccumulator >= fixedDelta && steps++ < 8) {
-            fixedAccumulator -= fixedDelta;
-            Input::FixedTickScope inputTick;
-            if (currentScene) {
-                ScopeActivation sceneScope(currentScene->GetCallbackScope());
-                currentScene->FixedUpdate();
-            }
-            if (paused) return;
-            PhysicsWorld::Step();
-            if (paused) return;
-        }
-        OnUpdate();
-    }
+    void Tick(float dt);
 
     Color clearColor = BLACK;
     int targetFPS = 60;
@@ -241,7 +229,9 @@ private:
     bool shuttingDown = false;
     CanvasScaleMode canvasScaleMode = CanvasScaleMode::Fit;
     Vector2 lastCanvasSize = {0, 0};
-    float fixedAccumulator = 0.0f;
+    double fixedAccumulator = 0.0;
+    FrameTiming timing;
+    bool ticking = false;
 
     void RefreshWindowTheme(bool force = false);
 
@@ -254,6 +244,7 @@ private:
         if (currentScene && previous.x > 0 && previous.y > 0) {
             ScopeActivation sceneScope(currentScene->GetCallbackScope());
             currentScene->OnViewportChanged(previous, size);
+            currentScene->ResetInterpolation();
         }
     }
 
@@ -271,7 +262,6 @@ private:
         hasPendingScene = false;
 
         UnloadCurrentScene();
-        PhysicsWorld::Clear();
         Input::DiscardPending();
         fixedAccumulator = 0;
         UI::ResetInteraction();
@@ -281,6 +271,7 @@ private:
         if (currentScene) {
             currentScene->AttachCallbackScope(GetCallbackScope());
             currentScene->Load();
+            currentScene->ResetInterpolation();
         }
     }
 
@@ -323,14 +314,16 @@ private:
         OnRender();
 
         if (showDebug) {
-            UI::Panel({12, 84, 210, 78});
+            UI::Panel({12, 84, 250, 122});
             UI::Label(24, 92, TextFormat("FPS  %d", GetFPS()), 18);
             UI::Label(24, 114, TextFormat("OBJECTS  %d",
                 currentScene ? (int)currentScene->GetAllGameObjects().size() : 0), 18);
-            UI::Label(24, 136, TextFormat("COLLIDERS  %d", PhysicsWorld::GetColliderCount()), 18);
+            UI::Label(24, 136, TextFormat("COLLIDERS  %d", currentScene ? currentScene->GetPhysicsWorld().GetColliderCount() : 0), 18);
+            UI::Label(24, 158, TextFormat("FIXED STEPS  %d", timing.fixedSteps), 18);
+            UI::Label(24, 180, TextFormat("DROPPED  %.3f s", timing.totalDroppedSeconds), 18);
             auto* camera = currentScene ? currentScene->GetActiveCamera() : nullptr;
             if (camera) camera->Begin();
-            PhysicsWorld::DebugDraw();
+            if (currentScene) currentScene->GetPhysicsWorld().DebugDraw();
             if (camera) camera->End();
         }
 

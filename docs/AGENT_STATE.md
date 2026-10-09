@@ -11,7 +11,63 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：CI 构建和产物下载（远端已验证）
+## 最近工作包：独立物理世界、更新阶段/插值与示例图标（已实现并验证）
+
+用户要求先完成最高优先级的物理世界隔离和更新阶段/表现插值，且四游戏 EXE/APK
+均使用独立图标；Android 真机验收暂缓。本包没有安装或启动 Android 设备。
+提交主题：`Isolate scene physics, add fixed phases and interpolation, brand example icons`。
+
+1. 每个 Scene 持有非全局的 PhysicsWorld，注册、接触表、清理代次和重入状态
+   独立。切关/关闭只清当前场景物理；禁止把场景碰撞体注册到另一个世界。
+   独立 GameObject 必须显式注册到独立世界，世界销毁会安全解除绑定。
+2. 阶段固定为帧 Update → 全对象 FixedUpdate → 全刚体积分 → 当前世界碰撞
+   与回调 → PostFixedUpdate → 应用 OnUpdate/场景 LateUpdate → Render。
+   相机跟随移至 LateUpdate；积分不再依赖刚体和控制器的添加顺序。
+3. 固定阶段的 GameTime::DeltaTime/GetTime 返回固定 dt/tick 时间，离开阶段
+   或异常时恢复帧视图。FrameTiming 提供固定步数、插值系数、模拟时间、当前帧
+   及累计丢弃的长帧时间；暂停时间不计为丢帧。F1 面板显示步数和丢弃时间。
+4. Transform 提供不修改模拟状态的渲染 TRS/点变换，包含父子层级和最短角度插值。
+   Rigidbody 默认启用，纯固定移动可显式启用。精灵/动画/地图和示例绘制接入，
+   暂停、视口变化、重载、异常和 Teleport 重置历史。框架仍是单应用图形/输入/
+   时间服务；独立物理世界不表示多个窗口或并行应用循环已受支持。
+5. Breakout 的球/挡板，Space Shooter 的移动/射击和碰撞，以及 Bullet Hell 的
+   弹幕/玩家/Boss/炮台均按固定阶段模拟；Bouncing Balls 在物理后处理边界。
+   弹幕数组保存前后位置用于绘制，结算/视口变化消除历史拖影。
+6. 四个原创 SVG 图标分别对应飞船、弹球、砖块挡板和弹幕核心。EXE 内嵌八种
+   ICO 尺寸，运行窗口加载对应 PNG；APK 含五种密度、API 26 自适应图标和 API 33
+   主题单色图层。源码和生成说明在 `artwork/icons`，普通构建不需要 Python。
+7. `scripts/verify-windows-icons.ps1` 比对 EXE 八种资源与原始 ICO，并已加入 CI；
+   Android 构建脚本新增图标资源检查。README 已提供阶段契约、插值和 API 迁移。
+
+### 本包最终验证
+
+- MSVC 2022 x64 Debug/Release 全目标构建通过，每种模式 **311 passed, 0 failed**。
+  新增多世界嵌套步进/隔离清理、1,000 次清理后注册/接触稳定性、刚体顺序无关、
+  30/60/144 FPS 控制运动、层级插值、暂停/重载/异常恢复和长帧统计检查。
+- Debug/Release 图形 smoke 均 **0 failures**，包括插值像素与物理位置不变断言、
+  运行窗口图标、原四游戏 × 四比例、全屏/主题/资源和异常清理。
+- 四个 Release EXE 的八种图标图像均与各自 ICO 精确匹配。
+- 四个 ARM64 Release APK 重新生成，位于 `bin/android/arm64-v8a/release/`，
+  各约 1.36–1.38 MB；签名、16 KiB 对齐、入口、字体/许可及图标资源检查通过。
+  aapt 实际包信息确认各 manifest 引用了自定义 launcher 图标。
+- 图标预览 `build/icons-preview.png` 和四游戏布局预览
+  `build/worlds-examples-preview.png` 已人工查看。`actionlint` 和
+  `git diff --check` 通过；最终桌面配置仍为 MSVC Release、无控制台。
+- 本包未运行 Linux/macOS、新 GitHub 工作流、Android 真机/模拟器；先前 CI
+  成绩仍属于 `a9ce490`，不能当成本包远端验证。控制运动回归也不代表所有随机
+  游戏逻辑已实现确定性回放，图形 smoke 没有自动全图差异基线。
+
+日志：`build/worlds-{debug,release}-{config,build,tests,smoke}.log`、
+`build/worlds-icons-check.log`、`build/worlds-android-build.log`；APK 校验报告仍为
+`build/android/verification-release.json`。不要删除本地 Android 调试签名密钥。
+
+迁移要点：旧 `PhysicsWorld::Step/Clear/...` 改为 `scene.GetPhysicsWorld()` 的实例
+方法；`Step/CheckCollisions` 只处理碰撞。手动循环需显式执行积分与后处理；
+直接 `Rigidbody::FixedUpdate()` 积分改为 `Integrate(dt)`。禁用碰撞体保留所属世界
+绑定但不参与检测；Clear 不发送销毁期碰撞事件。Scene 的 Clear/Load 规则不变：
+组件遍历期间不能立即重新创建对象。异常恢复清掉追帧和插值历史，不回滚业务写入。
+
+## 上一工作包：CI 构建和产物下载（远端已验证）
 
 提交主题：`Build and upload Windows games and Android APKs in CI`。
 实现提交：`a9ce490`；2026-10-09 已核对对应远端运行和产物。
@@ -166,17 +222,14 @@ Release 使用 `-m release`。串行构建减少本机偶发 EXE 文件锁冲突
 本包已完成，M0 尚未整体完成。无需重复实现或重跑本包已有通过项，除非后续
 改动影响它们。继续前先核对工作区与本记录，再按路线推进：
 
-1. **物理世界隔离**：将全局 PhysicsWorld 逐步迁移为场景/运行上下文拥有的
-   实例；保留必要兼容入口。验证两个世界分别注册/步进/清理互不影响、切关无泄漏。
-2. **更新阶段与表现插值**：明确固定步物理前/后和表现更新顺序、插值及丢帧
-   观测；把 Breakout 等混用变帧移动与固定碰撞的行为迁移到明确的时间域。
-3. **补齐 M0 验收**：真实设备初始化/显存失败、多 DPI/多显示器、跨平台验证。
-   R04 和整个 M0 不能仅凭本包标记完成。
-4. 再推进 M1：外部消费项目、完整参考游戏的菜单/设置/多关流程、版本化内容
+1. **补齐 M0 验收**：真实设备初始化/显存失败、多 DPI/多显示器、跨平台与长稳
+   验证；独立物理世界、固定阶段、插值与丢帧观测已完成，不要重复实现。
+2. **SDK 消费与完整游戏流程**：外部消费项目、菜单/设置/多关流程、版本化内容
    序列化、资源管线和中文文字，具体验收见产品化评审文档。
+3. **后续工程化**：CI 图形 smoke、Actions Node 24 迁移、许可/发行包与稳定签名。
 
 并行于主线的待验收事项：Android 真机启动、字体/触控、存档、后台/锁屏恢复、
-安全区域和长稳性能尚无用户反馈记录；按用户要求不代为安装或启动设备。发行前
+安全区域和长稳性能尚无用户反馈记录，用户已明确暂缓；不代为安装或启动设备。发行前
 还需稳定签名、干净机器运行、独立 SDK 消费和许可文件，CI 产物生成不能替代这些。
 
 实现边界：资源为同步图形线程 API，借用原生指针不能跨替换/卸载保存；句柄不

@@ -10,24 +10,24 @@ namespace RayGame {
 
 namespace detail {
 inline void DrawMissingSprite(Rectangle source, const Transform& transform, Vector2 pivot) {
-    auto position = transform.GetWorldPosition();
-    auto scale = transform.GetWorldScale();
+    auto position = transform.GetRenderPosition();
+    auto scale = transform.GetRenderScale();
     Rectangle dest = {position.x, position.y,
         std::fabs((source.width != 0 ? source.width : 16) * scale.x),
         std::fabs((source.height != 0 ? source.height : 16) * scale.y)};
     DrawRectanglePro(dest, {dest.width * pivot.x, dest.height * pivot.y},
-                     transform.GetWorldRotation(), MAGENTA);
+                     transform.GetRenderRotation(), MAGENTA);
 }
 inline void DrawSprite(Texture2D texture, Rectangle source, const Transform& transform,
                        Vector2 pivot, bool flipX, bool flipY, Color tint) {
-    Vector2 position = transform.GetWorldPosition();
-    Vector2 scale = transform.GetWorldScale();
+    Vector2 position = transform.GetRenderPosition();
+    Vector2 scale = transform.GetRenderScale();
     Rectangle dest = {position.x, position.y,
                       std::fabs(source.width * scale.x), std::fabs(source.height * scale.y)};
     if (flipX != (scale.x < 0)) source.width = -source.width;
     if (flipY != (scale.y < 0)) source.height = -source.height;
     DrawTexturePro(texture, source, dest, {dest.width * pivot.x, dest.height * pivot.y},
-                   transform.GetWorldRotation(), tint);
+                   transform.GetRenderRotation(), tint);
 }
 }
 

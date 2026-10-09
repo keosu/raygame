@@ -19,6 +19,10 @@ Release 原生代码使用本地调试密钥签名，适合侧载测试。它不
 保留外接键盘的原有操作。触屏版本暂未实现弹幕游戏的独立慢速移动按钮。
 同一方向内使用传感器允许屏幕翻转，不在本轮开放任意横竖方向切换。
 
+每个游戏有独立图标：Windows EXE 内嵌多尺寸 ICO，Android 包含普通密度图标、
+Android 8+ 自适应图标和 Android 13+ 主题单色图层。原始 SVG、生成工具和尺寸说明
+见 `artwork/icons/README.md`；图标形状由系统或启动器决定。
+
 包名分别是 `org.raygame.spaceshooter`、`org.raygame.bouncingballs`、
 `org.raygame.neonbreakout`、`org.raygame.bullethell`，四个包可同时安装。
 Android 首次侧载时按系统提示允许相应文件管理器安装应用。后续更新保留同一
@@ -63,6 +67,7 @@ pwsh -NoProfile -File scripts/build-android.ps1 `
 ZIP 对齐、ARM64 ELF 的 16 KiB LOAD 段对齐、NativeActivity 导出入口、静态
 C++ 运行库以及字体/许可内容。SHA-256 等结果存入
 `build/android/verification-release.json`（Debug 对应 `verification-debug.json`）。
+构建检查也覆盖 APK 中的普通、自适应和主题图标资源。
 
 ## GitHub Actions 构建与下载
 
