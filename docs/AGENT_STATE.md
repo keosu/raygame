@@ -11,9 +11,10 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：CI 构建和产物下载（已配置，远端待运行）
+## 最近工作包：CI 构建和产物下载（远端已验证）
 
 提交主题：`Build and upload Windows games and Android APKs in CI`。
+实现提交：`a9ce490`；2026-10-09 已核对对应远端运行和产物。
 
 - `.github/workflows/ci.yml` 保留 Windows/MSVC 和 Linux Debug/Release 构建与
   逻辑测试，增加 Windows 四 EXE/字体资源上传；新增 Android ARM64 Release
@@ -30,10 +31,19 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 已确认 xmake v3.1.1 的 Android `xmake.lua/load.lua/package.lua` 规则与本机
 已成功构建 APK 的版本一致。仅改 CI/文档，未重复执行上一包已通过的编译/游戏测试。
 
-远端状态：检查时 GitHub 最新成功运行是 `37943402300`（提交 `7039164`），
-Windows/Linux Debug/Release 四任务均成功，尚无 Android job。本包未推送或触发
-远端工作流；本地检查不能视为新 CI 已通过。推送后在 Actions → CI 验证五个任务
-以及三个产物归档，下载解压 EXE/字体，APK 继续由用户手动验证。
+远端状态：用户已推送，GitHub 运行
+[`37953515827`](https://github.com/keosu/raygame/actions/runs/37953515827)
+对应 `a9ce490`，五个任务均成功。Windows Debug/Release 各 **259 passed,
+0 failed**，Linux Debug/Release 各 **258 passed, 0 failed**（平台专有检查数量
+不同）。Android 四个 APK 构建和脚本验证成功，v2/v3 签名均通过。
+
+三个产物 `raygame-windows-x64-{debug,release}`、`raygame-android-arm64-release`
+已上传且检查时未过期；Windows 每份 9 个文件，Android 5 个文件。远端日志保存在
+`build/ci-37953515827.log`。本次仅核对任务、日志和上传记录，没有下载并运行这些
+CI 产物；CI 不执行图形 smoke 或 Android 运行验收，APK 继续由用户手动验证。
+
+后续工程维护：日志有部分 Actions 使用 Node 20 的弃用提示，目前实际运行成功，
+可单独升级兼容 Node 24 的 action 版本。本轮仅更新验证记录，没有修改运行时代码。
 
 ## 上一工作包：Android APK（已实现并验证构建）
 
@@ -94,6 +104,7 @@ Android 当前限制：未验证后台/锁屏恢复、GPU 上下文丢失后资�
 - `7039164`：生命周期异常清理、时间域、安全存档、文件日志、四游戏比例适配。
 - `d95cdb9`：类型资源句柄、固定 tick 输入缓冲与回调所有者作用域。
 - `a79fd50`：Android APK 构建、触屏操作、私有文件与 APK 资源适配。
+- `a9ce490`：CI 构建/上传 Windows EXE 和 Android APK，五任务已在 GitHub 通过。
 - 历史工作包先后通过 MSVC Debug/Release 各 206、252 项逻辑检查，图形 smoke
   零失败；本包新增 Android 支持后的最终成绩见上文。
 
@@ -163,6 +174,10 @@ Release 使用 `-m release`。串行构建减少本机偶发 EXE 文件锁冲突
    R04 和整个 M0 不能仅凭本包标记完成。
 4. 再推进 M1：外部消费项目、完整参考游戏的菜单/设置/多关流程、版本化内容
    序列化、资源管线和中文文字，具体验收见产品化评审文档。
+
+并行于主线的待验收事项：Android 真机启动、字体/触控、存档、后台/锁屏恢复、
+安全区域和长稳性能尚无用户反馈记录；按用户要求不代为安装或启动设备。发行前
+还需稳定签名、干净机器运行、独立 SDK 消费和许可文件，CI 产物生成不能替代这些。
 
 实现边界：资源为同步图形线程 API，借用原生指针不能跨替换/卸载保存；句柄不
 支持外部原生资源的所有权导入。输入边沿以布尔值合并，不保存多次转换顺序，
