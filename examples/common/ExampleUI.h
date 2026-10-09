@@ -9,10 +9,46 @@ inline constexpr Color cyan = {97, 218, 255, 255};
 inline constexpr Color pink = {255, 115, 173, 255};
 inline constexpr Color gold = {255, 207, 112, 255};
 
-inline void ConfigureLogging() {
+inline float Width() { return RayGame::Display::GetWidth(); }
+inline float Height() { return RayGame::Display::GetHeight(); }
+
+inline Vector2 Remap(Vector2 position, Vector2 previous, Vector2 current) {
+    return {position.x * current.x / previous.x, position.y * current.y / previous.y};
+}
+
+inline void ConfigureLogging(const std::string& appId) {
 #ifdef RAYGAME_QUIET_EXAMPLE
-    SetTraceLogLevel(LOG_NONE);
+    constexpr bool console = false;
+#else
+    constexpr bool console = true;
 #endif
+    try {
+        auto path = RayGame::FileSystem::UserDataDirectory(appId) / "logs/game.log";
+        RayGame::Diagnostics::Initialize(path, console);
+        RayGame::Diagnostics::InstallRaylibCallback();
+        RayGame::Diagnostics::Write(RayGame::LogLevel::Info, "Starting " + appId);
+    } catch (...) {
+        if (!console) SetTraceLogLevel(LOG_NONE);
+    }
+}
+
+template<class Game>
+int Run(const std::string& appId) {
+    ConfigureLogging(appId);
+    int result = 0;
+    try {
+        Game game;
+        game.SetCanvasScaleMode(RayGame::CanvasScaleMode::Expand);
+        game.Run();
+    } catch (const std::exception& error) {
+        RayGame::Diagnostics::Write(RayGame::LogLevel::Error, error.what());
+        result = 1;
+    } catch (...) {
+        RayGame::Diagnostics::Write(RayGame::LogLevel::Error, "Unhandled game exception");
+        result = 1;
+    }
+    RayGame::Diagnostics::Shutdown();
+    return result;
 }
 
 inline void Triangle(Vector2 a, Vector2 b, Vector2 c, Color color) {

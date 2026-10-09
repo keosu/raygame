@@ -32,8 +32,8 @@ public:
         for (int i = 0; i < numStars; i++) {
             Star star;
             star.position = {
-                static_cast<float>(GetRandomValue(0, 800)),
-                static_cast<float>(GetRandomValue(0, 600))
+                static_cast<float>(GetRandomValue(0, (int)ExampleUI::Width())),
+                static_cast<float>(GetRandomValue(0, (int)ExampleUI::Height()))
             };
             star.size = static_cast<float>(GetRandomValue(5, 18)) / 10.0f;
             star.brightness = static_cast<float>(GetRandomValue(30, 100)) / 100.0f;
@@ -63,9 +63,9 @@ public:
             
             // Slowly move stars down for parallax effect
             star.position.y += 10.0f * GameTime::DeltaTime();
-            if (star.position.y > 600) {
+            if (star.position.y > ExampleUI::Height()) {
                 star.position.y = 0;
-                star.position.x = static_cast<float>(GetRandomValue(0, 800));
+                star.position.x = static_cast<float>(GetRandomValue(0, (int)ExampleUI::Width()));
             }
         }
     }
@@ -77,7 +77,7 @@ public:
         }
         if (stars.empty()) return;
         
-        DrawRectangleGradientV(0, 0, 800, 600, {8, 16, 32, 255}, {3, 7, 17, 255});
+        DrawRectangleGradientV(0, 0, (int)std::ceil(ExampleUI::Width()), (int)std::ceil(ExampleUI::Height()), {8, 16, 32, 255}, {3, 7, 17, 255});
 
         // Draw twinkling stars
         for (const auto& star : stars) {
@@ -236,7 +236,7 @@ public:
         gameObject->transform->position.x = startX + offset;
         
         // Destroy if off screen
-        if (gameObject->transform->position.y > 700) {
+        if (gameObject->transform->position.y > ExampleUI::Height() + 100) {
             gameObject->MarkDestroyed();
         }
     }
@@ -255,7 +255,7 @@ public:
         
         // Destroy if off screen
         if (gameObject->transform->position.y < -10 || 
-            gameObject->transform->position.y > 700) {
+            gameObject->transform->position.y > ExampleUI::Height() + 100) {
             gameObject->MarkDestroyed();
         }
     }
@@ -272,6 +272,21 @@ public:
     bool restartRequested = false;
     
     SpaceShooterScene() : Scene("Space Shooter") {}
+
+    void OnViewportChanged(Vector2 previous, Vector2 current) override {
+        for (const auto& object : GetAllGameObjects()) {
+            object->transform->position = ExampleUI::Remap(object->transform->position, previous, current);
+            if (auto ai = object->GetComponent<EnemyAI>()) ai->startX *= current.x / previous.x;
+            if (auto background = object->GetComponent<StarfieldBackground>())
+                for (auto& star : background->stars) star.position = ExampleUI::Remap(star.position, previous, current);
+            if (auto particles = object->GetComponent<ParticleEmitter>()) particles->Clear();
+        }
+        if (player && !player->IsDestroyed()) {
+            auto& p = player->transform->position;
+            p.x = Clamp(p.x, 20.0f, current.x - 20);
+            p.y = Clamp(p.y, 92.0f, current.y - 54);
+        }
+    }
     
     void OnLoad() override {
         ExampleUI::Initialize();
@@ -282,7 +297,7 @@ public:
         // Create player
         player = CreateGameObject("Player");
         player->tag = "Player";
-        player->transform->position = {400, 500};
+        player->transform->position = {ExampleUI::Width() / 2, ExampleUI::Height() - 100};
         
         // Add custom ship renderer instead of sprite
         player->AddComponent<PlayerShipRenderer>();
@@ -316,7 +331,7 @@ public:
         // Create camera
         auto cameraObj = CreateGameObject("Camera");
         auto camera = cameraObj->AddComponent<Camera2DComponent>();
-        camera->offset = {400, 300};
+        camera->offset = {ExampleUI::Width() / 2, ExampleUI::Height() / 2};
         camera->zoom = 1.0f;
         
         // Create some initial enemies
@@ -393,11 +408,11 @@ public:
     void Render() override {
         Scene::Render();
         
-        ExampleUI::Header(800, "SPACE SHOOTER", "ORBITAL DEFENSE");
-        ExampleUI::Stat(768, "SCORE", TextFormat("%06d", score));
-        ExampleUI::Footer(800, 600, "WASD / ARROWS  MOVE     SPACE  FIRE");
+        ExampleUI::Header(ExampleUI::Width(), "SPACE SHOOTER", "ORBITAL DEFENSE");
+        ExampleUI::Stat(ExampleUI::Width() - 32, "SCORE", TextFormat("%06d", score));
+        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "WASD / ARROWS  MOVE     SPACE  FIRE");
         if (!player || !player->active) {
-            if (ExampleUI::Result(800, 600, "SECTOR LOST", score)) restartRequested = true;
+            if (ExampleUI::Result(ExampleUI::Width(), ExampleUI::Height(), "SECTOR LOST", score)) restartRequested = true;
         }
     }
 
@@ -417,7 +432,7 @@ public:
         enemy->tag = "Enemy";
         
         // Use GetRandomValue directly for testing
-        float x = static_cast<float>(GetRandomValue(50, 750));
+        float x = static_cast<float>(GetRandomValue(100, (int)ExampleUI::Width() - 100));
         enemy->transform->position = {x, -30};
         
         // Add custom enemy ship renderer
@@ -508,12 +523,12 @@ void PlayerController::Update() {
     float margin = 20;
     if (gameObject->transform->position.x < margin) 
         gameObject->transform->position.x = margin;
-    if (gameObject->transform->position.x > 800 - margin) 
-        gameObject->transform->position.x = 800 - margin;
+    if (gameObject->transform->position.x > ExampleUI::Width() - margin)
+        gameObject->transform->position.x = ExampleUI::Width() - margin;
     if (gameObject->transform->position.y < 92)
         gameObject->transform->position.y = 92;
-    if (gameObject->transform->position.y > 546)
-        gameObject->transform->position.y = 546;
+    if (gameObject->transform->position.y > ExampleUI::Height() - 54)
+        gameObject->transform->position.y = ExampleUI::Height() - 54;
 }
 
 void PlayerController::Shoot() {
@@ -551,9 +566,6 @@ public:
 };
 
 int main() {
-    ExampleUI::ConfigureLogging();
-    SpaceShooterGame game;
-    game.Run();
-    return 0;
+    return ExampleUI::Run<SpaceShooterGame>("raygame.space_shooter");
 }
 

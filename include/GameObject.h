@@ -2,6 +2,7 @@
 
 #include "Core.h"
 #include "Component.h"
+#include "Diagnostics.h"
 
 namespace RayGame {
 
@@ -98,13 +99,15 @@ private:
         }
     }
 
-    void DestroyNow() {
+    void DestroyNow() noexcept {
         if (finalized) return;
         finalized = true;
         MarkDestroyed();
         for (const auto& comp : components) {
-            if (comp->IsEnabled()) comp->SetEnabled(false);
-            comp->OnDestroy();
+            try { if (comp->IsEnabled()) comp->SetEnabled(false); }
+            catch (...) { Diagnostics::Write(LogLevel::Error, "Component OnDisable failed during destruction"); }
+            try { comp->OnDestroy(); }
+            catch (...) { Diagnostics::Write(LogLevel::Error, "Component OnDestroy failed during destruction"); }
         }
         if (transform) transform->DetachHierarchy();
         for (const auto& comp : components) comp->gameObject = nullptr;

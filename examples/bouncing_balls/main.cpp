@@ -5,14 +5,27 @@ using namespace RayGame;
 
 class BouncingBallsScene : public Scene {
 public:
-    static constexpr int WIDTH = 800, HEIGHT = 600;
     Rectangle arena = {24, 92, 752, 454};
     bool gravityEnabled = true;
     static constexpr int MAX_BALLS = 128;
 
     BouncingBallsScene() : Scene("Bouncing Balls") {}
 
+    void OnViewportChanged(Vector2, Vector2 current) override {
+        Rectangle previous = arena;
+        arena = {24, 92, current.x - 48, current.y - 146};
+        for (const auto& object : GetAllGameObjects()) {
+            auto& p = object->transform->position;
+            p = {arena.x + 16 + (p.x - previous.x - 16) * (arena.width - 32) / (previous.width - 32),
+                 arena.y + 16 + (p.y - previous.y - 16) * (arena.height - 32) / (previous.height - 32)};
+            p.x = Clamp(p.x, arena.x + 16, arena.x + arena.width - 16);
+            p.y = Clamp(p.y, arena.y + 16, arena.y + arena.height - 16);
+            if (auto particles = object->GetComponent<ParticleEmitter>()) particles->Clear();
+        }
+    }
+
     void OnLoad() override {
+        arena = {24, 92, ExampleUI::Width() - 48, ExampleUI::Height() - 146};
         ExampleUI::Initialize({132, 233, 181, 255});
         for (int i = 0; i < 10; ++i) {
             AddRandomBall({Random(arena.x + 24, arena.x + arena.width - 24),
@@ -49,17 +62,17 @@ public:
     }
 
     void Render() override {
-        DrawRectangleGradientV(0, 0, WIDTH, HEIGHT, {10, 22, 34, 255}, {6, 11, 23, 255});
+        DrawRectangleGradientV(0, 0, ExampleUI::Width(), ExampleUI::Height(), {10, 22, 34, 255}, {6, 11, 23, 255});
         DrawRectangleRounded(arena, 0.035f, 8, {12, 23, 38, 255});
         DrawRectangleRoundedLines(arena, 0.035f, 8, {45, 73, 92, 255});
-        for (int y = 112; y < 530; y += 32) {
-            for (int x = 44; x < 760; x += 32) DrawCircle(x, y, 1, {36, 55, 73, 255});
+        for (int y = 112; y < ExampleUI::Height() - 70; y += 32) {
+            for (int x = 44; x < ExampleUI::Width() - 40; x += 32) DrawCircle(x, y, 1, {36, 55, 73, 255});
         }
         Scene::Render();
-        ExampleUI::Header(WIDTH, "BOUNCING BALLS", "PHYSICS PLAYGROUND");
-        ExampleUI::Stat(WIDTH - 180.0f, "BALLS", TextFormat("%03d / %d", (int)GetAllGameObjects().size(), MAX_BALLS), UI::accentColor);
-        ExampleUI::Stat(WIDTH - 32.0f, "GRAVITY", gravityEnabled ? "ON" : "OFF", ExampleUI::gold);
-        ExampleUI::Footer(WIDTH, HEIGHT, "SPACE / CLICK  ADD    G  GRAVITY    R  RESET");
+        ExampleUI::Header(ExampleUI::Width(), "BOUNCING BALLS", "PHYSICS PLAYGROUND");
+        ExampleUI::Stat(ExampleUI::Width() - 180.0f, "BALLS", TextFormat("%03d / %d", (int)GetAllGameObjects().size(), MAX_BALLS), UI::accentColor);
+        ExampleUI::Stat(ExampleUI::Width() - 32.0f, "GRAVITY", gravityEnabled ? "ON" : "OFF", ExampleUI::gold);
+        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "SPACE / CLICK  ADD    G  GRAVITY    R  RESET");
     }
 
     void AddRandomBall(Vector2 position = {-1, -1}) {
@@ -101,8 +114,5 @@ public:
 };
 
 int main() {
-    ExampleUI::ConfigureLogging();
-    MyGame game;
-    game.Run();
-    return 0;
+    return ExampleUI::Run<MyGame>("raygame.bouncing_balls");
 }

@@ -26,9 +26,9 @@ target("raygame")
     set_targetdir("$(projectdir)/bin")
 
     if is_plat("windows") then
-        add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", {public = true})
+        add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", "shell32", "ole32", {public = true})
     elseif is_plat("mingw") then
-        add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", {public = true})
+        add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", "shell32", "ole32", {public = true})
     elseif is_plat("linux") then
         add_syslinks("pthread", "m", "dl", "rt", {public = true})
     elseif is_plat("macosx") then
@@ -80,7 +80,7 @@ target("tests")
     set_languages("c++17")
     set_basename("tests")
     set_default(false)
-    add_files("tests/main.cpp", "tests/header_compat.cpp")
+    add_files("tests/main.cpp", "tests/header_compat.cpp", "tests/platform_files.cpp")
     add_deps("raygame")
     set_targetdir("$(projectdir)/bin")
 target_end()

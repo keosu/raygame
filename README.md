@@ -7,6 +7,9 @@ callbacks, particles, tweening, an event bus, tilemaps, immediate-mode UI and mo
 
 Version 0.2.0 · C++17 · MIT
 
+See the [product readiness review and roadmap](docs/PRODUCT_READINESS_REVIEW.md)
+(Chinese) for current limitations, proposed architecture and release acceptance criteria.
+
 ## Features
 
 ### Core
@@ -22,7 +25,7 @@ Version 0.2.0 · C++17 · MIT
 - **Sprite & animation** components with pivot, flip and tint
 - **Global layer sorting**: components draw in `layer`/`renderOrder` order across all objects
 - **Camera2D** with smooth follow, zoom, world/screen conversion, opt-in render integration
-- **Resizable window & borderless fullscreen** with a fixed logical canvas, aspect-ratio preservation and mapped mouse input
+- **Resizable window & borderless fullscreen** with fixed or expanding logical canvases, aspect-ratio preservation and mapped mouse input
 - **Sharp UI text** with a display-sized render target and bundled example fonts
 - **Native Windows title bar** follows the system's app light/dark preference, including changes while running
 
@@ -47,6 +50,7 @@ Version 0.2.0 · C++17 · MIT
 - **Audio**: sound/music with master volume (own `Audio.h`)
 - **Immediate-mode UI**: labels, panels, buttons, progress bars
 - **Save system**: dependency-free key/value persistence
+- **Safe storage & diagnostics**: atomic saves with checksums and backup recovery, per-user data directories, rotating file logs
 
 ## Architecture
 
@@ -101,10 +105,20 @@ fields after adding it; `Start` runs once before its first update or render. Dis
 components start when enabled. Runtime spawns are queued during scene traversal.
 `active = false` pauses an object; use `Scene::Destroy` or `MarkDestroyed` to remove
 it. Deferred cleanup runs `OnDestroy` once even if another `Ref` retains the object.
+During `Scene::Clear`, `IsClearing()` is true and `CreateGameObject` throws
+`std::logic_error`: cleanup callbacks cannot repopulate a scene being cleared.
+Exceptions from destruction/unload callbacks are logged and cleanup continues.
+Exceptions from initialization, updating or rendering propagate after `Run` cleans
+up the scene, resources and native devices. `Shutdown` is idempotent, with a
+destructor fallback for an engine initialized without calling `Run`.
 
 Use `GameTime::DeltaTime()` in `Update` and `GameTime::FixedDeltaTime()` in
 `FixedUpdate`. Rigidbody integration and collision processing run at the fixed
 interval (1/60 second by default), with at most eight catch-up steps per frame.
+The simulation delta used by ordinary updates and tweens is capped to the same
+eight-step budget, so a long stall does not advance animations far ahead of physics.
+`GameTime::UnscaledDeltaTime/UnscaledTime` retain actual elapsed time, including while
+paused. Override `GameEngine::OnUnscaledUpdate` for work that must continue during pause.
 Set it with `GameEngine::SetFixedTimeStep`; zero and negative intervals are ignored.
 Collision layers are numbered 0–31; a nonpositive rigidbody mass is treated as static.
 
@@ -188,15 +202,32 @@ All four examples share the following window controls:
 | `F1` | Toggle debug overlay |
 | `R` | Retry after game over; reset the bouncing-balls playground |
 
-The window is resizable. Game coordinates stay at the example's original
-resolution; unused space is letterboxed, and mouse input follows the same viewport.
+The window is resizable. The four examples use an expanding canvas: wider windows
+show more horizontal game space, and taller windows show more vertical space.
+Sprites retain their proportions; backgrounds, HUDs, movement bounds and mouse input
+follow the new layout. Resizing preserves the current run, recenters brick rows and
+keeps the paddle anchored to the bottom. This intentionally changes the available
+play area; choose `Fit` for games that require identical playfield geometry.
 The previous window size and position are restored when leaving fullscreen.
 On Windows, the native title bar follows the light/dark app theme and respects
 high-contrast mode. Theme changes are picked up within half a second.
 For your own games, use `GameEngine::SetFullscreen`, `SetPaused`, or
-`SetCanvasSize`. `GetScreenWidth/Height` on the engine return logical canvas units;
-raylib's global functions return the actual window size. Use `Input::GetMousePosition`
+`SetCanvasSize`. The default `CanvasScaleMode::Fit` preserves the reference canvas
+and letterboxes unused space. Select `Expand` before `Run` to fill the window:
+
+```cpp
+game.SetCanvasScaleMode(CanvasScaleMode::Expand);
+game.Run();
+```
+
+Use `Display::GetWidth/GetHeight/GetSize` for the current logical dimensions and
+override `Scene::OnViewportChanged(previous, current)` to reposition your game's
+objects or layout. The engine's `GetScreenWidth/Height` return rounded logical units;
+raylib's global functions return actual window dimensions. Use `Input::GetMousePosition`
 for game coordinates and `Input::IsMouseInCanvas` to ignore clicks in the margins.
+The render target is quantized to reduce resize allocations and capped at 4096 pixels
+per axis. At extreme resolutions it scales up; a failed resize allocation keeps the
+last working target.
 
 The examples use **Rajdhani SemiBold** for headings and scores and **Barlow Medium**
 for labels, with matching HUDs and retry panels. The TTF files and SIL Open Font
@@ -235,6 +266,23 @@ and logs for debugging, run `xmake f --example_console=y` and rebuild. Use
 `xmake f --example_console=n` to return to quiet launches. The `tests` and `smoke`
 targets always keep their console and diagnostic output.
 
+Quiet examples write raylib diagnostics to per-user rotating logs instead:
+`%LOCALAPPDATA%/raygame.<example>/logs/game.log` on Windows and
+`$XDG_DATA_HOME/raygame.<example>/logs/game.log` (default `~/.local/share`) on Linux.
+Each active log is capped at 1 MiB with one `.previous` file. Custom games can use
+`Diagnostics::Initialize` and `InstallRaylibCallback`; log shutdown belongs to the
+application that initialized it.
+
+Neon Breakout stores its save in the same per-user application directory and imports
+an existing `breakout_save.txt` from the working or executable directory on first use.
+`SaveSystem` reads legacy key/value files and writes a versioned, checksummed format
+(maximum 1 MiB). Writes use a synced sibling temporary file and atomic replacement;
+the previous valid save becomes `.bak`. `Load` tries the backup when the main file
+is unreadable or fails validation; `WasRecovered()` reports this case. The checksum
+detects corruption and is not an anti-cheat mechanism. A save file should have one
+writer process; in-process writes are serialized. `FileSystem::UserDataDirectory`
+provides an application-specific writable directory.
+
 When including individual headers, replace the old `#include "Time.h"` with
 `#include "GameTime.h"`. Windows treats `Time.h` and the C runtime's `time.h` as
 the same filename, so keeping the old header on the include path breaks `<ctime>`
@@ -259,9 +307,10 @@ xmake run smoke
 
 It requires an OpenGL 3.3-capable display even though the window is hidden.
 It also checks fullscreen/window restoration, the native Windows title-bar theme,
-font loading, viewport scaling and
-resource cleanup, and saves rendered previews to `bin/screenshots`. The logic suite
-covers letterboxing, coordinate conversion and pause timing without a window.
+font loading, initialization/render failure cleanup, and a 16-case matrix of four
+games at 4:3, 16:9, 21:9 and 9:16. Rendered previews are saved to `bin/screenshots`.
+The logic suite covers viewport conversion, pause/long-frame timing, callback failure
+recovery, Unicode save paths, backup recovery, write failures and log rotation.
 
 ## License
 

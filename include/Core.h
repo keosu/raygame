@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Export.h"
+
 #include <raylib.h>
 #include <raymath.h>
 #include <memory>
@@ -11,18 +13,6 @@
 #include <cmath>
 #include <type_traits>
 #include <utility>
-
-// Export/Import macros. Empty for static builds (the default); define
-// RAYGAME_SHARED when building/consuming RayGame as a shared library.
-#if defined(_WIN32) && defined(RAYGAME_SHARED)
-    #ifdef RAYGAME_EXPORTS
-        #define RAYGAME_API __declspec(dllexport)
-    #else
-        #define RAYGAME_API __declspec(dllimport)
-    #endif
-#else
-    #define RAYGAME_API
-#endif
 
 // Forward declarations
 namespace RayGame {

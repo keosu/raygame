@@ -3,6 +3,7 @@
 #include "Core.h"
 #include "GameObject.h"
 #include "Camera2D.h"
+#include <stdexcept>
 
 namespace RayGame {
 
@@ -17,17 +18,20 @@ public:
 
     virtual void OnLoad() {}
     virtual void OnUnload() {}
+    virtual void OnViewportChanged(Vector2 previous, Vector2 current) {}
+
+    bool IsClearing() const { return clearing; }
 
     virtual void Update() {
         if (!started) Start();
         FlushPending();
-        updating = true;
+        Traversal traversal(*this);
         for (size_t i = 0; i < gameObjects.size(); i++) {
             if (gameObjects[i] && gameObjects[i]->active && !gameObjects[i]->IsDestroyed()) {
                 gameObjects[i]->Update();
             }
         }
-        updating = false;
+        traversal.End();
 
         FlushPending();
     }
@@ -35,23 +39,27 @@ public:
     virtual void FixedUpdate() {
         if (!started) Start();
         FlushPending();
-        updating = true;
+        Traversal traversal(*this);
         for (size_t i = 0; i < gameObjects.size(); i++) {
             if (gameObjects[i] && gameObjects[i]->active && !gameObjects[i]->IsDestroyed()) {
                 gameObjects[i]->FixedUpdate();
             }
         }
-        updating = false;
+        traversal.End();
         FlushPending();
     }
 
     virtual void Render() {
         if (!started) Start();
-        updating = true;
+        Traversal traversal(*this);
         auto camera = activeCamera.lock();
         bool cam = camera && camera->GetGameObject() && camera->GetGameObject()->active
                    && camera->IsEnabled();
         if (cam) camera->Begin();
+        struct CameraScope {
+            Camera2DComponent* value;
+            ~CameraScope() { if (value) value->End(); }
+        } cameraScope{cam ? camera.get() : nullptr};
 
         // Build a flat, layer-sorted draw list across all objects.
         drawList.clear();
@@ -73,12 +81,13 @@ public:
         }
         drawList.clear();
 
-        if (cam) camera->End();
-        updating = false;
+        if (cam) { camera->End(); cameraScope.value = nullptr; }
+        traversal.End();
         FlushPending();
     }
 
     Ref<GameObject> CreateGameObject(const std::string& name = "GameObject") {
+        if (clearing) throw std::logic_error("Cannot create objects in a scene being cleared");
         auto obj = CreateRef<GameObject>(name);
         obj->scene = this;
         if (updating) {
@@ -102,6 +111,8 @@ public:
 
     // Also finalizes externally retained objects before releasing scene resources.
     void Clear() {
+        if (clearing) { if (!updating) FlushPending(); return; }
+        clearing = true;
         for (auto& obj : gameObjects) if (obj) obj->MarkDestroyed();
         for (auto& obj : pendingAdd) if (obj) obj->MarkDestroyed();
         activeCamera.reset();
@@ -136,12 +147,12 @@ public:
     void Start() {
         if (!started) {
             started = true;
-            updating = true;
+            Traversal traversal(*this);
             // Index-based: components may spawn new objects during Start().
             for (size_t i = 0; i < gameObjects.size(); i++) {
                 if (gameObjects[i]) gameObjects[i]->Start();
             }
-            updating = false;
+            traversal.End();
             FlushPending();
         }
     }
@@ -168,11 +179,12 @@ protected:
 
     void FlushPending() {
         if (updating) return;
-        updating = true;
+        Traversal traversal(*this);
+        if (clearing) { Drain(); return; }
         std::vector<Ref<GameObject>> additions;
         additions.swap(pendingAdd);
+        gameObjects.insert(gameObjects.end(), additions.begin(), additions.end());
         for (const auto& obj : additions) {
-            gameObjects.push_back(obj);
             if (started && obj) obj->Start();
         }
         // Separate removals before callbacks, which may create more objects.
@@ -183,14 +195,35 @@ protected:
         gameObjects.erase(std::remove_if(gameObjects.begin(), gameObjects.end(),
             [](const Ref<GameObject>& obj) { return !obj || obj->IsDestroyed(); }), gameObjects.end());
         for (const auto& obj : removed) obj->DestroyNow();
-        updating = false;
+        if (clearing) Drain();
     }
 
 private:
+    struct Traversal {
+        Scene& scene;
+        explicit Traversal(Scene& value) : scene(value) {
+            if (scene.updating) throw std::logic_error("Scene traversal cannot be re-entered");
+            scene.updating = true;
+        }
+        void End() { scene.updating = false; }
+        ~Traversal() { End(); }
+    };
+
+    void Drain() {
+        // clearing remains true throughout user callbacks: no resurrection.
+        auto objects = std::move(gameObjects);
+        auto pending = std::move(pendingAdd);
+        gameObjects.clear(); pendingAdd.clear(); drawList.clear();
+        for (const auto& obj : objects) if (obj) obj->DestroyNow();
+        for (const auto& obj : pending) if (obj) obj->DestroyNow();
+        clearing = false;
+    }
+
     std::vector<Ref<GameObject>> pendingAdd;
     std::vector<Ref<Component>> drawList;
     std::weak_ptr<Camera2DComponent> activeCamera;
     bool updating = false;
+    bool clearing = false;
 };
 
 }

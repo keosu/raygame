@@ -3,6 +3,8 @@
 // Main include file for RayGame Engine
 
 #include "Core.h"
+#include "Diagnostics.h"
+#include "FileSystem.h"
 #include "Display.h"
 #include "GameTime.h"
 #include "Input.h"

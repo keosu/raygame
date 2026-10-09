@@ -6,8 +6,7 @@
 
 using namespace RayGame;
 
-static const int SCREEN_W = 960;
-static const int SCREEN_H = 720;
+
 
 // ---- Neon drawing helpers ----
 static void DrawGlowCircle(Vector2 p, float r, Color c) {
@@ -64,13 +63,13 @@ public:
     void Render() override {
         float t = GameTime::GetTime();
         Color line = {40, 60, 120, 60};
-        for (int x = 0; x <= SCREEN_W; x += 48) {
+        for (int x = 0; x <= ExampleUI::Width(); x += 48) {
             float a = 30 + 20 * sinf(t + x * 0.02f);
-            DrawLine(x, 0, x, SCREEN_H, Fade(line, a / 255.0f));
+            DrawLine(x, 0, x, ExampleUI::Height(), Fade(line, a / 255.0f));
         }
-        for (int y = 0; y <= SCREEN_H; y += 48) {
+        for (int y = 0; y <= ExampleUI::Height(); y += 48) {
             float a = 30 + 20 * cosf(t + y * 0.02f);
-            DrawLine(0, y, SCREEN_W, y, Fade(line, a / 255.0f));
+            DrawLine(0, y, ExampleUI::Width(), y, Fade(line, a / 255.0f));
         }
     }
 };
@@ -129,7 +128,7 @@ public:
         if (move == 0 && Input::IsMouseInCanvas() && std::fabs(Input::GetMouseDelta().x) > 0) {
             pos.x = Input::GetMousePosition().x;
         }
-        pos.x = Clamp(pos.x, size.x/2, SCREEN_W - size.x/2);
+        pos.x = Clamp(pos.x, size.x/2, ExampleUI::Width() - size.x/2);
         auto box = gameObject->GetComponent<BoxCollider>();
         if (box) box->size = size;
     }
@@ -180,13 +179,40 @@ public:
     bool gameOver = false;
     bool won = false;
     bool restartRequested = false;
-    const char* savePath = "breakout_save.txt";
+    std::filesystem::path savePath;
 
     BreakoutScene() : Scene("Neon Breakout") {}
+
+    void OnViewportChanged(Vector2 previous, Vector2 current) override {
+        for (const auto& object : GetAllGameObjects()) {
+            if (object->tag == "Brick") object->transform->position.x += (current.x - previous.x) / 2;
+            if (auto particles = object->GetComponent<ParticleEmitter>()) particles->Clear();
+        }
+        if (paddle) {
+            auto& p = paddle->transform->position;
+            p = {Clamp(p.x * current.x / previous.x, 60.0f, current.x - 60), current.y - 60};
+        }
+        if (ball) {
+            auto& p = ball->transform->position;
+            p = ExampleUI::Remap(p, previous, current);
+            p.x = Clamp(p.x, 10.0f, current.x - 10);
+            p.y = Clamp(p.y, 10.0f, current.y - 80);
+            if (!ball->GetComponent<Ball>()->launched && paddle) p = {paddle->transform->position.x, current.y - 90};
+        }
+    }
 
     void OnLoad() override {
         ExampleUI::Initialize(ExampleUI::cyan);
         SaveSystem save;
+        if (savePath.empty()) {
+            savePath = FileSystem::UserDataDirectory("raygame.neon_breakout") / "breakout_save.txt";
+            if (!std::filesystem::exists(savePath)) {
+                for (const auto& legacy : {std::filesystem::path("breakout_save.txt"),
+                     std::filesystem::u8path(GetApplicationDirectory()) / "breakout_save.txt"}) {
+                    if (save.Load(legacy)) { save.Save(savePath); break; }
+                }
+            }
+        }
         if (save.Load(savePath)) highscore = save.GetInt("highscore", 0);
 
         EventBus::Clear();
@@ -206,7 +232,7 @@ public:
         // Paddle
         paddle = CreateGameObject("Paddle");
         paddle->tag = "Paddle";
-        paddle->transform->position = {SCREEN_W / 2.0f, SCREEN_H - 60.0f};
+        paddle->transform->position = {ExampleUI::Width() / 2.0f, ExampleUI::Height() - 60.0f};
         paddle->AddComponent<Paddle>();
         auto pbox = paddle->AddComponent<BoxCollider>(Vector2{120, 18});
         pbox->isTrigger = true;
@@ -219,7 +245,7 @@ public:
         const int cols = 10, rows = 6;
         const float bw = 80, bh = 28, gap = 8;
         float totalW = cols * bw + (cols - 1) * gap;
-        float startX = (SCREEN_W - totalW) / 2 + bw / 2;
+        float startX = (ExampleUI::Width() - totalW) / 2 + bw / 2;
         Color rowColors[] = {
             {255, 80, 160, 255}, {255, 140, 60, 255}, {255, 230, 60, 255},
             {90, 240, 140, 255}, {80, 200, 255, 255}, {170, 120, 255, 255}
@@ -251,7 +277,7 @@ public:
     void SpawnBall() {
         ball = CreateGameObject("Ball");
         ball->tag = "Ball";
-        ball->transform->position = {SCREEN_W / 2.0f, SCREEN_H - 90.0f};
+        ball->transform->position = {ExampleUI::Width() / 2.0f, ExampleUI::Height() - 90.0f};
         auto b = ball->AddComponent<Ball>();
         b->game = this;
         auto col = ball->AddComponent<CircleCollider>(10.0f);
@@ -301,17 +327,17 @@ public:
     void Render() override {
         Scene::Render();  // world (shaken)
 
-        ExampleUI::Header(SCREEN_W, "NEON BREAKOUT", "BREAK THE PATTERN");
+        ExampleUI::Header(ExampleUI::Width(), "NEON BREAKOUT", "BREAK THE PATTERN");
         ExampleUI::Lives(380, lives);
-        ExampleUI::Stat(SCREEN_W - 195.0f, "SCORE", TextFormat("%06d", score));
-        ExampleUI::Stat(SCREEN_W - 32.0f, "BEST", TextFormat("%06d", highscore), ExampleUI::gold);
-        ExampleUI::Footer(SCREEN_W, SCREEN_H, "MOUSE / A D  MOVE     SPACE / CLICK  LAUNCH");
+        ExampleUI::Stat(ExampleUI::Width() - 195.0f, "SCORE", TextFormat("%06d", score));
+        ExampleUI::Stat(ExampleUI::Width() - 32.0f, "BEST", TextFormat("%06d", highscore), ExampleUI::gold);
+        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "MOUSE / A D  MOVE     SPACE / CLICK  LAUNCH");
 
         if (!gameOver && ball && !ball->GetComponent<Ball>()->launched) {
-            UI::TitleCentered(SCREEN_W / 2, SCREEN_H - 180, "READY TO LAUNCH", 32);
-            UI::LabelCentered(SCREEN_W / 2, SCREEN_H - 142, "Press Space or click to begin", 20, ExampleUI::muted);
+            UI::TitleCentered(ExampleUI::Width() / 2, ExampleUI::Height() - 180, "READY TO LAUNCH", 32);
+            UI::LabelCentered(ExampleUI::Width() / 2, ExampleUI::Height() - 142, "Press Space or click to begin", 20, ExampleUI::muted);
         }
-        if (gameOver && ExampleUI::Result(SCREEN_W, SCREEN_H, won ? "ALL CLEAR" : "GAME OVER", score, won)) {
+        if (gameOver && ExampleUI::Result(ExampleUI::Width(), ExampleUI::Height(), won ? "ALL CLEAR" : "GAME OVER", score, won)) {
             restartRequested = true;
         }
     }
@@ -323,7 +349,7 @@ void Ball::Update() {
     auto& pos = gameObject->transform->position;
 
     if (!launched) {
-        if (game && game->paddle) pos = {game->paddle->transform->position.x, SCREEN_H - 90.0f};
+        if (game && game->paddle) pos = {game->paddle->transform->position.x, ExampleUI::Height() - 90.0f};
         if (Input::GetKeyDown(KEY_SPACE) || (Input::IsMouseInCanvas() && Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT))) {
             launched = true;
             velocity = Normalize({(float)GetRandomValue(-40, 40), -100});
@@ -337,7 +363,7 @@ void Ball::Update() {
 
     // Wall bounces
     if (pos.x - radius < 0) { pos.x = radius; velocity.x = std::fabs(velocity.x); }
-    if (pos.x + radius > SCREEN_W) { pos.x = SCREEN_W - radius; velocity.x = -std::fabs(velocity.x); }
+    if (pos.x + radius > ExampleUI::Width()) { pos.x = ExampleUI::Width() - radius; velocity.x = -std::fabs(velocity.x); }
     if (pos.y - radius < 0) { pos.y = radius; velocity.y = std::fabs(velocity.y); }
 
     // Trail
@@ -345,7 +371,7 @@ void Ball::Update() {
     if (trail.size() > 12) trail.erase(trail.begin());
 
     // Fell out
-    if (pos.y - radius > SCREEN_H) {
+    if (pos.y - radius > ExampleUI::Height()) {
         if (game) game->LoseLife();
     }
 }
@@ -379,15 +405,12 @@ void Ball::OnTriggerEnter(Collider* other) {
 
 class NeonBreakoutGame : public GameEngine {
 public:
-    NeonBreakoutGame() : GameEngine("RayGame - Neon Breakout", SCREEN_W, SCREEN_H) {
+    NeonBreakoutGame() : GameEngine("RayGame - Neon Breakout", 960, 720) {
         SetClearColor(Color{8, 10, 24, 255});
     }
     void OnInit() override { LoadScene(CreateRef<BreakoutScene>()); }
 };
 
 int main() {
-    ExampleUI::ConfigureLogging();
-    NeonBreakoutGame game;
-    game.Run();
-    return 0;
+    return ExampleUI::Run<NeonBreakoutGame>("raygame.neon_breakout");
 }

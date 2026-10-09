@@ -70,6 +70,7 @@ public:
     static void Update(float dt) {
         if (updating || !std::isfinite(dt) || dt < 0) return;
         updating = true;
+        struct UpdateScope { ~UpdateScope() { updating = false; } } scope;
         const auto snapshot = tweens;
         for (const auto& instance : snapshot) {
             auto& t = *instance;

@@ -1,12 +1,17 @@
 #pragma once
 
 #include "Core.h"
+#include "FileSystem.h"
+#include "Diagnostics.h"
 #include <fstream>
 #include <sstream>
+#include <iomanip>
+#include <cstdint>
 
 namespace RayGame {
 
-// Minimal dependency-free key/value save store. Persists as `key=value` lines.
+// Versioned key/value saves with an integrity checksum and atomic replacement.
+// Legacy key=value files remain readable. The checksum detects corruption, not tampering.
 class RAYGAME_API SaveSystem {
 public:
     void SetString(const std::string& key, const std::string& value) { data[key] = value; }
@@ -48,17 +53,64 @@ public:
     void Remove(const std::string& key) { data.erase(key); }
     void ClearAll() { data.clear(); }
 
-    bool Save(const std::string& filepath) const {
-        std::ofstream out(filepath, std::ios::trunc);
-        if (!out.is_open()) return false;
-        for (const auto& kv : data) out << Escape(kv.first) << "=" << Escape(kv.second) << "\n";
-        out.flush();
-        return out.good();
+    bool Save(const std::filesystem::path& filepath) const {
+        std::vector<std::string> keys;
+        for (const auto& kv : data) keys.push_back(kv.first);
+        std::sort(keys.begin(), keys.end());
+        std::ostringstream body;
+        for (const auto& key : keys) body << Escape(key) << "=" << Escape(data.at(key)) << "\n";
+        std::string content = body.str();
+        if (content.size() > 1024 * 1024 - 64) return false;
+        std::ostringstream header;
+        header << "# RayGame save 1 " << std::hex << Checksum(content) << "\n";
+        // Preserve an existing good backup if the main file is already damaged.
+        SaveSystem previous;
+        bool validPrevious = previous.LoadFile(filepath);
+        bool ok = FileSystem::WriteAtomic(filepath, header.str() + content, validPrevious);
+        if (!ok) Diagnostics::Write(LogLevel::Error, "Cannot save: " + filepath.u8string());
+        return ok;
     }
 
-    bool Load(const std::string& filepath) {
-        std::ifstream in(filepath);
-        if (!in.is_open()) return false;
+    bool Load(const std::filesystem::path& filepath) {
+        recovered = false;
+        if (LoadFile(filepath)) return true;
+        auto backup = filepath; backup += ".bak";
+        if (!LoadFile(backup)) return false;
+        recovered = true;
+        Diagnostics::Write(LogLevel::Warning, "Recovered save from backup: " + backup.u8string());
+        return true;
+    }
+
+    bool WasRecovered() const { return recovered; }
+
+private:
+    bool recovered = false;
+
+    static std::uint64_t Checksum(const std::string& value) {
+        std::uint64_t hash = 14695981039346656037ull;
+        for (unsigned char c : value) { hash ^= c; hash *= 1099511628211ull; }
+        return hash;
+    }
+
+    bool LoadFile(const std::filesystem::path& filepath) {
+        std::string content;
+        if (!FileSystem::ReadText(filepath, content)) return false;
+        bool versioned = false;
+        if (content.compare(0, 15, "# RayGame save ") == 0) {
+            versioned = true;
+            size_t lineEnd = content.find('\n');
+            if (lineEnd == std::string::npos) return false;
+            constexpr const char* prefix = "# RayGame save 1 ";
+            if (content.compare(0, 17, prefix) != 0) return false;
+            std::string checksum = content.substr(17, lineEnd - 17);
+            content.erase(0, lineEnd + 1);
+            try {
+                size_t used = 0;
+                auto expected = std::stoull(checksum, &used, 16);
+                if (used != checksum.size() || expected != Checksum(content)) return false;
+            } catch (...) { return false; }
+        }
+        std::istringstream in(content);
         std::unordered_map<std::string, std::string> loaded;
         std::string line;
         while (std::getline(in, line)) {
@@ -68,18 +120,18 @@ public:
                 if (line[eq] == '\\') { if (eq + 1 < line.size()) ++eq; }
                 else if (line[eq] == '=') break;
             }
-            if (eq == line.size()) continue;
+            if (eq == line.size()) return false;
             std::string key = line.substr(0, eq);
             std::string value = line.substr(eq + 1);
             if (!value.empty() && value.back() == '\r') value.pop_back();
             loaded[Unescape(key)] = Unescape(value);
         }
         if (in.bad()) return false;
+        if (!versioned && loaded.empty()) return false;
         data.swap(loaded);
         return true;
     }
 
-private:
     static std::string Escape(const std::string& value) {
         std::string out;
         for (char c : value) {

@@ -7,8 +7,7 @@
 
 using namespace RayGame;
 
-static const int SCREEN_W = 820;
-static const int SCREEN_H = 900;
+
 
 static void DrawGlowCircle(Vector2 p, float r, Color c) {
     DrawCircleV(p, r * 2.2f, Fade(c, 0.12f));
@@ -52,8 +51,8 @@ public:
             Bullet* b = live[i];
             b->pos.x += b->vel.x * dt;
             b->pos.y += b->vel.y * dt;
-            if (b->pos.x < -40 || b->pos.x > SCREEN_W + 40 ||
-                b->pos.y < -40 || b->pos.y > SCREEN_H + 40) {
+            if (b->pos.x < -40 || b->pos.x > ExampleUI::Width() + 40 ||
+                b->pos.y < -40 || b->pos.y > ExampleUI::Height() + 40) {
                 b->active = false; pool.Release(b);
                 live[i] = live.back(); live.pop_back();
             } else {
@@ -178,6 +177,20 @@ public:
 
     BulletHellScene() : Scene("Bullet Hell") {}
 
+    void OnViewportChanged(Vector2 previous, Vector2 current) override {
+        for (const auto& object : GetAllGameObjects()) {
+            if (!object->transform->GetParent())
+                object->transform->position = ExampleUI::Remap(object->transform->position, previous, current);
+            if (auto field = object->GetComponent<BulletField>())
+                for (auto* bullet : field->live) bullet->pos = ExampleUI::Remap(bullet->pos, previous, current);
+        }
+        if (player) {
+            auto& p = player->transform->position;
+            p.x = Clamp(p.x, 12.0f, current.x - 12);
+            p.y = Clamp(p.y, 122.0f, current.y - 58);
+        }
+    }
+
     void OnLoad() override {
         ExampleUI::Initialize(ExampleUI::pink);
         EventBus::Clear();
@@ -196,12 +209,12 @@ public:
         playerField = pf->AddComponent<BulletField>(28).get();
 
         player = CreateGameObject("Player");
-        player->transform->position = {SCREEN_W/2.0f, SCREEN_H - 120.0f};
+        player->transform->position = {ExampleUI::Width()/2.0f, ExampleUI::Height() - 120.0f};
         auto pl = player->AddComponent<Player>();
         pl->enemyField = enemyField; pl->playerField = playerField; pl->game = this;
 
         boss = CreateGameObject("Boss");
-        boss->transform->position = {SCREEN_W/2.0f, 150.0f};
+        boss->transform->position = {ExampleUI::Width()/2.0f, 150.0f};
         auto b = boss->AddComponent<Boss>();
         b->field = enemyField; b->game = this;
     }
@@ -237,25 +250,25 @@ public:
     void EndGame(bool victory) { if (!gameOver) { gameOver = true; won = victory; } }
 
     void Render() override {
-        DrawRectangleGradientV(0, 0, SCREEN_W, SCREEN_H, {19, 12, 36, 255}, {6, 12, 24, 255});
-        for (int y = 110; y < SCREEN_H - 40; y += 48) {
-            for (int x = 26; x < SCREEN_W; x += 48) DrawCircle(x, y, 1, {53, 51, 82, 160});
+        DrawRectangleGradientV(0, 0, ExampleUI::Width(), ExampleUI::Height(), {19, 12, 36, 255}, {6, 12, 24, 255});
+        for (int y = 110; y < ExampleUI::Height() - 40; y += 48) {
+            for (int x = 26; x < ExampleUI::Width(); x += 48) DrawCircle(x, y, 1, {53, 51, 82, 160});
         }
         Scene::Render();
-        ExampleUI::Header(SCREEN_W, "BULLET HELL", "BOSS ENCOUNTER / 01");
+        ExampleUI::Header(ExampleUI::Width(), "BULLET HELL", "BOSS ENCOUNTER / 01");
         if (player) ExampleUI::Lives(320, player->GetComponent<Player>()->lives);
-        ExampleUI::Stat(SCREEN_W - 190.0f, "SCORE", TextFormat("%06d", score), ExampleUI::gold);
-        ExampleUI::Stat(SCREEN_W - 32.0f, "BULLETS", TextFormat("%04d",
+        ExampleUI::Stat(ExampleUI::Width() - 190.0f, "SCORE", TextFormat("%06d", score), ExampleUI::gold);
+        ExampleUI::Stat(ExampleUI::Width() - 32.0f, "BULLETS", TextFormat("%04d",
             (enemyField ? enemyField->Count() : 0) + (playerField ? playerField->Count() : 0)), ExampleUI::pink);
-        ExampleUI::Footer(SCREEN_W, SCREEN_H, "WASD  MOVE    Z / SPACE  FIRE    SHIFT  FOCUS");
+        ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "WASD  MOVE    Z / SPACE  FIRE    SHIFT  FOCUS");
 
         if (boss && !gameOver) {
             auto enemy = boss->GetComponent<Boss>();
             UI::Label(28, 82, "THE SENTINEL", 13, ExampleUI::muted);
-            UI::LabelRight(SCREEN_W - 28, 82, TextFormat("%d%%", (int)(100 * enemy->hp / enemy->maxHp)), 13, ExampleUI::pink);
-            UI::ProgressBar({28, 101, SCREEN_W - 56.0f, 6}, enemy->hp / enemy->maxHp, ExampleUI::pink);
+            UI::LabelRight(ExampleUI::Width() - 28, 82, TextFormat("%d%%", (int)(100 * enemy->hp / enemy->maxHp)), 13, ExampleUI::pink);
+            UI::ProgressBar({28, 101, ExampleUI::Width() - 56.0f, 6}, enemy->hp / enemy->maxHp, ExampleUI::pink);
         }
-        if (gameOver && ExampleUI::Result(SCREEN_W, SCREEN_H, won ? "VICTORY" : "DEFEATED", score, won)) {
+        if (gameOver && ExampleUI::Result(ExampleUI::Width(), ExampleUI::Height(), won ? "VICTORY" : "DEFEATED", score, won)) {
             restartRequested = true;
         }
     }
@@ -279,7 +292,7 @@ void Boss::Update() {
     if (game && game->gameOver) return;
     // Tweened side-to-side sweep via sine.
     float t = GameTime::GetTime();
-    gameObject->transform->position.x = SCREEN_W/2.0f + sinf(t * 0.8f) * 240.0f;
+    gameObject->transform->position.x = ExampleUI::Width()/2.0f + sinf(t * 0.8f) * 240.0f;
     gameObject->transform->rotation += 20.0f * GameTime::DeltaTime();
 
     // Aimed ring bursts.
@@ -315,8 +328,8 @@ void Player::Update() {
     float s = (Input::GetKey(KEY_LEFT_SHIFT)) ? speed * 0.45f : speed;
     pos.x += mv.x * s * GameTime::DeltaTime();
     pos.y += mv.y * s * GameTime::DeltaTime();
-    pos.x = Clamp(pos.x, 12.0f, SCREEN_W - 12.0f);
-    pos.y = Clamp(pos.y, 122.0f, SCREEN_H - 58.0f);
+    pos.x = Clamp(pos.x, 12.0f, ExampleUI::Width() - 12.0f);
+    pos.y = Clamp(pos.y, 122.0f, ExampleUI::Height() - 58.0f);
 
     // Fire
     fireTimer -= GameTime::DeltaTime();
@@ -346,15 +359,12 @@ void Player::Update() {
 
 class BulletHellGame : public GameEngine {
 public:
-    BulletHellGame() : GameEngine("RayGame - Bullet Hell Boss", SCREEN_W, SCREEN_H) {
+    BulletHellGame() : GameEngine("RayGame - Bullet Hell Boss", 820, 900) {
         SetClearColor(Color{10, 8, 20, 255});
     }
     void OnInit() override { LoadScene(CreateRef<BulletHellScene>()); }
 };
 
 int main() {
-    ExampleUI::ConfigureLogging();
-    BulletHellGame game;
-    game.Run();
-    return 0;
+    return ExampleUI::Run<BulletHellGame>("raygame.bullet_hell");
 }

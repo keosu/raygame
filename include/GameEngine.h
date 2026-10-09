@@ -17,6 +17,7 @@ class RAYGAME_API GameEngine {
 public:
     GameEngine(const std::string& title, int width, int height)
         : windowTitle(title), screenWidth(width), screenHeight(height) {
+        if (width <= 0 || height <= 0) throw std::invalid_argument("Canvas dimensions must be positive");
         currentScene = nullptr;
         pendingScene = nullptr;
         hasPendingScene = false;
@@ -24,54 +25,67 @@ public:
         showDebug = false;
     }
 
-    virtual ~GameEngine() = default;
+    virtual ~GameEngine() { Shutdown(); }
 
     void Init() {
         if (initialized) return;
-        InitWindow(screenWidth, screenHeight, windowTitle.c_str());
-        initialized = true;
-        RefreshWindowTheme(true);
-        SetWindowState(FLAG_WINDOW_RESIZABLE);
-        SetWindowMinSize(std::max(320, screenWidth / 2), std::max(240, screenHeight / 2));
-        SetExitKey(KEY_NULL);
-        int monitor = GetCurrentMonitor();
-        float fit = std::min(1.0f, std::min(GetMonitorWidth(monitor) * 0.9f / screenWidth,
-                                          GetMonitorHeight(monitor) * 0.85f / screenHeight));
-        if (fit < 1) SetWindowSize((int)(screenWidth * fit), (int)(screenHeight * fit));
-        Display::Configure(screenWidth, screenHeight);
-        Display::Refresh();
-        if (startFullscreen) SetFullscreen(true);
-        GameTime::Reset();
-        SetTargetFPS(targetFPS);
+        try {
+            InitWindow(screenWidth, screenHeight, windowTitle.c_str());
+            if (!IsWindowReady()) throw std::runtime_error("Cannot initialize the game window");
+            initialized = true;
+            RefreshWindowTheme(true);
+            SetWindowState(FLAG_WINDOW_RESIZABLE);
+            SetWindowMinSize(std::max(320, screenWidth / 2), std::max(240, screenHeight / 2));
+            SetExitKey(KEY_NULL);
+            int monitor = GetCurrentMonitor();
+            float fit = std::min(1.0f, std::min(GetMonitorWidth(monitor) * 0.9f / screenWidth,
+                                              GetMonitorHeight(monitor) * 0.85f / screenHeight));
+            if (fit < 1) SetWindowSize((int)(screenWidth * fit), (int)(screenHeight * fit));
+            Display::Configure(screenWidth, screenHeight, canvasScaleMode);
+            RefreshCanvas();
+            if (startFullscreen) SetFullscreen(true);
+            GameTime::Reset();
+            SetTargetFPS(targetFPS);
 
-        AudioManager::Init();
-        ResourceManager::Init();
+            AudioManager::Init();
+            ResourceManager::Init();
 
-        OnInit();
+            OnInit();
+        } catch (...) {
+            Diagnostics::Write(LogLevel::Error, "Game initialization failed");
+            Shutdown();
+            throw;
+        }
     }
 
     void Run() {
-        Init();
+        try {
+            Init();
 
-        ApplyPendingScene();
+            ApplyPendingScene();
 
-        running = true;
+            running = true;
 
-        while (!WindowShouldClose() && running) {
-            Update();
-            Render();
+            while (!WindowShouldClose() && running) {
+                Update();
+                Render();
+            }
+
+            Shutdown();
+        } catch (...) {
+            Diagnostics::Write(LogLevel::Error, "Game stopped after an exception");
+            Shutdown();
+            throw;
         }
-
-        Shutdown();
     }
 
-    void Shutdown() {
+    void Shutdown() noexcept {
+        if (shuttingDown) return;
+        if (!initialized && !currentScene && !hasPendingScene) return;
+        shuttingDown = true;
         running = false;
-        if (currentScene) {
-            currentScene->OnUnload();
-            currentScene->Clear();
-            currentScene.reset();
-        }
+        UnloadCurrentScene();
+        if (pendingScene) pendingScene->Clear();
         pendingScene.reset();
         hasPendingScene = false;
         fixedAccumulator = 0;
@@ -88,10 +102,12 @@ public:
             CloseWindow();
             initialized = false;
         }
+        shuttingDown = false;
     }
 
     // Deferred — the swap happens at the start of the next frame.
     void LoadScene(Ref<Scene> scene) {
+        if (shuttingDown) throw std::logic_error("Cannot load a scene during shutdown");
         pendingScene = scene;
         hasPendingScene = true;
     }
@@ -108,7 +124,7 @@ public:
         if (initialized && IsFullscreen() != value) {
             ToggleBorderlessWindowed();
             RefreshWindowTheme(true);
-            Display::Refresh();
+            RefreshCanvas();
         }
     }
     void ToggleFullscreen() { SetFullscreen(!IsFullscreen()); }
@@ -124,29 +140,37 @@ public:
         if (std::isfinite(dt) && dt > 0) fixedDelta = dt;
     }
 
-    int GetScreenWidth() const { return screenWidth; }
-    int GetScreenHeight() const { return screenHeight; }
+    int GetScreenWidth() const { return initialized ? (int)std::lround(Display::GetWidth()) : screenWidth; }
+    int GetScreenHeight() const { return initialized ? (int)std::lround(Display::GetHeight()) : screenHeight; }
+    void SetCanvasScaleMode(CanvasScaleMode mode) {
+        canvasScaleMode = mode;
+        if (initialized) { Display::Configure(screenWidth, screenHeight, mode); RefreshCanvas(); }
+    }
+    CanvasScaleMode GetCanvasScaleMode() const { return canvasScaleMode; }
     void SetCanvasSize(int width, int height) {
         if (width <= 0 || height <= 0) return;
         screenWidth = width;
         screenHeight = height;
-        if (initialized) { Display::Configure(width, height); Display::Refresh(); }
+        if (initialized) { Display::Configure(width, height, canvasScaleMode); RefreshCanvas(); }
     }
 
 protected:
     virtual void OnInit() {}
+    virtual void OnUnscaledUpdate() {}
     virtual void OnUpdate() {}
     virtual void OnRender() {}
 
     // Advance logic without drawing; also useful for deterministic simulations.
     void Tick(float dt) {
         ApplyPendingScene();
-        if (paused) { GameTime::Update(0); return; }
-        GameTime::Update(dt);
+        float realDelta = std::isfinite(dt) ? std::max(0.0f, dt) : 0.0f;
+        GameTime::Advance(realDelta, paused ? 0 : std::min(realDelta, fixedDelta * 8));
+        OnUnscaledUpdate();
+        if (paused) return;
         GameTime::SetFixedDeltaTime(fixedDelta);
         TweenManager::Update(GameTime::DeltaTime());
         if (currentScene) currentScene->Update();
-        fixedAccumulator += std::min(GameTime::DeltaTime(), fixedDelta * 8);
+        fixedAccumulator += GameTime::DeltaTime();
         int steps = 0;
         while (fixedAccumulator >= fixedDelta && steps++ < 8) {
             if (currentScene) currentScene->FixedUpdate();
@@ -171,20 +195,36 @@ private:
     bool initialized = false;
     bool startFullscreen = false;
     bool paused = false;
+    bool shuttingDown = false;
+    CanvasScaleMode canvasScaleMode = CanvasScaleMode::Fit;
+    Vector2 lastCanvasSize = {0, 0};
     float fixedAccumulator = 0.0f;
 
     void RefreshWindowTheme(bool force = false);
+
+    void RefreshCanvas() {
+        Display::Refresh();
+        Vector2 size = Display::GetSize();
+        if (size.x == lastCanvasSize.x && size.y == lastCanvasSize.y) return;
+        Vector2 previous = lastCanvasSize;
+        lastCanvasSize = size;
+        if (currentScene && previous.x > 0 && previous.y > 0) currentScene->OnViewportChanged(previous, size);
+    }
+
+    void UnloadCurrentScene() noexcept {
+        auto old = std::move(currentScene);
+        if (!old) return;
+        try { old->OnUnload(); }
+        catch (...) { Diagnostics::Write(LogLevel::Error, "Scene OnUnload failed; continuing cleanup"); }
+        old->Clear();
+    }
 
     void ApplyPendingScene() {
         if (!hasPendingScene) return;
         auto next = std::move(pendingScene);
         hasPendingScene = false;
 
-        if (currentScene) {
-            currentScene->OnUnload();
-            currentScene->Clear();
-            currentScene.reset();
-        }
+        UnloadCurrentScene();
         PhysicsWorld::Clear();
         TweenManager::Clear();
         EventBus::Clear();
@@ -207,7 +247,7 @@ private:
             else Quit();
         }
         if (Input::GetKeyDown(KEY_P)) paused = !paused;
-        Display::Refresh();
+        RefreshCanvas();
         AudioManager::UpdateMusic();
 
         if (Input::GetKeyDown(KEY_F1)) ToggleDebug();
@@ -216,6 +256,9 @@ private:
 
     void Render() {
         Display::Begin();
+        struct FrameScope {
+            ~FrameScope() { UI::inputEnabled = true; Display::End(); }
+        } frame;
         ClearBackground(clearColor);
         UI::inputEnabled = !paused;
 
@@ -236,13 +279,12 @@ private:
         }
 
         if (paused) {
-            DrawRectangle(0, 0, screenWidth, screenHeight, {4, 7, 16, 190});
-            UI::Panel({screenWidth / 2.0f - 190, screenHeight / 2.0f - 78, 380, 156});
-            UI::TitleCentered(screenWidth / 2.0f, screenHeight / 2.0f - 50, "PAUSED", 52);
-            UI::LabelCentered(screenWidth / 2.0f, screenHeight / 2.0f + 18, "Press P to continue", 22);
+            float width = Display::GetWidth(), height = Display::GetHeight();
+            DrawRectangle(0, 0, (int)std::ceil(width), (int)std::ceil(height), {4, 7, 16, 190});
+            UI::Panel({width / 2 - 190, height / 2 - 78, 380, 156});
+            UI::TitleCentered(width / 2, height / 2 - 50, "PAUSED", 52);
+            UI::LabelCentered(width / 2, height / 2 + 18, "Press P to continue", 22);
         }
-        Display::End();
-        UI::inputEnabled = true;
     }
 };
 

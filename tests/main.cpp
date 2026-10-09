@@ -157,6 +157,7 @@ static void TestPhysicsCallbacks() {
 }
 
 #include "regressions.h"
+#include "foundation.h"
 
 int main() {
     printf("RayGame tests\n=============\n");
@@ -168,6 +169,7 @@ int main() {
     TestTransformHierarchy();
     TestPhysicsCallbacks();
     TestRegressions();
+    TestFoundation();
 
     printf("=============\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

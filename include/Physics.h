@@ -152,6 +152,7 @@ public:
     static void Step() {
         if (stepping) return;
         stepping = true;
+        struct StepScope { ~StepScope() { stepping = false; } } scope;
         const auto snapshot = colliders;
         const auto previous = activePairs;
         const auto generation = clearGeneration;
