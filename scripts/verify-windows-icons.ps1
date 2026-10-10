@@ -41,7 +41,7 @@ foreach ($game in @('space_shooter', 'bouncing_balls', 'neon_breakout', 'bullet_
     if ($module -eq [IntPtr]::Zero) { throw "Cannot open EXE resources: $exe" }
     try {
         $group = Read-IconResource $module 1 14
-        $ico = [IO.File]::ReadAllBytes((Join-Path $projectRoot "resources/windows/$game.ico"))
+        $ico = [IO.File]::ReadAllBytes((Join-Path $projectRoot "examples/resources/windows/$game.ico"))
         $count = [BitConverter]::ToUInt16($group, 4)
         if ($count -ne 8 -or $count -ne [BitConverter]::ToUInt16($ico, 4)) { throw "Expected eight icon sizes: $game" }
         for ($i = 0; $i -lt $count; $i++) {

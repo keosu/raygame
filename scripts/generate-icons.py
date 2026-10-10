@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw
 from resvg_py import svg_to_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
+EXAMPLES = ROOT / "examples"
 GAMES = ("space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell")
 BACKGROUNDS = ("#0b1a30", "#0b252d", "#1b1a32", "#221432")
 ET.register_namespace("", "http://www.w3.org/2000/svg")
@@ -24,16 +25,16 @@ def save(image, path, size):
 previews = Image.new("RGB", (1024, 296), "#0d1220")
 labels = ImageDraw.Draw(previews)
 for index, (name, background) in enumerate(zip(GAMES, BACKGROUNDS)):
-    source = ROOT / "artwork/icons" / f"{name}.svg"
+    source = EXAMPLES / "artwork/icons" / f"{name}.svg"
     svg = source.read_text(encoding="utf-8")
     image = Image.open(BytesIO(svg_to_bytes(svg_string=svg, width=1024, height=1024))).convert("RGBA")
-    save(image, ROOT / "assets/icons" / f"{name}.png", 256)
-    windows = ROOT / "resources/windows"
+    save(image, EXAMPLES / "assets/icons" / f"{name}.png", 256)
+    windows = EXAMPLES / "resources/windows"
     windows.mkdir(parents=True, exist_ok=True)
     image.save(windows / f"{name}.ico", sizes=[(s, s) for s in (16, 20, 24, 32, 48, 64, 128, 256)])
     (windows / f"{name}.rc").write_text(f'1 ICON "{name}.ico"\n', encoding="utf-8", newline="\n")
 
-    res = ROOT / "android" / name / "res"
+    res = EXAMPLES / "android" / name / "res"
     for density, size in (("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("xxxhdpi", 192)):
         save(image, res / f"mipmap-{density}/ic_launcher.png", size)
     tree = ET.fromstring(svg)

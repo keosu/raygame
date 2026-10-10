@@ -388,7 +388,7 @@ last working target.
 
 The examples use **Rajdhani SemiBold** for headings and scores and **Barlow Medium**
 for labels, with matching HUDs and retry panels. The TTF files and SIL Open Font
-License notices live in `assets/fonts`; xmake copies them to `bin/assets` through
+License notices live in `examples/assets/fonts`; xmake copies them to `bin/assets` through
 the shared `example_assets` target. They work without installing system fonts.
 
 In `bouncing_balls`, press `Space` or click in the arena to add a ball, `G` to toggle
@@ -396,6 +396,13 @@ gravity, and `R` to reset. Balls share one texture and the arena is capped at 12
 balls to keep the physics playground responsive.
 
 ## Building
+
+The root `xmake.lua` defines the engine and shared dependencies, then includes
+`examples/xmake.lua` and `tests/xmake.lua` for their targets. Run xmake from the
+repository root. Example assets, artwork and Android/Windows packaging resources
+live under `examples/`; the engine's Android raylib recipe is in
+`xmake/packages/raylib.lua`. Desktop runtime assets remain in `bin/assets`, and
+Android packages remain in `bin/android/<arch>/<mode>`.
 
 ```bash
 xmake            # build the library and all four examples
@@ -425,7 +432,7 @@ targets always keep their console and diagnostic output.
 
 Each game has its own embedded EXE icon, native window icon and Android launcher
 icon, including adaptive and themed Android variants. Editable SVG sources and
-regeneration instructions are in [artwork/icons](artwork/icons/README.md).
+regeneration instructions are in [examples/artwork/icons](examples/artwork/icons/README.md).
 
 Quiet examples write raylib diagnostics to per-user rotating logs instead:
 `%LOCALAPPDATA%/raygame.<example>/logs/game.log` on Windows and

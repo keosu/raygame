@@ -21,7 +21,7 @@ Release 原生代码使用本地调试密钥签名，适合侧载测试。它不
 
 每个游戏有独立图标：Windows EXE 内嵌多尺寸 ICO，Android 包含普通密度图标、
 Android 8+ 自适应图标和 Android 13+ 主题单色图层。原始 SVG、生成工具和尺寸说明
-见 `artwork/icons/README.md`；图标形状由系统或启动器决定。
+见 `examples/artwork/icons/README.md`；图标形状由系统或启动器决定。
 
 包名分别是 `org.raygame.spaceshooter`、`org.raygame.bouncingballs`、
 `org.raygame.neonbreakout`、`org.raygame.bullethell`，四个包可同时安装。
@@ -111,7 +111,7 @@ xmake build -j 4 -y
   Expand 等比适配；桌面专用标题栏/窗口大小 API 不会在 Android 调用。
 - xmake-repo 的 raylib 5.5 Android 配方添加了 `--wrap=fopen`，与该版本
   自带 `android_fopen` 重复，实测会出现 `undefined symbol: __wrap_fopen`。
-  `android/raylib.lua` 提供固定版本和源文件校验和的本地配方，去掉错误包装，
+  `xmake/packages/raylib.lua` 提供固定版本和源文件校验和的本地配方，去掉错误包装，
   保留实际链接检查。它仅在 Android 配置下生效，不修改系统包仓库。
 - 原生库显式禁止未解析符号，并设置 16 KiB ELF 对齐；APK 中库压缩存放、由
   系统解压后加载。当前 C++ 运行库静态链接，不遗漏 `libc++_shared.so`。

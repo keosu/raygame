@@ -11,7 +11,63 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：独立物理世界、更新阶段/插值与示例图标（已实现并验证）
+## 最近工作包：示例目录归属与 xmake 拆分（已实现并验证）
+
+按用户要求核对根目录资源归属并整理构建入口。开始时工作区干净，基线为
+`83be019`。提交主题：`Organize example resources and split xmake target definitions`。
+
+1. 示例 APK manifest/图标移至 `examples/android`；原创图标源文件移至
+   `examples/artwork`；字体/许可/窗口 PNG 移至 `examples/assets`；四游戏
+   Windows ICO/RC 同时移至 `examples/resources`。smoke 使用这些示例资源。
+   67 个迁移文件中 66 个逐字节不变，图标 README 仅更新路径。
+2. 原 `android/raylib.lua` 是引擎 Android 依赖配方，移至
+   `xmake/packages/raylib.lua`，由顶层在 Android 配置下包含。
+3. 顶层 `xmake.lua` 保留工程、依赖和引擎目标，包含 `examples/xmake.lua`
+   与 `tests/xmake.lua`。示例选项、资源复制、四游戏及 APK 配置归前者；
+   逻辑/图形 smoke 目标归后者，仍不在 Android 定义测试二进制。
+   示例声明帮助函数改为 local，各子文件按自身目录解析源码和资源路径。
+4. APK 签名密钥显式按工程根目录转为绝对路径，防止 native_app 规则按新的
+   scriptdir 错误解析默认密钥。保留现有密钥、目标名、选项、默认目标行为、
+   GUI 启动与日志，以及 `bin/assets`、`bin/android/<arch>/<mode>` 产物布局。
+5. 图标生成/Windows 校验脚本及 README、Android 文档已更新；CI 调用入口和
+   产物路径仍有效。没有修改引擎或示例游戏的 C++ 行为。
+
+### 本包通过的检查
+
+- MSVC 2022 x64 Debug/Release 全目标完整重建通过；每种模式均
+  **311 passed, 0 failed**，图形 smoke 均 **0 failures**。
+- 两种模式四 EXE 的八尺寸内嵌图标全部匹配；四 Release EXE 确认使用
+  Windows GUI 子系统。将原 `bin/assets` 移到忽略目录备份后，资源目标重新
+  复制全部 9 个文件，内容与 `examples/assets` 一致；Release smoke 在此基础上通过。
+- 图标脚本在 `build/layout-icon-generator` 的隔离目录中实际运行，生成的
+  52 个 ICO/RC、窗口 PNG、Android 图标/配置文件与已提交内容逐字节一致。
+- Android 脚本配置/构建通过，并从新目录实际重新打包四个 ARM64 Release
+  APK；v2/v3 签名、ZIP/ELF 16 KiB 对齐、入口、静态运行库、字体/许可及
+  launcher/adaptive/themed 图标检查全部通过；四 APK 各自的全部 9 个 assets
+  内容均与新源目录逐字节一致。没有改动 C++，本次复用原生
+  编译缓存，不能描述为完整 Android 原生重编译。
+- `actionlint`、PowerShell/Python 脚本语法、UTF-8/LF 与 `git diff --check`
+  通过；最终桌面配置保持 MSVC Release、`example_console=n`。
+
+### 未运行的检查与已知限制
+
+- 本包未运行 Linux/macOS、远端 CI 或 Android 真机/模拟器。跨平台分支与
+  CI 产物路径已保留，但此前远端成绩不能当作本包验证。
+- Debug/Release 仍共用 `bin/raygame.lib`。本次首次切换 Debug 时，缓存判断
+  未重归档引擎，遗留 Release 库引发 LNK2038；使用 `xmake build -r -a -j 1 -y`
+  完整重建后通过。此问题属于已有产物布局；切换模式做本地矩阵验收时应完整重建。
+- 子目录 xmake 文件由顶层包含，构建命令仍从仓库根目录运行；此包不是独立
+  SDK 消费项目。后续先核对本提交的 Windows/Linux/Android CI，再推进本文末尾
+  M0 验收和 SDK 消费主线。Android 运行验收继续按用户要求暂缓。
+
+日志：`build/layout-{debug,release}-{config,build,tests,smoke,icons}.log`、
+`build/layout-debug-rebuild.log`、`build/layout-assets-{copy,and-subsystem}.log`、
+`build/layout-icon-generator.log`、`build/layout-ci-check.log`、
+`build/layout-android-{build,assets}.log`；APK 报告为
+`build/android/verification-release.json`。
+资源备份位于 `build/layout-previous-assets`；不要删除 Android 本地签名密钥。
+
+## 上一工作包：独立物理世界、更新阶段/插值与示例图标（已实现并验证）
 
 用户要求先完成最高优先级的物理世界隔离和更新阶段/表现插值，且四游戏 EXE/APK
 均使用独立图标；Android 真机验收暂缓。本包没有安装或启动 Android 设备。
@@ -35,7 +91,8 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
    弹幕数组保存前后位置用于绘制，结算/视口变化消除历史拖影。
 6. 四个原创 SVG 图标分别对应飞船、弹球、砖块挡板和弹幕核心。EXE 内嵌八种
    ICO 尺寸，运行窗口加载对应 PNG；APK 含五种密度、API 26 自适应图标和 API 33
-   主题单色图层。源码和生成说明在 `artwork/icons`，普通构建不需要 Python。
+   主题单色图层。源码和生成说明现位于 `examples/artwork/icons`，普通构建
+   不需要 Python。
 7. `scripts/verify-windows-icons.ps1` 比对 EXE 八种资源与原始 ICO，并已加入 CI；
    Android 构建脚本新增图标资源检查。README 已提供阶段契约、插值和 API 迁移。
 
@@ -114,7 +171,8 @@ SDK，以及 `.android` 中的工具/调试密钥。本包使用现有 JDK；SDK
 1. xmake 将四游戏构建为 NativeActivity 共享库/APK，ARM64、API 26 起、target
    API 35、OpenGL ES 2.0。Release 原生代码使用本地调试签名，适合侧载测试。
    raylib 固定为 5.5。原始 xmake-repo 配方的 `--wrap=fopen` 导致真实链接失败，
-   仓库内 `android/raylib.lua` 去掉重复包装并保留链接检查，未修改系统包仓库。
+   仓库内 raylib 配方（现位于 `xmake/packages/raylib.lua`）去掉重复包装并
+   保留链接检查，未修改系统包仓库。
 2. Android 入口桥接在启动日志前取得 Activity；日志和存档写应用私有目录，
    日志同时写入 logcat。字体及许可打入 APK；`FileSystem::AssetExists` 支持
    AssetManager，着色器存在检查也使用该接口。

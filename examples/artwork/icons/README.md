@@ -6,9 +6,9 @@ They share a dark rounded tile while keeping distinct silhouettes at small sizes
 
 Generated assets are committed, so normal xmake and CI builds need no image tools:
 
-- `resources/windows/*.ico`: 16, 20, 24, 32, 48, 64, 128 and 256 px, embedded with RC.
-- `assets/icons/*.png`: 256 px native window icons (Windows/Linux).
-- `android/<game>/res`: launcher PNGs at five densities, Android 8+ adaptive layers,
+- `examples/resources/windows/*.ico`: 16, 20, 24, 32, 48, 64, 128 and 256 px, embedded with RC.
+- `examples/assets/icons/*.png`: 256 px native window icons (Windows/Linux).
+- `examples/android/<game>/res`: launcher PNGs at five densities, Android 8+ adaptive layers,
   and Android 13+ monochrome layers for themed icons. The system controls the mask.
 
 After editing the SVGs, regenerate from the repository root:

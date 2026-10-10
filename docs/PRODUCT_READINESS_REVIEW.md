@@ -307,3 +307,18 @@ MSVC Debug/Release 各 311 项逻辑检查通过，图形 smoke 均零失败。�
 四 APK 与四 EXE 图标检查通过。API 迁移见 README，完整证据见 AGENT_STATE。
 本包推进 R04/R05 的内核契约；设备故障、多 DPI/多显示器和长稳验收仍未完成，
 不能据此将整个 M0 标为完成。SDK 消费、完整参考游戏和内容管线是下一阶段重点。
+
+
+**15. 示例资源归属与构建配置拆分**
+
+2026-10-09 按用户要求将示例 Android 打包内容、图标源文件、字体/许可/窗口
+图标及 Windows ICO/RC 分别归入 `examples/android`、`examples/artwork`、
+`examples/assets`、`examples/resources`。引擎 Android raylib 配方单独放在
+`xmake/packages/raylib.lua`。顶层保留引擎/依赖，包含 examples 和 tests 各自的
+`xmake.lua`；现有目标、构建入口、静默启动和产物布局保持兼容。
+
+MSVC Debug/Release 各完整重建通过、311 项逻辑检查通过、图形 smoke 零失败，
+四 EXE 的八尺寸图标一致。资源复制及图标脚本在新目录下实际验证，四个 ARM64
+Release APK 从新资源路径重新打包且签名/对齐/入口/资源检查通过。
+本包未运行 Linux/macOS、远端 CI 或 Android 设备，也未建立独立 SDK 消费项目；
+目录拆分仅改善工程组织，SDK/发行与 M0 待验收项继续按原路线推进。
