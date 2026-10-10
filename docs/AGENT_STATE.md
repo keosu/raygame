@@ -11,7 +11,90 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：独立桌面 SDK 消费与配置切换（已实现并验证）
+## 最近工作包：FORGE 独立横版平台参考游戏（已实现并验证）
+
+用户询问 M0 验收含义，并明确优先实现完整横版平台参考游戏，要求工业级效果。
+本包开始时工作区干净，基线 `8efbf85`。提交主题：
+`Add FORGE platform game as an independent RayGame SDK consumer`。
+
+1. 新增 `games/forge_runner` 独立 xmake 项目，只消费安装后的 RayGame SDK，
+   不引用引擎源码/原公开头文件/examples。三关工业科幻平台游戏 FORGE /
+   The last delivery：Foundry、Conduit、Heart，收集全部电池解锁出口。
+2. 固定步自定义角色模拟，包括加减速、跳跃宽限/缓冲、可变跳高、二段跳、
+   墙跳/滑墙、冲刺冷却、单向平台下落和移动升降台。周期激光、无人机、危险
+   区域、检查点/死亡重生；危险分段检测，死亡不能同时触发出口过关。
+3. 完整主菜单、继续/新游戏覆盖确认、暂停/重试、设置、逐关/最终结算与制作
+   信息。键盘/鼠标/手柄输入、失焦自动暂停；固定 1280×720 Fit 等比画布。
+   per-user 文件日志/校验存档/原子写入/备份恢复，保存失败提示。
+   过关后存档指向下一关，最终通关保留纪录并关闭 active run。
+4. 三层视差工业场景、机械设施/平台、关节角色/围巾、灯光、粒子、落地反馈、
+   可关闭震屏、HUD/排版。原创八种合成音效与 32 秒配乐，八尺寸 EXE ICO 和
+   窗口 PNG。字体及原始 OFL、常见依赖源许可随 assets 提供。
+5. 关卡为独立版本化文本，加载检查字段范围/数量和未知指令；生成脚本源码与
+   资源均提交，正常构建不依赖 Python。campaign 索引固定三关，增加第四关
+   需扩展游戏索引与存档 schema，无需修改引擎。
+6. 引擎新增默认开启的 `SetDefaultShortcutsEnabled`，游戏可接管桌面快捷键
+   和 Android 默认返回/暂停。新增 `AudioManager::SetMusicVolume`，调整
+   音量不重置播放游标。四个示例保留默认行为。
+7. `scripts/build-forge.ps1` 隔离 xmake 配置构建/安装 SDK 和游戏，支持
+   Debug/Release、逻辑/图标/图形验收；`-SkipGraphics` 明确报告未运行图形。
+   Windows CI 加入构建/逻辑/图标与游戏包上传，CI 使用无图形模式。
+   图标检查脚本保持默认四游戏，增加可指定 EXE/ICO 的参数。接入见 SDK.md。
+
+### 本包通过的检查
+
+- MSVC 2022 x64 Debug/Release 原引擎全目标构建通过，各 **311 passed,
+  0 failed**，图形 smoke 各 **0 failures**，四示例八尺寸内嵌图标均匹配。
+- FORGE 独立 SDK Debug/Release 构建通过，各 **42 passed, 0 failed**，
+  图形 smoke 各 **0 failures**。逻辑路线搜索通过正常移动/跳跃/冲刺命令
+  完成三关的全部电池与出口，不传送/改几何；针对性检查另有传送定位。
+  包含跳高/二段跳/宽限、单向/移动平台、危险穿透、检查点、损坏恢复、最终
+  完成和不可写目录。新游戏编译/链接没有新增警告。
+- 108 帧图形 smoke 覆盖菜单/设置/三关/最终结算、暂停世界时间冻结、重载
+  存档、4:3/超宽屏坐标和退出资源释放；注入键盘/鼠标/手柄快照走通设置
+  保存、暂停/恢复/重试、返回菜单、继续游戏、覆盖确认取消与恢复焦点。
+  smoke 保存目录隔离，每次默认起点，不修改正常用户进度。
+- FORGE Debug/Release EXE 八种尺寸图标与源 ICO 一致；Release 确认 GUI
+  子系统。截图及 `build/forge-preview.png` 已人工查看。
+- 把完整游戏及 SDK 复制到 `build/forge-independent consumer` 含空格的新
+  路径，实际独立编译/运行及图形 smoke 通过。CI 使用的 Release
+  `-Verify -SkipGraphics` 路径实际通过，明确显示图形未运行。
+- 图标/灯光/音频生成器在隔离目录重跑，13 个生成文件逐字节一致。
+  PowerShell/Python 语法、actionlint、UTF-8/LF、git diff --check 通过。
+- Android ARM64 Release 四 APK 重新打包，签名/ZIP 与 ELF 16 KiB 对齐/
+  入口/静态运行库/字体许可/图标检查通过，复用编译缓存；未运行设备。
+- 最终 IDE 配置为 Windows/MSVC x64 Release、build_examples=y、
+  build_tests=y、example_console=n。
+
+### 未运行的检查与已知边界
+
+- 未做人工从头到尾通关/手感调优、真实手柄、多 DPI/多显示器/长稳测试、
+  音频主观试听、Linux/macOS 或 Android 游戏移植/设备运行。程序化美术和
+  全流程已交付，不能将本包描述为已通过商业发行/工业级质量全部验收。
+- 游戏 UI 为英文；中文字体/本地化、按键重绑、完整无障碍、通用场景栈/
+  预制体/地图动画导入尚未实现，本包没有将整个 M1 标为完成。
+- M0 的真实设备初始化/显存耗尽错误路径、多 DPI/多显示器与长稳验收仍
+  未闭合。Android 真机按用户此前要求继续暂缓，不安装/启动设备。
+- 没有推送或运行新远端 CI。本包新增 Windows CI 的图形 smoke 仍跳过；
+  Linux 分支保留，历史 `83be019` CI 成绩不能算成本包验收。
+- MSVC Release 依赖 VC++ 2015–2022 x64 动态运行库，未在干净机器验收。
+  依赖完整许可/发行符号/根目录 LICENSE/签名与发行渠道仍需后续闭合。
+
+入口：`pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify`；
+EXE：`games/forge_runner/build/windows/x64/release/forge_runner.exe`，保留相邻
+assets。正常用户目录 `%LOCALAPPDATA%/raygame.forge`。详细操作/内容见游戏 README。
+本地运行包 `build/forge/FORGE-windows-x64-release.zip` 含 EXE、assets 与说明；
+它是本次可试玩包，未做干净机器发行验收。
+日志：`build/forge-script-{debug,release}.log`、`build/forge/<mode>/*.log`；
+图形截图/文件日志在各模式 smoke-data；原引擎回归
+`build/forge-engine-{debug,release}-{config,build,tests,smoke,icons}.log`；
+Android `build/forge-android-build.log` 与 `build/android/verification-release.json`。
+不要删除 Android 本地签名密钥。
+
+下一工作包：优先人工体验 FORGE 完整通关/音效/真实手柄，形成具体问题再
+打磨关卡与表现；核对本提交远端 CI，然后按下方 M0 硬件矩阵推进。
+
+## 上一工作包：独立桌面 SDK 消费与配置切换（已实现并验证）
 
 用户要求继续剩余 TODO。本包选择产品评审 R12 的独立 SDK 消费验收，并修复
 此前已记录的构建配置混用问题。开始时工作区干净，基线为 `7660d2b`。
@@ -360,9 +443,9 @@ Release 使用 `-m release`。串行构建减少本机偶发 EXE 文件锁冲突
 
 1. **补齐 M0 验收**：真实设备初始化/显存失败、多 DPI/多显示器、跨平台与长稳
    验证；独立物理世界、固定阶段、插值与丢帧观测已完成，不要重复实现。
-2. **SDK 后续与完整游戏流程**：独立桌面 xmake 消费基础已完成；先核对本包
-   Windows/Linux CI，再推进外部参考游戏的菜单/设置/多关流程、版本化内容
-   序列化、资源管线和中文文字，具体验收见产品化评审文档。
+2. **参考游戏与 SDK 后续**：FORGE 三关/菜单/设置/存档/独立 SDK 接入已
+   实现，先做人工完整体验与真实输入设备验收；核对远端 CI，再推进中文、
+   按键重绑/无障碍、通用内容序列化/管线和发行包验收，勿重复实现现有流程。
 3. **后续工程化**：CI 图形 smoke、Actions Node 24 迁移、许可/发行包与稳定签名。
 
 并行于主线的待验收事项：Android 真机启动、字体/触控、存档、后台/锁屏恢复、

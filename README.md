@@ -463,6 +463,15 @@ When including individual headers, replace the old `#include "Time.h"` with
 the same filename, so keeping the old header on the include path breaks `<ctime>`
 and other standard headers. Including `RayGame.h` needs no change.
 
+## FORGE reference game
+
+[FORGE / The last delivery](games/forge_runner/README.md) is an independent SDK
+consumer: a three-sector industrial sci-fi platform game with jump buffering,
+coyote time, double jumps, dashes, moving platforms, checkpoints, menus/settings,
+saves, procedural artwork and original synthesized audio. On Windows, build and
+verify it with `pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify`.
+The original four examples remain the default engine build targets.
+
 ## Tests & CI
 
 `tests/main.cpp` and `tests/regressions.h` cover math, lifecycle and deferred

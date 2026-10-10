@@ -1,0 +1,60 @@
+version 1
+name THE HEART
+subtitle Carry the last light. Bring the whole machine back.
+size 7000 960
+spawn 160 720
+goal 6800 720
+solid 0 720 720 240
+solid 950 720 720 240
+solid 1900 720 770 240
+solid 2940 720 720 240
+solid 3930 720 830 240
+solid 5020 720 750 240
+solid 6000 720 1000 240
+solid 400 590 180 130
+solid 1220 545 220 175
+solid 2170 565 180 155
+solid 3210 530 220 190
+solid 4270 540 200 180
+solid 5320 535 230 185
+solid 6180 580 180 140
+moving 720 590 180 22 0 -160 3.4 0
+moving 1670 615 210 22 0 -185 3.8 0.5
+ledge 2690 525 230 20
+moving 3670 610 220 22 0 -190 4.5 0
+ledge 4780 510 220 20
+moving 5770 600 210 22 0 -160 3.7 0.5
+hazard 760 875 150 85
+hazard 1720 875 150 85
+hazard 2720 875 170 85
+hazard 3720 875 170 85
+hazard 4810 875 170 85
+hazard 5810 875 150 85
+laser 1510 500 16 220 2.6 0
+laser 2460 490 16 230 3 1.4
+laser 3450 475 16 245 2.8 0.7
+laser 4540 470 16 250 3 0
+laser 5550 455 16 265 2.7 1.3
+drone 2800 460 95 3.8
+drone 4070 640 90 3.2
+drone 6500 620 95 3
+cell 490 535
+cell 810 425
+cell 1330 490
+cell 1780 427
+cell 2250 513
+cell 2800 475
+cell 3320 478
+cell 3790 417
+cell 4360 487
+cell 4890 460
+cell 5430 483
+cell 5860 423
+cell 6270 525
+checkpoint 1030 720
+checkpoint 3050 720
+checkpoint 5100 720
+checkpoint 6100 720
+sign 200 615 THE FINAL DELIVERY
+sign 3080 450 BREATHE / JUMP / DASH
+sign 6560 495 ONE SPARK CAN WAKE A WORLD

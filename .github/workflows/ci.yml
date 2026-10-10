@@ -64,6 +64,23 @@ jobs:
         if: runner.os == 'Windows'
         run: ./scripts/verify-windows-icons.ps1
 
+      - name: Build and verify FORGE reference game
+        if: runner.os == 'Windows'
+        run: ./scripts/build-forge.ps1 -Mode ${{ matrix.mode }} -Verify -SkipGraphics
+
+      - name: Upload FORGE reference game
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: raygame-forge-windows-x64-${{ matrix.mode }}
+          path: |
+            games/forge_runner/build/windows/x64/${{ matrix.mode }}/forge_runner.exe
+            games/forge_runner/build/windows/x64/${{ matrix.mode }}/assets/
+            games/forge_runner/README.md
+            games/forge_runner/THIRD_PARTY_NOTICES.md
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload Windows games and assets
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4

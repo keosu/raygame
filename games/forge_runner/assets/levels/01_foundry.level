@@ -1,0 +1,46 @@
+; FORGE content schema 1. Coordinates use 1280x720 game units.
+version 1
+name THE FOUNDRY
+subtitle Cold steel. A borrowed spark. Find the way out.
+size 5800 960
+spawn 160 720
+goal 5620 720
+solid 0 720 900 240
+solid 1080 720 660 240
+solid 1950 720 810 240
+solid 2970 720 760 240
+solid 3930 720 900 240
+solid 5020 720 780 240
+solid 660 650 160 70
+solid 1370 600 200 120
+solid 2230 610 180 110
+solid 3360 590 170 130
+solid 4320 610 180 110
+ledge 880 605 180 20
+ledge 1730 590 190 20
+ledge 2770 580 190 20
+moving 3730 610 150 22 0 -110 4 0
+ledge 4810 580 190 20
+hazard 920 880 140 80
+hazard 1770 880 140 80
+hazard 2790 880 140 80
+hazard 3770 880 120 80
+hazard 4860 880 120 80
+cell 760 602
+cell 1450 546
+cell 1860 540
+cell 2310 555
+cell 2860 535
+cell 3440 538
+cell 4400 555
+cell 4900 532
+checkpoint 1210 720
+checkpoint 3070 720
+checkpoint 5120 720
+drone 2570 647 100 5
+laser 4590 592 16 128 3.5 1.4
+sign 270 635 A / D TO MOVE
+sign 600 555 SPACE TO JUMP / HOLD FOR HEIGHT
+sign 1510 450 JUMP AGAIN IN THE AIR
+sign 3050 560 SHIFT TO DASH
+sign 5310 620 COLLECT EVERY POWER CELL

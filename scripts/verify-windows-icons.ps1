@@ -1,4 +1,9 @@
-param([string]$BinaryDirectory = 'bin')
+param(
+    [string]$BinaryDirectory = 'bin',
+    [string[]]$Games = @('space_shooter', 'bouncing_balls', 'neon_breakout', 'bullet_hell'),
+    [string]$IconDirectory = '',
+    [string[]]$IconNames = @()
+)
 $ErrorActionPreference = 'Stop'
 
 # Read resources as data without executing game entry points or loading dependencies.
@@ -35,13 +40,17 @@ function Read-IconResource([IntPtr]$Module, [int]$Id, [int]$Type) {
 }
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
-foreach ($game in @('space_shooter', 'bouncing_balls', 'neon_breakout', 'bullet_hell')) {
+if (-not $IconDirectory) { $IconDirectory = Join-Path $projectRoot 'examples/resources/windows' }
+if ($IconNames.Count -ne 0 -and $IconNames.Count -ne $Games.Count) { throw 'IconNames must match Games' }
+for ($gameIndex = 0; $gameIndex -lt $Games.Count; $gameIndex++) {
+    $game = $Games[$gameIndex]
+    $iconName = if ($IconNames.Count) { $IconNames[$gameIndex] } else { $game }
     $exe = (Resolve-Path -LiteralPath (Join-Path $BinaryDirectory "$game.exe")).Path
     $module = [RayGameIconResources]::LoadLibraryExW($exe, [IntPtr]::Zero, 0x22)
     if ($module -eq [IntPtr]::Zero) { throw "Cannot open EXE resources: $exe" }
     try {
         $group = Read-IconResource $module 1 14
-        $ico = [IO.File]::ReadAllBytes((Join-Path $projectRoot "examples/resources/windows/$game.ico"))
+        $ico = [IO.File]::ReadAllBytes((Join-Path $IconDirectory "$iconName.ico"))
         $count = [BitConverter]::ToUInt16($group, 4)
         if ($count -ne 8 -or $count -ne [BitConverter]::ToUInt16($ico, 4)) { throw "Expected eight icon sizes: $game" }
         for ($i = 0; $i -lt $count; $i++) {

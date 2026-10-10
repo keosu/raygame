@@ -69,6 +69,13 @@ xmake run my_game
 若希望 Windows 游戏启动时无控制台，在自己的目标内添加
 `add_ldflags("/SUBSYSTEM:WINDOWS", "/ENTRY:mainCRTStartup", {force = true})`，
 并使用 `Diagnostics` 记录文件日志。独立接入不会自动套用示例游戏的启动策略。
+游戏自带暂停/设置菜单时，调用 `SetDefaultShortcutsEnabled(false)` 接管引擎默认
+Escape/P/F1/F11/Alt+Enter（Android 同时关闭默认返回键/触屏暂停按钮）。设置
+音乐音量使用 `AudioManager::SetMusicVolume(name, value)`，避免重新播放音乐。
+
+完整独立消费例子见 [FORGE](../games/forge_runner/README.md)：三关横版平台游戏，
+含菜单、音频、存档和版本化关卡文件。根目录运行
+`pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify` 可构建并验收。
 
 ## 可重复的消费验收
 

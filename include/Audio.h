@@ -44,7 +44,7 @@ public:
         auto it = music.find(name);
         if (it != music.end()) {
             it->second.looping = loop;
-            SetMusicVolume(it->second, volume);
+            ::SetMusicVolume(it->second, volume);
             PlayMusicStream(it->second);
         }
     }
@@ -52,6 +52,12 @@ public:
     static void StopMusic(const std::string& name) {
         auto it = music.find(name);
         if (it != music.end()) StopMusicStream(it->second);
+    }
+
+    // Adjust an active stream without restarting its playback cursor.
+    static void SetMusicVolume(const std::string& name, float volume) {
+        auto it = music.find(name);
+        if (it != music.end() && std::isfinite(volume)) ::SetMusicVolume(it->second, Clamp(volume, 0.0f, 1.0f));
     }
 
     static void PauseMusic(const std::string& name) {

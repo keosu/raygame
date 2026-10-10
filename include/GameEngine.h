@@ -173,6 +173,10 @@ public:
     }
     bool IsPaused() const { return paused; }
 
+    // Games with their own menus can route Escape/P/F1/F11 themselves.
+    void SetDefaultShortcutsEnabled(bool value) { defaultShortcuts = value; }
+    bool AreDefaultShortcutsEnabled() const { return defaultShortcuts; }
+
     void ToggleDebug() { showDebug = !showDebug; }
     bool IsDebugEnabled() const { return showDebug; }
 
@@ -232,6 +236,7 @@ private:
     double fixedAccumulator = 0.0;
     FrameTiming timing;
     bool ticking = false;
+    bool defaultShortcuts = true;
 
     void RefreshWindowTheme(bool force = false);
 
@@ -279,21 +284,21 @@ private:
         Input::CaptureFrame();
         RefreshWindowTheme();
 #if defined(__ANDROID__)
-        if (Input::GetKeyDown(KEY_BACK)) SetPaused(!paused);
-        if (!paused && Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)
+        if (defaultShortcuts && Input::GetKeyDown(KEY_BACK)) SetPaused(!paused);
+        if (defaultShortcuts && !paused && Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)
             && CheckCollisionPointRec(Input::GetMousePosition(), PauseButtonBounds())) SetPaused(true);
 #endif
-        if (Input::GetKeyDown(KEY_F11) || (Input::GetKeyDown(KEY_ENTER)
-            && (Input::GetKey(KEY_LEFT_ALT) || Input::GetKey(KEY_RIGHT_ALT)))) ToggleFullscreen();
-        if (Input::GetKeyDown(KEY_ESCAPE)) {
+        if (defaultShortcuts && (Input::GetKeyDown(KEY_F11) || (Input::GetKeyDown(KEY_ENTER)
+            && (Input::GetKey(KEY_LEFT_ALT) || Input::GetKey(KEY_RIGHT_ALT))))) ToggleFullscreen();
+        if (defaultShortcuts && Input::GetKeyDown(KEY_ESCAPE)) {
             if (IsFullscreen()) SetFullscreen(false);
             else Quit();
         }
-        if (Input::GetKeyDown(KEY_P)) SetPaused(!paused);
+        if (defaultShortcuts && Input::GetKeyDown(KEY_P)) SetPaused(!paused);
         RefreshCanvas();
         AudioManager::UpdateMusic();
 
-        if (Input::GetKeyDown(KEY_F1)) ToggleDebug();
+        if (defaultShortcuts && Input::GetKeyDown(KEY_F1)) ToggleDebug();
         Tick(GetFrameTime());
     }
 
@@ -328,7 +333,7 @@ private:
         }
 
 #if defined(__ANDROID__)
-        if (!paused) {
+        if (defaultShortcuts && !paused) {
             UI::Panel(PauseButtonBounds());
             UI::LabelCentered(Display::GetWidth() - 70, Display::GetHeight() - 38, "PAUSE", 18);
         }

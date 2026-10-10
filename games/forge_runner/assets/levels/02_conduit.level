@@ -1,0 +1,53 @@
+version 1
+name THE CONDUIT
+subtitle Keep your rhythm. The factory is waking up.
+size 6400 960
+spawn 150 720
+goal 6200 720
+solid 0 720 690 240
+solid 900 720 790 240
+solid 1920 720 760 240
+solid 2950 720 750 240
+solid 3940 720 840 240
+solid 5050 720 680 240
+solid 5920 720 480 240
+solid 1160 600 190 120
+solid 2110 565 230 155
+solid 3260 580 200 140
+solid 4310 540 220 180
+solid 5320 600 190 120
+ledge 660 585 220 20
+moving 1680 625 180 22 0 -130 3.5 0
+moving 2690 600 180 22 0 -140 3.8 0.5
+ledge 3710 555 210 20
+moving 4780 615 210 22 0 -160 4 0
+ledge 5710 580 190 20
+hazard 730 875 130 85
+hazard 1740 875 140 85
+hazard 2740 875 170 85
+hazard 3770 875 140 85
+hazard 4830 875 180 85
+hazard 5770 875 100 85
+laser 1450 550 16 170 3 0
+laser 2480 540 16 180 2.8 1
+laser 4100 550 16 170 3.2 1.6
+laser 5510 520 16 200 3.4 0.6
+drone 3490 495 110 4
+drone 5200 640 85 3.2
+cell 770 533
+cell 1250 548
+cell 1770 485
+cell 2220 510
+cell 2790 455
+cell 3360 526
+cell 4410 488
+cell 4880 440
+cell 5420 544
+cell 5800 528
+checkpoint 1000 720
+checkpoint 3040 720
+checkpoint 5130 720
+sign 260 620 TIME YOUR RUN THROUGH THE LASERS
+sign 2040 425 TWO JUMPS / ONE CLEAN LANDING
+sign 3220 440 DASH THROUGH SENTINELS
+sign 4600 625 MOVING LIFTS CARRY YOU
