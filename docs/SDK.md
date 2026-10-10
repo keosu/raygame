@@ -1,0 +1,103 @@
+# 独立项目接入 RayGame
+
+桌面项目可以安装引擎的公开头文件和静态库，再通过 xmake 接入。消费项目只
+引用安装目录；无需引用引擎的 `src`、`examples` 或测试文件。当前依赖仍由
+xmake 下载/缓存：raylib-cpp 5.5.0 和 raylib 5.5，SDK 不包含它们的二进制。
+
+## 构建与安装
+
+在引擎仓库根目录执行（Windows/MSVC）：
+
+```powershell
+xmake f -p windows -a x64 --toolchain=msvc -m release --build_examples=n --build_tests=n -y
+xmake build -y raygame
+xmake install -o C:/SDK/raygame/windows-x64-release raygame
+```
+
+Linux 使用 `xmake f -p linux -a x86_64 -m release --build_examples=n --build_tests=n -y`，
+然后构建并安装到可写目录。Debug 使用 `-m debug`，并选择独立安装目录。
+安装时明确指定 `raygame`，避免安装示例。安装目录结构：
+
+```text
+include/raygame/*.h
+lib/raygame.lib                  # Linux 为 libraygame.a
+share/raygame/xmake.lua          # 可搬迁的接入脚本
+share/raygame/sdk.lua            # 版本、平台、架构、模式和系统依赖
+```
+
+Windows 默认使用 Release `MD` / Debug `MDd`。消费项目必须使用相同平台、架构、
+模式、运行库和兼容的编译工具链；接入脚本检查前四项，编译工具链的 ABI 兼容
+仍由使用者保证。SDK 目录可以整体搬迁；需要在消费项目重新配置新的路径。
+SDK 本身没有打包示例字体、窗口图标或 APK 资源，游戏负责自己的资源与许可。
+这套接入目前面向桌面 xmake 项目，Android SDK 打包与独立 CMake 接入尚未验收。
+
+## 消费项目
+
+在另一个目录创建 `xmake.lua`：
+
+```lua
+set_project("my_game")
+set_languages("c++17")
+set_encodings("utf-8")
+add_rules("mode.debug", "mode.release")
+
+option("raygame_sdk")
+    set_showmenu(true)
+    set_description("Installed RayGame SDK directory")
+option_end()
+
+local sdk = get_config("raygame_sdk")
+if sdk then
+    includes(path.join(sdk, "share/raygame/xmake.lua"))
+    target("my_game")
+        set_kind("binary")
+        add_files("main.cpp")
+        add_raygame_sdk()
+    target_end()
+end
+```
+
+使用 `#include <raygame/RayGame.h>`，或按需包含
+`<raygame/Scene.h>`、`<raygame/Input.h>` 等公开头文件。
+
+```powershell
+xmake f -p windows -a x64 --toolchain=msvc -m release --raygame_sdk=C:/SDK/raygame/windows-x64-release -y
+xmake build -y
+xmake run my_game
+```
+
+若希望 Windows 游戏启动时无控制台，在自己的目标内添加
+`add_ldflags("/SUBSYSTEM:WINDOWS", "/ENTRY:mainCRTStartup", {force = true})`，
+并使用 `Diagnostics` 记录文件日志。独立接入不会自动套用示例游戏的启动策略。
+
+## 可重复的消费验收
+
+构建好当前配置的 `raygame` 目标后，在引擎仓库根目录执行：
+
+```powershell
+xmake lua scripts/verify-sdk.lua
+xmake lua scripts/verify-sdk.lua --graphics
+```
+
+脚本将 SDK 安装到新临时目录，再搬到含空格的新路径；将独立消费项目复制到
+另一子目录，编译并检查头文件、物理/固定 tick、输入和存档。不引用引擎源码
+或示例资源。脚本还验证模式、架构及 Windows C 运行库不匹配会被明确拒绝。
+`--graphics` 额外创建真实隐藏窗口、程序生成纹理并绘制四帧，检查退出清理，
+需要 OpenGL 环境。Windows/Linux CI 使用无窗口模式。
+
+日志及 `report.lua` 位于 `build/sdk-validation/<平台>/<架构>/<模式>`。
+临时 SDK 和消费项目保留以便诊断，其路径写入报告。报告只在全部检查通过后
+写入；验证只覆盖所选配置，不代表干净机器发行、离线依赖或完整游戏验收。
+
+恢复本仓库的示例/测试目标：
+
+```powershell
+xmake f --build_examples=y --build_tests=y --example_console=n -y
+xmake build -a -j 1 -y
+```
+
+桌面引擎库按平台/架构/模式输出到 `build/lib/<平台>/<架构>/<模式>`，防止
+Debug/Release 库相互覆盖。四示例及 tests/smoke 的可执行文件仍共用 `bin`；
+构建规则在每个可执行文件旁保存 `.raygame-config` 配置标记，切换模式后强制
+重新链接，避免模式独立的缓存误判共享 EXE。相同配置的无改动构建仍复用产物。
+切换配置后需运行构建，不能将此前的 EXE 当作当前配置产物；配置标记无需分发。

@@ -424,6 +424,13 @@ Use `-m release` for an optimized build. xmake downloads raylib-cpp/raylib and
 compiles the dependencies for the selected toolchain. Targets use UTF-8 source
 encoding and put executables in `bin`.
 
+Desktop engine archives live in `build/lib/<platform>/<arch>/<mode>`, so Debug and
+Release libraries do not overwrite one another. To build only the engine, configure
+with `--build_examples=n --build_tests=n`. Install with
+`xmake install -o <sdk-dir> raygame`; independent xmake projects can use the installed
+headers and library through the supplied SDK integration script. See
+[SDK setup and verification](docs/SDK.md).
+
 The four examples build as Windows GUI applications by default: launching an EXE
 does not open a console, and raylib trace output is disabled. To enable the console
 and logs for debugging, run `xmake f --example_console=y` and rebuild. Use
@@ -462,6 +469,10 @@ and other standard headers. Including `RayGame.h` needs no change.
 destruction, render ordering, fixed physics, scene switching, transform hierarchy,
 tilemaps, tween callback mutation, timers, pooling, events and saves.
 `tests/header_compat.cpp` checks standard-library header interoperability.
+`xmake lua scripts/verify-sdk.lua` installs and relocates an SDK, then builds and runs
+an independent consumer with no engine source/example paths. It checks fixed-step
+physics, input, storage, and configuration mismatch diagnostics; `--graphics` also
+checks a native window and texture cleanup. Desktop CI runs the headless consumer.
 GitHub Actions builds and runs the logic suite in Debug and Release on Linux and
 Windows; Windows explicitly selects MSVC. A separate Windows job builds and verifies
 the four ARM64 Android Release APKs with JDK 17, SDK 35 and NDK r28c. All jobs use

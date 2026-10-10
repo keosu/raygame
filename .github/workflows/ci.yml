@@ -57,6 +57,9 @@ jobs:
       - name: Run tests
         run: xmake run tests
 
+      - name: Verify installed SDK from an independent project
+        run: xmake lua scripts/verify-sdk.lua
+
       - name: Verify Windows embedded icons
         if: runner.os == 'Windows'
         run: ./scripts/verify-windows-icons.ps1

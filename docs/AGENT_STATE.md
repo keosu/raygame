@@ -11,7 +11,85 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：示例目录归属与 xmake 拆分（已实现并验证）
+## 最近工作包：独立桌面 SDK 消费与配置切换（已实现并验证）
+
+用户要求继续剩余 TODO。本包选择产品评审 R12 的独立 SDK 消费验收，并修复
+此前已记录的构建配置混用问题。开始时工作区干净，基线为 `7660d2b`。
+提交主题：`Add standalone SDK consumption and reliable desktop mode switching`。
+
+1. 新增 `build_examples` / `build_tests` 选项，默认均开启；同时关闭只定义
+   引擎目标。可保留 tests/smoke 并关闭四个示例二进制，smoke 仍使用真实示例
+   内容和原有资源。Android 默认四 APK 目标与打包路径保留。
+2. 桌面引擎库移至 `build/lib/<plat>/<arch>/<mode>`，消除 Debug/Release
+   相互覆盖。实际往返发现共用 `bin` 的 EXE 也会被模式独立的链接缓存误判；
+   新增 `xmake/rules/desktop-config.lua`，在每个桌面 EXE 旁保存配置标记，
+   模式/架构/运行库/编译器/控制台选项变化时仅强制重新链接。原 `bin/*.exe`
+   路径、GUI 启动与文件诊断保留；同配置无改动构建继续复用产物。
+3. `xmake install -o <prefix> raygame` 安装命名空间头文件
+   `include/raygame/*.h`、静态库和 `share/raygame` 接入脚本/配置记录，不再
+   额外安装一套根目录头文件。安装内容可以整体搬迁；消费目标调用
+   `add_raygame_sdk()` 获得公开头文件、引擎库、固定版本 raylib 依赖及系统库。
+   配置阶段明确拒绝平台/架构、模式及 Windows C 运行库不匹配。
+4. 新增 `tests/sdk_consumer` 独立项目及 `scripts/verify-sdk.lua`。脚本将
+   SDK 安装到新临时目录，再搬到含空格路径，复制并构建另一个独立消费项目。
+   检查安装头文件内容与命名空间、独立包含/标准库互操作、物理/固定 tick、
+   输入、存档和错误配置拒绝；可用 `--graphics` 检查真实隐藏窗口、程序生成
+   纹理、四帧绘制与退出清理。全部成功才写通过报告，失败保留日志。
+5. 桌面 Windows/Linux CI 增加无窗口独立 SDK 验收；说明见 `docs/SDK.md`
+   和 README。没有改动引擎或示例游戏的 C++ 行为。
+
+### 本包通过的检查
+
+- MSVC 2022 x64 Debug/Release 全目标构建通过；两种模式逻辑测试各
+  **311 passed, 0 failed**，图形 smoke 均 **0 failures**。
+- 关闭示例/测试后只定义并成功构建 raygame；关闭示例且开启测试时，实际
+  tests/smoke 构建运行通过。随后恢复所有目标。
+- Debug (`MDd`) / Release (`MD`) 的 SDK 搬迁、独立编译/运行及图形验收
+  全部通过；各模式三类错误配置被明确拒绝，恢复后再次运行通过。
+  消费编译/链接日志确认只引用临时安装头文件/引擎库及 xmake raylib 缓存，
+  不引用引擎源码、原公开头文件目录或 examples。Release 另运行 CI 使用的
+  无窗口脚本通过；新版 SDK 消费编译没有新增警告。
+- 新配置规则下实际 `Release → Debug → Release` 构建/运行通过，18 次检查
+  确认六个 EXE 的 C 运行库随模式正确切换，四游戏每次均保持 GUI 子系统。
+  每种模式的测试/smoke/八尺寸 EXE 图标检查通过；两种引擎库 SHA-256 保持
+  不变，未使用 `-r` 强制重编译。相同模式无改动构建没有编译/归档/链接。
+- Android ARM64 Release 四 APK 构建脚本实际通过，v2/v3 签名、ZIP/ELF
+  16 KiB 对齐、入口、静态运行库、字体/许可及图标资源检查通过。本次复用
+  原生编译缓存，不描述为完整 Android 原生重编译；没有安装或运行设备。
+- `actionlint`、UTF-8/LF 与 `git diff --check` 通过。最终本地配置为
+  Windows/MSVC x64 Release，`build_examples=y`、`build_tests=y`、
+  `example_console=n`。
+
+### 本包未运行的检查与边界
+
+- 未运行本包 Linux/macOS 构建或新远端 CI。已核对此前 `83be019` 的远端
+  [`37960859746`](https://github.com/keosu/raygame/actions/runs/37960859746)：
+  五任务成功，Windows Debug/Release 各 311、Linux 各 310 项通过；四 EXE
+  图标及 Android 打包通过，三个产物未过期。这属于历史提交的成绩；
+  `7660d2b` 和本包尚无对应远端运行，未推送或触发远端执行。
+- SDK 的 raylib-cpp 5.5.0/raylib 5.5 仍由 xmake 解析下载/缓存，未打成
+  离线 SDK；相容编译工具链的 ABI、完整第三方许可/发行符号仍需验收。
+  本包未实现独立 CMake 或 Android SDK 消费，也未在干净机器运行发行包。
+- 四游戏与 tests/smoke 仍共享 bin 的 EXE 路径；配置标记保证构建时正确
+  重新链接，不能同时保留两种模式 EXE。消费项目使用 xmake 默认配置隔离
+  输出。示例字体/窗口图标属于游戏资源，SDK 不包含它们。
+- 本包是 SDK 消费基础验收，不是完整参考游戏或整个 M0 完成。设备失败、
+  多 DPI/多显示器、长稳和 Android 真机验收继续待办。
+
+日志：`build/sdk-{debug,release}-{config,build,tests,smoke,icons}.log`、
+`build/sdk-{engine-only,tests-only}-*.log`、`build/sdk-mode-*.log`、
+`build/sdk-mode-switch-report.json`、`build/sdk-release-nochange-build.log`、
+`build/sdk-verification-{debug,release,release-headless}.log`、
+`build/sdk-android-build.log`、`build/ci-37960859746.log`。
+SDK 分步日志/报告位于 `build/sdk-validation/windows/x64/<mode>`，实际临时
+SDK/消费项目路径写入 `report.lua`；Release 最近报告为无窗口检查，图形检查
+记录在 release/graphics.log。Android 报告为
+`build/android/verification-release.json`。不要删除本地 Android 签名密钥。
+
+下一工作包先核对本提交远端 Windows/Linux SDK CI，再按下方 M0/完整参考
+游戏路线推进；本包已通过项无需重复实现。
+
+## 上一工作包：示例目录归属与 xmake 拆分（已实现并验证）
 
 按用户要求核对根目录资源归属并整理构建入口。开始时工作区干净，基线为
 `83be019`。提交主题：`Organize example resources and split xmake target definitions`。
@@ -282,13 +360,14 @@ Release 使用 `-m release`。串行构建减少本机偶发 EXE 文件锁冲突
 
 1. **补齐 M0 验收**：真实设备初始化/显存失败、多 DPI/多显示器、跨平台与长稳
    验证；独立物理世界、固定阶段、插值与丢帧观测已完成，不要重复实现。
-2. **SDK 消费与完整游戏流程**：外部消费项目、菜单/设置/多关流程、版本化内容
+2. **SDK 后续与完整游戏流程**：独立桌面 xmake 消费基础已完成；先核对本包
+   Windows/Linux CI，再推进外部参考游戏的菜单/设置/多关流程、版本化内容
    序列化、资源管线和中文文字，具体验收见产品化评审文档。
 3. **后续工程化**：CI 图形 smoke、Actions Node 24 迁移、许可/发行包与稳定签名。
 
 并行于主线的待验收事项：Android 真机启动、字体/触控、存档、后台/锁屏恢复、
 安全区域和长稳性能尚无用户反馈记录，用户已明确暂缓；不代为安装或启动设备。发行前
-还需稳定签名、干净机器运行、独立 SDK 消费和许可文件，CI 产物生成不能替代这些。
+还需稳定签名、干净机器运行、SDK 发行与许可文件，CI 产物生成不能替代这些。
 
 实现边界：资源为同步图形线程 API，借用原生指针不能跨替换/卸载保存；句柄不
 支持外部原生资源的所有权导入。输入边沿以布尔值合并，不保存多次转换顺序，

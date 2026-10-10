@@ -11,15 +11,17 @@ option("example_console")
 option_end()
 
 -- Shared desktop resources for the games and the graphics smoke test.
-target("example_assets")
-    set_kind("phony")
-    set_default(false)
-    on_build(function (target)
-        local destination = path.join(os.projectdir(), "bin")
-        os.mkdir(destination)
-        os.cp(path.join(target:scriptdir(), "assets"), destination)
-    end)
-target_end()
+if has_config("build_examples") or has_config("build_tests") then
+    target("example_assets")
+        set_kind("phony")
+        set_default(false)
+        on_build(function (target)
+            local destination = path.join(os.projectdir(), "bin")
+            os.mkdir(destination)
+            os.cp(path.join(target:scriptdir(), "assets"), destination)
+        end)
+    target_end()
+end
 
 local function add_example(name)
     target(name)
@@ -66,7 +68,9 @@ local function add_example(name)
     target_end()
 end
 
-add_example("space_shooter")
-add_example("bouncing_balls")
-add_example("neon_breakout")
-add_example("bullet_hell")
+if has_config("build_examples") then
+    add_example("space_shooter")
+    add_example("bouncing_balls")
+    add_example("neon_breakout")
+    add_example("bullet_hell")
+end

@@ -1,8 +1,21 @@
 set_project("raygame")
 set_version("0.2.0")
 
-add_rules("mode.debug", "mode.release")
+includes("xmake/rules/desktop-config.lua")
+add_rules("mode.debug", "mode.release", "raygame.desktop_config")
 set_encodings("utf-8")
+
+option("build_examples")
+    set_default(true)
+    set_showmenu(true)
+    set_description("Build the bundled example games")
+option_end()
+
+option("build_tests")
+    set_default(true)
+    set_showmenu(true)
+    set_description("Define the desktop logic and graphics smoke targets")
+option_end()
 
 if is_plat("android") then includes("xmake/packages/raylib.lua") end
 add_requires("raylib-cpp 5.5.0")
@@ -19,12 +32,14 @@ target("raygame")
     set_languages("c++17")
 
     add_files("src/*.cpp")
-    add_headerfiles("include/*.h")
+    add_headerfiles("include/(*.h)", {prefixdir = "raygame"})
     add_includedirs("include", {public = true})
 
     add_packages("raylib-cpp", {public = true})
 
-    set_targetdir(is_plat("android") and "$(projectdir)/bin/android/$(arch)/$(mode)" or "$(projectdir)/bin")
+    -- Libraries must survive mode switches without reusing another mode's archive.
+    set_targetdir(is_plat("android") and "$(projectdir)/bin/android/$(arch)/$(mode)"
+                  or "$(builddir)/lib/$(plat)/$(arch)/$(mode)")
 
     if is_plat("windows") then
         add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", "shell32", "ole32", {public = true})
@@ -42,8 +57,19 @@ target("raygame")
         end)
     end
 
-    -- Install headers + library
-    add_installfiles("include/(*.h)", {prefixdir = "include/raygame"})
+    add_installfiles("xmake/sdk/xmake.lua", {prefixdir = "share/raygame"})
+    after_install(function (target)
+        -- No source/package-cache paths are written into the relocatable SDK.
+        io.save(path.join(target:installdir(), "share/raygame/sdk.lua"), {
+            version = target:version(),
+            plat = target:plat(),
+            arch = target:arch(),
+            mode = get_config("mode"),
+            runtimes = target:runtimes(),
+            syslinks = target:get("syslinks"),
+            frameworks = target:get("frameworks")
+        })
+    end)
 target_end()
 
 includes("examples/xmake.lua", "tests/xmake.lua")
