@@ -56,7 +56,7 @@ NDK r28c (`28.2.13676358`)。不需要 Gradle、Java 游戏 Activity 或 Android
 sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
 ```
 
-本轮缓存工具可直接运行：
+在仓库根目录运行，默认构建全部五个游戏：
 
 ```powershell
 pwsh -NoProfile -File scripts/build-android.ps1
@@ -80,8 +80,11 @@ pwsh -NoProfile -File scripts/build-android.ps1 `
 独立的 `XMAKE_CONFIGDIR`，恢复调用者的 JAVA_HOME/PATH/config 环境，不改变
 普通 `xmake` 命令使用的桌面配置。
 
-签名密钥首次自动生成到 `build/android/debug.keystore`，使用标准调试密码
-`android`，与用户 `~/.android/debug.keystore` 分开。每个 APK 会检查签名、
+此脚本目前使用 Windows 工具文件名，Linux/macOS 使用下文的直接 xmake 命令。
+签名密钥首次自动生成到 `build/android/debug.keystore`，alias 为
+`androiddebugkey`，store/key 密码均为 `android`，与用户
+`~/.android/debug.keystore` 分开。`build/` 被 Git 忽略，因此其他机器或新克隆
+没有这个文件；直接执行 xmake 也不会自动生成它。每个 APK 会检查签名、
 ZIP 对齐、ARM64 ELF 的 16 KiB LOAD 段对齐、NativeActivity 导出入口、静态
 C++ 运行库以及各自资源/共用字体和许可的 SHA-256；缺失、多余或内容不一致的
 运行资源会使检查失败。SHA-256 等结果存入
@@ -104,15 +107,79 @@ CI 检查构建/签名/打包，不安装或启动 Android 应用。
 
 ## 直接使用 xmake（Linux/macOS 也可参考）
 
-配置好 JAVA_HOME/PATH，生成上述 debug.keystore 后：
+安装与 Windows 相同版本的 SDK/NDK/JDK，在仓库根目录执行。下面使用
+Linux/macOS 的 sh/bash/zsh 语法，把工具路径换成自己的安装目录：
 
-```text
-xmake f -p android -a arm64-v8a -m release --toolchain=ndk --ndk=<NDK目录> --android_sdk=<SDK目录> --ndk_sdkver=26 --build_toolver=35.0.0 --runtimes=c++_static -y
+```sh
+export ANDROID_HOME="/path/to/Android/Sdk"
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
+export JAVA_HOME="/path/to/jdk-17"
+export PATH="$JAVA_HOME/bin:$PATH"
+
+# 首次创建本地调试 key；已有文件时保留，便于覆盖安装。
+mkdir -p build/android
+if [ ! -f build/android/debug.keystore ]; then
+    keytool -genkeypair -keystore build/android/debug.keystore \
+        -storepass android -keypass android -alias androiddebugkey \
+        -keyalg RSA -keysize 2048 -validity 10000 \
+        -dname "CN=RayGame Debug,O=RayGame,C=US"
+fi
+
+xmake f -p android -a arm64-v8a -m release --toolchain=ndk \
+    --ndk="$ANDROID_NDK_HOME" --android_sdk="$ANDROID_HOME" \
+    --ndk_sdkver=26 --build_toolver=35.0.0 --runtimes=c++_static \
+    --build_examples=y --build_tests=n \
+    --android_keystore="$PWD/build/android/debug.keystore" -o build/android -y
 xmake build -j 4 -y
+# 只构建 FORGE 时，将上一行换为：xmake build -j 4 -y forge_runner
 ```
 
+输出仍为 `bin/android/arm64-v8a/release/*.apk`。只切换 `-m debug` 时，输出在
+同级 `debug/` 目录。已有标准 `~/.android/debug.keystore` 时，可以跳过生成，
+并把配置中的路径换成 `--android_keystore="$HOME/.android/debug.keystore"`。
 这些直接命令会切换当前目录的 xmake 配置；Windows 推荐使用前面的隔离脚本。
-本轮只在 Windows 主机实际构建了 ARM64 Release APK，其他主机/ABI 尚未验证。
+目前只在 Windows 主机实际构建了 ARM64 Release 及 FORGE Debug APK，
+其他主机/ABI 尚未验证。
+
+## 指定自己的签名 key
+
+目前直接 xmake 支持 `--android_keystore=/绝对路径/自己的.keystore`，但五个
+游戏的打包规则都把密码固定为 `android`；未提供自定义密码、alias 或独立
+key password 的配置项。Windows 包装脚本也没有 `-Keystore` 参数，始终使用
+仓库下的本地调试 key。
+
+使用自定义密码或多 alias 的 keystore 时，先按上文正常构建，再使用 SDK 的
+`apksigner` 签出一份独立 APK。下面的命令会交互询问密码（私钥密码与 store
+密码不同时会再询问），不需要把密码写到命令或 xmake 配置中。将 key 路径和
+`myalias` 换成自己的值；省略 `--ks-key-alias` 仅适用于只有一个私钥条目的 key。
+
+Linux/macOS：
+
+```sh
+"$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
+    --ks "/path/to/my-release.jks" --ks-key-alias myalias \
+    --out bin/android/arm64-v8a/release/forge_runner-signed.apk \
+    bin/android/arm64-v8a/release/forge_runner.apk
+"$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs \
+    bin/android/arm64-v8a/release/forge_runner-signed.apk
+```
+
+Windows PowerShell（当前终端需配置 `JAVA_HOME` / `ANDROID_HOME`）：
+
+```powershell
+& "$env:ANDROID_HOME/build-tools/35.0.0/apksigner.bat" sign `
+    --ks 'D:/keys/my-release.jks' --ks-key-alias myalias `
+    --out bin/android/arm64-v8a/release/forge_runner-signed.apk `
+    bin/android/arm64-v8a/release/forge_runner.apk
+& "$env:ANDROID_HOME/build-tools/35.0.0/apksigner.bat" verify --verbose --print-certs `
+    bin/android/arm64-v8a/release/forge_runner-signed.apk
+```
+
+`apksigner` 替换 APK 原来的调试签名，保留资源、原生库及已有 ZIP 对齐；安装
+`forge_runner-signed.apk`。其他游戏替换文件名即可。原始 APK 和构建脚本的
+`verification-*.json` 仍对应调试签名产物，自有 key 的输出用上述 `verify` 检查。
+后续版本用同一私钥签名才可覆盖安装；要延续另一台机器的安装签名，需要复用
+那台机器的原 key，创建同名文件或相同 alias 不会生成相同私钥。
 
 ## 实现与平台边界
 

@@ -11,7 +11,36 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：FORGE Android APK 与多指触控（已实现并验证构建）
+## 最近工作包：Android 本地命令与自有 key 使用说明（文档）
+
+用户询问默认本地 Android 构建命令、其他平台缺失 keystore 和自有 key 的用法。
+基线 `eac4f5d`，开始时工作区干净；核对当前构建脚本和 xmake 3.1.1 打包规则。
+
+- `docs/ANDROID.md` 明确 Windows 默认构建五个 ARM64 Release APK，包装脚本
+  首次创建被 Git 忽略的本地 debug.keystore，直接 xmake 不创建密钥。
+- 补充 Linux/macOS 的 JDK/SDK/NDK 环境、存在性保护的 keytool 生成、完整
+  xmake 配置及单独构建 Forge 命令；已有标准 Android debug key 可传路径。
+- 说明当前 `--android_keystore` 只配置路径，密码固定 android，未开放
+  alias/独立 key password，包装脚本也没有 -Keystore 参数。为已有自有 key
+  提供两种 shell 的 apksigner 交互签名与校验命令，输出独立 signed.apk。
+  没有修改构建/CI 签名行为，没有修改或删除现有 key。
+
+通过的检查：在 Windows 使用 build/ 下新生成的临时 JKS，指定自定义 alias、
+不同的 store/key 密码，按文档经 stdin 回答两个交互提示后重签现有 Forge
+Release APK。v2/v3 签名、16 KiB ZIP 对齐及签名证书 SHA-256 与该 key 一致性
+通过；原 Forge APK 和原 debug.keystore 的 SHA-256 保持不变。
+文档两段 POSIX shell、四段 PowerShell 命令语法检查，UTF-8/LF 和
+`git diff --check` 通过。
+日志：`build/android/signing-doc-check-deafe814d7e04fa8ba31d859ffcc1c15/verification.log`。
+
+未运行：本包没有原生代码改动，不重跑编译/逻辑/图形测试；未在 Linux/macOS
+主机运行构建，未运行远端 CI，未安装/启动 Android 设备。构建中直接使用自定义
+密码/alias 仍非现有功能，当前可用路径是构建完成后用自有 key 签名。
+
+下一步：用户按所在平台执行文档命令，自有 key 场景安装 signed.apk，并继续
+手动验收 Forge 的启动、多指触控和存档。跨机器更新需保留原私钥。
+
+## 上一工作包：FORGE Android APK 与多指触控（已实现并验证构建）
 
 用户继续要求支持 Android。本包基线 `09c8443`，沿用不安装/启动设备的约定。
 提交主题：`Add FORGE Android APK packaging and multitouch controls`。
