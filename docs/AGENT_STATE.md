@@ -11,7 +11,59 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：Android 本地命令与自有 key 使用说明（文档）
+## 最近工作包：跨平台工具、代码格式与示例体验（已实现并本地验证）
+
+基线 `de9112a`，开始时工作区干净。用户要求审视跨平台差异和紧凑源码，并改进
+Forge 安卓宽屏/三关美术/主角、Bouncing Balls 多形状、Bullet Hell 玩法可理解性。
+
+- 新增公开 `TouchTracker`（ID 稳定、坐标映射、按下/释放、失焦/改画布取消、
+  异常触点阻塞）和 `CanvasLayout`（内容矩形内的边缘/中心锚点），由 SDK 导出。
+  Forge 的多动作缓冲复用 tracker；Bullet Hell 分别捕获移动和 FOCUS 手指。
+- Forge 改 Expand 等比画布，扩展世界可见范围、居中菜单与对应命中坐标、
+  边缘 HUD/触控按钮；相机处理小于可视区域的关卡。三关改成暖铸造厂、蓝色
+  冷却管廊、紫金反应核心，新角色有护甲/头盔/背包/围巾及更清晰的关节动画。
+- Bouncing Balls 现在显示 Shape Lab：圆/方/长方形，混合/实心/描边独立选择，
+  碰撞与边界按形状尺寸处理。描边仅为外观，仍是完整圆/矩形碰撞体。
+- Bullet Hell 增加目标/操作图示、练习/正式入口、三秒准备、自动射击与多指
+  慢速按钮，练习不扣护盾；正式三次机会；暂停/失焦取消手势。
+- `.clang-format` / `.editorconfig`、`scripts/format-code.py` 及 CI 格式检查；
+  clang-format 19.1.5，默认覆盖 20 文件。Forge 源码/测试、两示例及新工具展开
+  为四空格/100 列的 C++ 格式；九个纯格式文件与格式化前基线逐字节对比通过。
+  `docs/PLATFORM_GUIDE.md` 说明文件/输入/布局/生命周期/图形差异与工具边界。
+
+### 通过的检查
+
+- 最终源码 Windows/MSVC x64 Debug/Release 全目标，分别引擎 **335 passed,
+  0 failed**、Forge **72 passed, 0 failed**；两模式原图形 smoke 与 Forge 221 帧
+  中英文/多指模拟 smoke 均 **0 failures**。检查角色、美术、宽屏按钮及菜单截图。
+- 五个 ARM64 Release APK 签名、16 KiB ZIP/ELF 对齐、入口、静态运行库、
+  图标/资源 SHA-256 校验通过；Forge **2,956,678 B**，Shape Lab **1,267,283 B**，
+  Bullet Hell **1,283,664 B**。密钥未修改，报告 `build/android/verification-release.json`。
+- Windows 独立 SDK 消费通过，含两个新头文件的单独 include；模式/架构/运行库
+  不匹配拒绝检查通过。Forge 独立 SDK Release 编译、72 项逻辑及八尺寸图标通过，
+  该入口使用 `-SkipGraphics`，图形测试成绩来自根工程两模式。
+- 最终五个 Windows Release EXE 图标通过；clang-format 19.1.5 的 20 文件范围
+  检查及九个纯格式文件与格式化后的基线比对通过；actionlint 1.7.7 通过。
+  旧 actionlint 缓存缺失，已按发布校验和重新下载工具到 build/，后续实际检查通过。
+- 34 个改动文件的 UTF-8/LF/文件末尾换行、Python 语法及 `git diff --check` 通过。
+
+日志统一为 `build/platform-examples-*`，Forge 截图在
+`build/platform-forge-smoke-{debug,release}/screenshots/`；原示例截图在
+`bin/screenshots/`，这些均为 Windows 渲染/触摸输入模拟截图。
+本地最终恢复 Windows/MSVC x64 Release、examples/tests 开启、example_console=n。
+
+### 未运行与边界
+
+- 未运行 Android 设备/模拟器、Linux/macOS 本机、新远端 CI、这次源码的 Android
+  Debug 或独立 SDK Debug。APK 构建不证明设备运行/锁屏恢复/性能耗电验收完成。
+- 系统级 WindowInsets 自动查询、真实空心容器碰撞、其他小示例通用 UI 多指迁移
+  未实现。公共 TouchTracker 的事件只保留一帧，固定更新的动作缓冲仍由使用者负责。
+
+下一步：用户手动安装新 APK，确认宽屏原生 Surface、两侧操作区、三关视觉与主角、
+弹幕练习/双指 FOCUS；如系统仍给 Surface 留边，记录机型/系统和窗口行为后定位。
+推送后检查本提交的 CI 格式任务及五 APK/桌面产物。M0 长稳/硬件验收继续待办。
+
+## 上一工作包：Android 本地命令与自有 key 使用说明（文档）
 
 用户询问默认本地 Android 构建命令、其他平台缺失 keystore 和自有 key 的用法。
 基线 `eac4f5d`，开始时工作区干净；核对当前构建脚本和 xmake 3.1.1 打包规则。

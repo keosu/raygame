@@ -228,12 +228,29 @@ public:
         }
         if (frame == 25) LoadScene(CreateRef<balls::BouncingBallsScene>());
         if (frame == 30) {
-            std::static_pointer_cast<balls::BouncingBallsScene>(GetCurrentScene())->AddRandomBall();
-            auto tex = ResourceManager::GetTexture("ball");
+            std::static_pointer_cast<balls::BouncingBallsScene>(GetCurrentScene())->AddShape();
+            auto tex = ResourceManager::CreateCircleTexture("ball", 16, WHITE);
             auto cached = ResourceManager::CreateCircleTexture("ball", 16, WHITE);
             Expect(tex && tex == cached, "procedural textures reuse their named resource");
         }
-        if (frame == 35) Capture("bouncing_balls");
+        if (frame == 35) {
+            auto scene=std::static_pointer_cast<balls::BouncingBallsScene>(GetCurrentScene());
+            bool circle=false,box=false,outline=false,solid=false;
+            for(const auto& object:scene->GetAllGameObjects()) {
+                auto shape=object->GetComponent<balls::PlaygroundShape>();
+                if(!shape)continue;
+                circle|=object->GetComponent<CircleCollider>()!=nullptr;
+                box|=object->GetComponent<BoxCollider>()!=nullptr;
+                outline|=shape->outline;solid|=!shape->outline;
+            }
+            Expect(circle&&box&&outline&&solid,"playground contains circle/box physics and both drawing styles");
+            scene->AddShape({scene->arena.x,scene->arena.y},2,1);
+            scene->PostFixedUpdate();
+            auto shape=scene->GetAllGameObjects().back();
+            Expect(shape->transform->position.x>=scene->arena.x+30,
+                   "wide bars clamp by their own half extents");
+            Capture("bouncing_balls");
+        }
         if (frame == 50) {
             SetCanvasSize(960, 720);
             SetClearColor({8, 10, 24, 255});
@@ -268,6 +285,11 @@ public:
             SetCanvasSize(820, 900);
             LoadScene(CreateRef<bullethell::BulletHellScene>());
         }
+        if (frame == 78) {
+            auto scene=std::static_pointer_cast<bullethell::BulletHellScene>(GetCurrentScene());
+            Expect(!scene->started&&scene->enemyField->Count()==0,"briefing freezes enemy fire until start");
+            Capture("bullet_hell_briefing");
+        }
         if (frame == 85) Capture("bullet_hell");
         if (frame == 80 || frame == 95) {
             auto scene = std::static_pointer_cast<bullethell::BulletHellScene>(GetCurrentScene());
@@ -277,11 +299,42 @@ public:
                 Expect(turret->GetComponent<bullethell::Turret>()->field == scene->enemyField,
                        "turrets use the configured bullet field after restart");
             }
+            if(frame==80) {
+                scene->BeginEncounter();
+                Expect(scene->encounterTime==0,"starting the mission gives a preparation countdown");
+            }
+            scene->encounterTime=3;
             scene->boss->GetComponent<bullethell::Boss>()->ringTimer = 2;
         }
         if (frame == 90) {
             auto scene = std::static_pointer_cast<bullethell::BulletHellScene>(GetCurrentScene());
             scene->Restart();
+        }
+        if(frame==98) {
+            auto scene=std::static_pointer_cast<bullethell::BulletHellScene>(GetCurrentScene());
+            auto player=scene->player->GetComponent<bullethell::Player>();
+            scene->practice=true;player->invuln=0;
+            scene->enemyField->Spawn(scene->player->transform->position,{0,0},8,RED);
+            int lives=player->lives;
+            player->PostFixedUpdate();
+            Expect(player->lives==lives&&player->invuln>0,"practice keeps shields and still reports hits");
+            scene->practice=false;player->invuln=0;
+            scene->enemyField->Spawn(scene->player->transform->position,{0,0},8,RED);
+            player->PostFixedUpdate();
+            Expect(player->lives==lives-1,"normal mode still loses shields");
+            InputFrame input;
+            input.touchCount=2;
+            input.touches[0]={101,Display::CanvasToScreen({400,500})};
+            auto focus=scene->FocusBounds();
+            input.touches[1]={202,Display::CanvasToScreen({focus.x+20,focus.y+20})};
+            Input::SetFrame(input);scene->ReadTouches();
+            Expect(scene->moveFinger==101&&scene->focusHeld,"movement and focus capture separate fingers");
+            std::swap(input.touches[0],input.touches[1]);
+            Input::SetFrame(input);scene->ReadTouches();
+            Expect(scene->moveFinger==101&&scene->focusFinger==202,"touch order changes do not switch the pilot");
+            input.touchCount=1;Input::SetFrame(input);scene->ReadTouches();
+            Expect(scene->moveFinger<0&&scene->focusHeld,"lifting movement does not promote the focus finger");
+            Input::Reset();
         }
         if (frame >= 110) TestAspectMatrix(frame - 110);
     }
@@ -331,7 +384,7 @@ public:
             if (game == 1) {
                 auto scene = std::static_pointer_cast<balls::BouncingBallsScene>(GetCurrentScene());
                 Expect(std::fabs(scene->arena.width - Display::GetWidth() + 48) < 0.01f
-                    && std::fabs(scene->arena.height - Display::GetHeight() + 146) < 0.01f, "ball arena follows the viewport");
+                    && std::fabs(scene->arena.height - Display::GetHeight() + 220) < 0.01f, "ball arena follows the viewport");
                 for (auto& object : scene->GetAllGameObjects())
                     Expect(CheckCollisionPointRec(object->transform->position, scene->arena), "balls stay in the resized arena");
             }

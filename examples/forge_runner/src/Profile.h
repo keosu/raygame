@@ -23,7 +23,7 @@ public:
     int level = 0, checkpoint = -1, deaths = 0, unlocked = 0;
     std::uint64_t collected = 0;
     float elapsed = 0;
-    std::array<float,3> best{};
+    std::array<float, 3> best{};
     bool recovered = false;
     explicit Profile(std::filesystem::path path);
     void Load();
@@ -32,4 +32,4 @@ public:
     bool Record(const World& world);
     bool NewRun();
 };
-}
+} // namespace Forge

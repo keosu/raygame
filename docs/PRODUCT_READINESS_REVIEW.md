@@ -465,3 +465,21 @@ CI 的 Windows/Linux Debug/Release 均使用默认入口构建游戏并运行 Fo
 未推送新 CI，未运行 Linux/macOS、Android 设备或模拟器，不能将桌面触屏
 模拟视为 Android 实机验证；后台/锁屏、音频、触感、安全区域、GPU 恢复和
 性能耗电仍待用户手动验收，M0 和商业发行边界保持未完成。
+
+**22. 跨平台小工具、格式规范与示例可用性**
+
+2026-10-10 根据用户反馈增加公开 TouchTracker / CanvasLayout：触点 ID 稳定、
+映射/取消/释放与内容区域锚点可复用，Forge 保留自己的固定 tick 动作缓冲。
+Forge 改 Expand 等比画布、菜单居中、触控区与 HUD 锚定边缘；三关有不同机械
+轮廓、色调和环境粒子，重绘带护甲/头盔/背包的信使。Shape Lab 增加圆/方/条形
+与实心/描边；描边是绘制风格，不改变完整圆/矩形碰撞模型。Bullet Hell 增加
+图示开场、练习/正式模式、准备时间、自动射击、独立移动/慢速触点与失焦暂停。
+
+为 Forge、两示例和新增工具采用 clang-format 19.1.5，展开紧凑源码；格式脚本
+和 CI 检查覆盖 20 文件。PLATFORM_GUIDE.md 记录资产/存档、输入、显示、生命周期
+等边界。未把其他小示例 UI 全部迁移到多指路由，未自动查询 Android WindowInsets。
+
+Windows/MSVC Debug/Release 全目标、335 项引擎/72 项 Forge 逻辑、两套图形 smoke
+均通过；五个 ARM64 Release APK 构建/签名/对齐/资源检查通过；独立 SDK 消费及
+Forge 独立 Release 编译/逻辑通过。未运行本包新 CI、Linux/macOS 或 Android 设备，
+设备输入、系统安全区、生命周期恢复、长稳和 M0 商业验收仍需后续工作。

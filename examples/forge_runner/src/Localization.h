@@ -11,8 +11,11 @@ public:
     void Load(const std::string& path);
     const std::string& Translate(const std::string& english, Language language) const;
     std::vector<int> ChineseCodepoints() const;
-    size_t Size() const { return translations.size(); }
+    size_t Size() const {
+        return translations.size();
+    }
+
 private:
     std::map<std::string, std::string> translations;
 };
-}
+} // namespace Forge

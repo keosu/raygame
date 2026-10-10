@@ -11,18 +11,20 @@ Release 原生代码使用本地调试密钥签名，适合侧载测试。它不
 | APK（位于 `bin/android/arm64-v8a/release/`） | 屏幕方向 | 触屏操作 |
 | --- | --- | --- |
 | `space_shooter.apk` | 横屏，可反向横屏 | 在游戏区域拖动移动，按住自动射击，飞船位于手指上方 |
-| `bouncing_balls.apk` | 横屏，可反向横屏 | 点击场地添加球；底部 RESET 重置、GRAVITY 切换重力 |
+| `bouncing_balls.apk` | 横屏，可反向横屏 | 顶部选择圆/方/长方形及实心/描边；点击场地添加，RESET 重置、GRAVITY 切换重力 |
 | `neon_breakout.apk` | 横屏，可反向横屏 | 拖动移动挡板，点击发球，结算页点击 PLAY AGAIN 重开 |
-| `bullet_hell.apk` | 竖屏，可反向竖屏 | 在游戏区域拖动移动，按住自动射击；结算页可重开 |
+| `bullet_hell.apk` | 竖屏，可反向竖屏 | 开场说明后选择练习/正式挑战；自动射击，拖动移动，第二根手指按住 FOCUS 减速 |
 | `forge_runner.apk` | 横屏，可反向横屏 | 左侧箭头移动；右侧跳跃/冲刺，可多指同时操作；下箭头 + 跳跃穿过单向平台 |
 
 四个小示例都有右下角 PAUSE、暂停页 RESUME/EXIT；系统返回键切换暂停。
-保留外接键盘的原有操作。触屏版本暂未实现弹幕游戏的独立慢速移动按钮。
+保留外接键盘的原有操作。弹幕游戏有三秒准备时间，正式挑战三次护盾机会；
+练习模式保留命中反馈但不扣护盾。Shape Lab 描边形状仍使用完整圆/矩形碰撞体。
 同一方向内使用传感器允许屏幕翻转，不在本轮开放任意横竖方向切换。
 
 FORGE 使用右上暂停按钮和完整触屏菜单；设置行左半侧减少、右半侧增加，支持
 中英文切换。系统返回键切换暂停、退出设置/制作信息，在主菜单保存并退出。
-默认 60 FPS、系统全屏和 1280×720 Fit 等比画布，保留键盘/手柄操作。跳跃可
+默认 60 FPS、系统全屏和 1280×720 基准的 Expand 等比画布，保留键盘/手柄操作。
+宽屏增加可见场景，菜单居中、左右触控区锚定屏幕边缘；不拉伸角色。跳跃可
 按住控制高度，再次点击二段跳；控制按钮按触点 ID 跟踪，多指及触点顺序变化
 不会把跳跃变成冲刺。页面切换、失焦与窗口映射变化会清除操作并等待手指松开。
 
@@ -196,8 +198,9 @@ Windows PowerShell（当前终端需配置 `JAVA_HOME` / `ANDROID_HOME`）：
   和 AssetManager 读取，支持压缩资源与大小上限。普通 `ReadText/WriteAtomic`
   仍用于应用私有存档，不把存档查询混入 APK 资源。
 - Android 输入帧保存最多 8 个触点 ID/位置；`Input::GetTouchPosition` 按当前
-  Display 画布换算。Android 由原生 Surface 决定实际窗口尺寸，画布继续使用
-  四小示例使用 Expand、FORGE 使用 Fit 等比适配；桌面专用标题栏/窗口大小
+  Display 画布换算。Android 由原生 Surface 决定实际窗口尺寸，五个游戏都使用
+  Expand 等比适配；Forge 和 Bullet Hell 复用 TouchTracker 跟踪触点 ID 和取消。
+  CanvasLayout 支持内容矩形，但尚未自动查询 WindowInsets。桌面专用标题栏/窗口大小
   API 不会在 Android 正常游戏流程中调用。
 - xmake-repo 的 raylib 5.5 Android 配方添加了 `--wrap=fopen`，与该版本
   自带 `android_fopen` 重复，实测会出现 `undefined symbol: __wrap_fopen`。
@@ -210,10 +213,12 @@ Windows PowerShell（当前终端需配置 `JAVA_HOME` / `ANDROID_HOME`）：
 
 ## 本轮验证与下一步
 
-已检查：五个 Release APK 和 FORGE Debug APK 构建、v2/v3 签名、ZIP/ELF 对齐、
-原生入口、图标和完整资源。MSVC Debug/Release 各 316 项引擎、69 项 FORGE
+本次示例体验更新已检查：五个 Release APK 构建、v2/v3 签名、ZIP/ELF 对齐、
+原生入口、图标和完整资源。MSVC Debug/Release 各 335 项引擎、72 项 FORGE
 逻辑检查通过，原图形 smoke 和 FORGE 桌面/触屏模拟 smoke 均为零失败；
-完整记录见 `AGENT_STATE.md`。本包尚未推送或运行新的远端 CI。
+独立 SDK 消费、FORGE 独立 Release 编译/逻辑检查通过。当前 Android Debug
+未随这次美术/输入更新重建。完整记录见 `AGENT_STATE.md`。本包尚未推送或
+运行新的远端 CI。
 这些检查不能替代 Android 运行验证。
 
 手动验证建议先看：能否启动和显示字体、触屏移动/发球/菜单是否响应、暂停后

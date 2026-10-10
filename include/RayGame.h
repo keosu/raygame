@@ -8,6 +8,8 @@
 #include "Display.h"
 #include "GameTime.h"
 #include "Input.h"
+#include "CanvasLayout.h"
+#include "TouchTracker.h"
 #include "Audio.h"
 #include "Event.h"
 #include "Tween.h"

@@ -10,6 +10,9 @@ Version 0.2.0 · C++17 · MIT
 See the [product readiness review and roadmap](docs/PRODUCT_READINESS_REVIEW.md)
 (Chinese) for current limitations, proposed architecture and release acceptance criteria.
 
+See the [cross-platform guide](docs/PLATFORM_GUIDE.md) (Chinese) for asset versus save
+paths, touch ID tracking, adaptive UI anchors, lifecycle boundaries and C++ formatting.
+
 ## Features
 
 ### Core
@@ -47,6 +50,8 @@ See the [product readiness review and roadmap](docs/PRODUCT_READINESS_REVIEW.md)
 
 ### Input, Audio, UI, Save
 - **Input**: injectable keyboard/mouse/gamepad snapshots, fixed-tick edge buffering, axis helpers and named **action mapping**
+- **Touch and layout helpers**: `TouchTracker` preserves contact IDs and cancels interrupted gestures;
+  `CanvasLayout` anchors controls and centered menus on expanding canvases
 - **Audio**: sound/music with master volume (own `Audio.h`)
 - **Immediate-mode UI**: labels, panels, buttons, progress bars
 - **Save system**: dependency-free key/value persistence
@@ -345,9 +350,19 @@ and platform limits](docs/ANDROID.md) (Chinese) for prerequisites and commands.
 | Target | Showcases |
 | --- | --- |
 | `space_shooter` | Custom renderers, particles, enemy AI |
-| `bouncing_balls` | Rigidbodies, circle colliders, physics resolution |
+| `bouncing_balls` | Shape Lab: circles, squares and bars; solid/outline styles; mixed circle/box physics |
 | `neon_breakout` | Layered neon rendering, tweens, timers, trigger callbacks, camera shake, HUD, save |
-| `bullet_hell` | Object pooling (thousands of bullets), parent-child turrets, bullet patterns, HUD |
+| `bullet_hell` | Boss fight with briefing, practice mode, automatic fire, pooled bullets and parent-child turrets |
+
+Shape Lab lets you choose shape and drawing style independently, then click/tap the
+arena to add bodies. `1`–`4` select mixed/circle/square/bar, `F` cycles mixed/solid/outline,
+and `G` toggles gravity. Outlines use the same solid circle/box collision as filled shapes.
+
+In Bullet Hell, you control the cyan ship: move under the boss to hit it with automatic
+fire and dodge colored bullets with the small white hitbox. Empty the boss health bar
+before losing three shields. Start with **Practice / No Damage**, or choose **Start Mission**;
+both give three seconds to prepare. Use WASD/arrows and hold Shift for slow movement;
+on Android drag to move and hold **FOCUS** with a second finger. `P`/Android Back pauses.
 
 All four examples share the following window controls:
 

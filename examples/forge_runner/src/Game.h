@@ -37,11 +37,13 @@ public:
     void StartLevel(int index, bool resume);
     void Switch(Page next);
     void Persist();
+
 protected:
     void OnInit() override;
     void OnUnscaledUpdate() override;
     void OnUpdate() override;
     void OnRender() override;
+
 private:
     bool activate = false, mousePress = false;
     Vector2 pressedAt{}, lastMouse{};
@@ -56,7 +58,8 @@ private:
     bool smokeFullscreen = false;
     std::uint64_t smokeCollected = 0;
     void Audio(unsigned events);
-    bool Button(int index, Rectangle rect, const std::string& label, const std::string& detail = "", bool disabled = false);
+    bool Button(int index, Rectangle rect, const std::string& label, const std::string& detail = "",
+                bool disabled = false);
     void DrawHome();
     void DrawHUD();
     void DrawTouchControls();
@@ -69,4 +72,4 @@ private:
     void Capture(const std::string& name);
     void Expect(bool condition, const std::string& message);
 };
-}
+} // namespace Forge
