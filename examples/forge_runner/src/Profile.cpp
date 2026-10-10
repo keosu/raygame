@@ -11,7 +11,7 @@ void Profile::Load() {
         settings.music = Clamp(save.GetFloat("music",0.45f),0.0f,1.0f);
         settings.sfx = Clamp(save.GetFloat("sfx",0.75f),0.0f,1.0f);
         settings.shake = save.GetBool("shake",true); settings.fullscreen = save.GetBool("fullscreen",false);
-        int fps = save.GetInt("fps",120); settings.fps = fps == 60 || fps == 120 || fps == 144 ? fps : 120;
+        int fps = save.GetInt("fps",settings.fps); if (fps == 60 || fps == 120 || fps == 144) settings.fps = fps;
     }
     if (save.Load(directory / "campaign.sav") && save.GetInt("version") == 1) {
         level = save.GetInt("level",0); checkpoint = save.GetInt("checkpoint",-1);

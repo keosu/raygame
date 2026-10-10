@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('all', 'space_shooter', 'bouncing_balls', 'neon_breakout', 'bullet_hell')]
+    [ValidateSet('all', 'space_shooter', 'bouncing_balls', 'neon_breakout', 'bullet_hell', 'forge_runner')]
     [string]$Game = 'all',
     [ValidateSet('debug', 'release')][string]$Mode = 'release',
     [string]$SdkRoot,
@@ -56,7 +56,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Cannot generate the local debug signing key' }
     }
     & xmake f -p android -a arm64-v8a -m $Mode --toolchain=ndk "--ndk=$NdkRoot" "--android_sdk=$SdkRoot" `
-        --ndk_sdkver=26 --build_toolver=35.0.0 --runtimes=c++_static "--android_keystore=$keystore" -o build/android -y
+        --ndk_sdkver=26 --build_toolver=35.0.0 --runtimes=c++_static --build_examples=y --build_tests=n "--android_keystore=$keystore" -o build/android -y
     if ($LASTEXITCODE -ne 0) { throw 'Android configure failed' }
     $buildArgs = @('build', '-j', $Jobs, '-y')
     if ($Game -ne 'all') { $buildArgs += $Game }
@@ -64,7 +64,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Android build failed' }
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $names = if ($Game -eq 'all') { @('space_shooter','bouncing_balls','neon_breakout','bullet_hell') } else { @($Game) }
+    $names = if ($Game -eq 'all') { @('space_shooter','bouncing_balls','neon_breakout','bullet_hell','forge_runner') } else { @($Game) }
     $readelf = Join-Path $NdkRoot 'toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-readelf.exe'
     $results = foreach ($name in $names) {
         $apk = Join-Path $projectRoot "bin/android/arm64-v8a/$Mode/$name.apk"
@@ -74,24 +74,32 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Invalid APK alignment: $name" }
         $archive = [IO.Compression.ZipFile]::OpenRead($apk)
         try {
-            # Each APK contains common fonts plus this game's assets, byte for byte.
+            # Small games share fonts; FORGE owns its complete resource set.
             $expectedAssets = @{}
-            foreach ($assetRoot in @("$projectRoot/examples/common/assets", "$projectRoot/examples/$name/assets")) {
+            $assetRoots = if ($name -eq 'forge_runner') { @("$projectRoot/examples/$name/assets") }
+                          else { @("$projectRoot/examples/common/assets", "$projectRoot/examples/$name/assets") }
+            $assetPrefix = if ($name -eq 'forge_runner') { 'assets/forge/' } else { 'assets/' }
+            foreach ($assetRoot in $assetRoots) {
                 $assetRoot = (Resolve-Path -LiteralPath $assetRoot).Path
                 foreach ($file in (Get-ChildItem -LiteralPath $assetRoot -Recurse -File)) {
                     $relative = [IO.Path]::GetRelativePath($assetRoot, $file.FullName).Replace('\', '/')
-                    $asset = "assets/$relative"
+                    $asset = "$assetPrefix$relative"
                     if ($expectedAssets.ContainsKey($asset)) { throw "Conflicting APK asset: $asset" }
                     $expectedAssets[$asset] = $file.FullName
-                    $entry = $archive.GetEntry($asset)
-                    if (-not $entry) { throw "Missing APK asset: $asset" }
-                    $stream = $entry.Open()
-                    $sha256 = [Security.Cryptography.SHA256]::Create()
-                    try { $actualHash = [Convert]::ToHexString($sha256.ComputeHash($stream)) }
-                    finally { $stream.Dispose(); $sha256.Dispose() }
-                    if ($actualHash -ne (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash) {
-                        throw "APK asset differs from its source: $name/$relative"
-                    }
+                }
+            }
+            if ($name -eq 'forge_runner') {
+                $expectedAssets['assets/THIRD_PARTY_NOTICES.md'] = "$projectRoot/examples/$name/THIRD_PARTY_NOTICES.md"
+            }
+            foreach ($asset in $expectedAssets.Keys) {
+                $entry = $archive.GetEntry($asset)
+                if (-not $entry) { throw "Missing APK asset: $asset" }
+                $stream = $entry.Open()
+                $sha256 = [Security.Cryptography.SHA256]::Create()
+                try { $actualHash = [Convert]::ToHexString($sha256.ComputeHash($stream)) }
+                finally { $stream.Dispose(); $sha256.Dispose() }
+                if ($actualHash -ne (Get-FileHash -LiteralPath $expectedAssets[$asset] -Algorithm SHA256).Hash) {
+                    throw "APK asset differs from its source: $name/$asset"
                 }
             }
             foreach ($entry in $archive.Entries) {

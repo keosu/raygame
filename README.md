@@ -326,7 +326,7 @@ save.Save("save.txt");
 
 ## Android APK (experimental)
 
-The four games can be packaged as ARM64 NativeActivity APKs with xmake and raylib.
+All five games, including FORGE, can be packaged as ARM64 NativeActivity APKs with xmake and raylib.
 The current build targets Android 8.0+ (API 26), target SDK 35, and includes bundled
 fonts, touch controls, pause/exit UI and application-private saves/logs.
 
@@ -480,6 +480,9 @@ Its executable, assets and notices live together in `bin/forge_runner/`.
 Build and run its headless tests with `xmake build forge_tests` and `xmake run forge_tests`.
 The separate installed-SDK entry remains available on Windows through
 `pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify`.
+An experimental Android build adds multitouch movement/jump/dash controls and touch
+menus: `pwsh -NoProfile -File scripts/build-android.ps1 -Game forge_runner`.
+APK build checks pass locally; Android device execution still needs manual validation.
 
 ## Tests & CI
 
@@ -494,7 +497,7 @@ checks a native window and texture cleanup. Desktop CI runs the headless consume
 GitHub Actions builds all five desktop games and runs the engine and FORGE logic
 suites in Debug and Release on Linux and Windows; Windows explicitly selects MSVC
 and also verifies FORGE's standalone SDK build. A separate Windows job builds and verifies
-the four ARM64 Android Release APKs with JDK 17, SDK 35 and NDK r28c. All jobs use
+the five ARM64 Android Release APKs with JDK 17, SDK 35 and NDK r28c. All jobs use
 xmake 3.1.1 (`.github/workflows/ci.yml`). CI runs on pushes/PRs to `main` and supports
 manual **Actions → CI → Run workflow** runs.
 
@@ -506,7 +509,7 @@ Successful runs provide downloadable artifacts for 14 days:
 | `raygame-windows-x64-debug` | The same five games and assets in Debug mode |
 | `raygame-forge-windows-x64-<mode>` | FORGE EXE, its own `assets/`, README and third-party notices |
 | `raygame-forge-linux-x86_64-<mode>` | FORGE Linux executable, `assets/`, README and third-party notices |
-| `raygame-android-arm64-release` | Four APKs and `verification.json` with SHA-256 hashes |
+| `raygame-android-arm64-release` | Five APKs including FORGE, and `verification.json` with SHA-256 hashes |
 
 Open a CI run and download from **Artifacts**. Keep `assets/` next to the extracted
 Windows EXEs. The separate FORGE artifacts put the executable and assets at the

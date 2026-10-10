@@ -40,7 +40,8 @@ function add_forge_targets(options)
             add_raygame_sdk()
         else
             add_deps("raygame", "forge_headers")
-            set_targetdir("$(projectdir)/bin/forge_runner")
+            set_targetdir(is_plat("android") and "$(projectdir)/bin/android/$(arch)/$(mode)"
+                          or "$(projectdir)/bin/forge_runner")
         end
     end
 
@@ -50,6 +51,28 @@ function add_forge_targets(options)
             set_languages("c++17")
             add_files(path.join(forge_root, "src/*.cpp"))
             add_engine()
+            if is_plat("android") then
+                local staged_assets = path.join(build_root, "example-assets/forge_runner")
+                set_kind("shared")
+                add_rules("android.native_app", {
+                    android_sdk_version = "35",
+                    android_manifest = path.join(forge_root, "android/AndroidManifest.xml"),
+                    android_res = path.join(forge_root, "android/res"),
+                    android_assets = staged_assets,
+                    keystore = path.absolute(get_config("android_keystore"), os.projectdir()),
+                    keystore_pass = "android", package_name = "org.raygame.forge",
+                    native_app_glue = false, logcat_filters = {"raygame", "raylib"}
+                })
+                before_build(function ()
+                    sync_files(path.join(forge_root, "assets"), path.join(staged_assets, "forge"), os, io, assert)
+                    local source = path.join(forge_root, "THIRD_PARTY_NOTICES.md")
+                    local output = path.join(staged_assets, "THIRD_PARTY_NOTICES.md")
+                    if not os.isfile(output) or io.readfile(source) ~= io.readfile(output) then os.cp(source, output) end
+                end)
+                add_shflags("-Wl,-u,ANativeActivity_onCreate", "-Wl,-u,__wrap_android_main",
+                            "-Wl,--wrap=android_main", "-Wl,-z,max-page-size=16384",
+                            "-Wl,--no-undefined", {force = true})
+            end
             if is_plat("windows", "mingw") then
                 add_files(path.join(forge_root, "resources/forge.rc"))
                 add_includedirs(path.join(forge_root, "resources"))
@@ -60,6 +83,7 @@ function add_forge_targets(options)
                 add_ldflags("-mwindows", {force = true})
             end
             after_build(function (target)
+                if target:is_plat("android") then return end
                 sync_files(path.join(forge_root, "assets"), path.join(target:targetdir(), "assets"), os, io, assert)
                 for _, name in ipairs({"README.md", "THIRD_PARTY_NOTICES.md"}) do
                     local source = path.join(forge_root, name)
@@ -72,13 +96,14 @@ function add_forge_targets(options)
         target_end()
     end
 
-    if options.tests then
+    if options.tests and not is_plat("android") then
         target("forge_tests")
             set_kind("binary")
             set_languages("c++17")
             set_default(false)
             add_files(path.join(forge_root, "tests/main.cpp"), path.join(forge_root, "src/World.cpp"),
-                      path.join(forge_root, "src/Profile.cpp"), path.join(forge_root, "src/Localization.cpp"))
+                      path.join(forge_root, "src/Profile.cpp"), path.join(forge_root, "src/Localization.cpp"),
+                      path.join(forge_root, "src/TouchControls.cpp"))
             add_engine()
             set_runargs(path.join(forge_root, "assets"), path.join(build_root, "forge-tests/$(plat)/$(arch)/$(mode)"))
         target_end()

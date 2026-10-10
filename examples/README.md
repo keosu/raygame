@@ -34,7 +34,9 @@ Android 打包在 build 目录按游戏合并共用与专用资源，不把其�
 FORGE 在根工程中链接当前引擎，输出为 `bin/forge_runner/forge_runner.exe`（Linux
 无 `.exe` 后缀），相邻 `assets/`、README 和许可随构建复制，可整体打包。
 `build_examples=n` 关闭全部五个桌面游戏；`build_tests=y` 仍可单独构建并运行
-`forge_tests`，默认使用隔离的测试存档目录。FORGE 暂无 Android 目标。
+`forge_tests`，默认使用隔离的测试存档目录。Android 默认也包含 FORGE；单独构建
+使用 `pwsh -NoProfile -File scripts/build-android.ps1 -Game forge_runner`，生成
+`bin/android/arm64-v8a/release/forge_runner.apk`，触屏与验收边界见游戏说明。
 
 FORGE 同时保留自己的独立 SDK 入口：Windows 可运行
 `pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify`，输出仍为

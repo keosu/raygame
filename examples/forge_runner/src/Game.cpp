@@ -16,13 +16,17 @@ Command ReadCommand() {
 }
 class Pilot : public Component {
 public:
-    std::shared_ptr<World> world; bool* playing;
-    Pilot(std::shared_ptr<World> value,bool* enabled):world(std::move(value)),playing(enabled){}
+    std::shared_ptr<World> world; bool* playing; TouchControls* touch;
+    Pilot(std::shared_ptr<World> value,bool* enabled,TouchControls* controls):world(std::move(value)),playing(enabled),touch(controls){}
     void Start() override { gameObject->transform->SetInterpolationEnabled(true); }
     void FixedUpdate() override {
         if(!*playing) return;
         auto oldTimer=world->deathTimer;
-        world->Step(ReadCommand(),GameTime::DeltaTime());
+        auto command=ReadCommand(), mobile=touch->Consume();
+        if(mobile.move!=0) command.move=mobile.move;
+        command.jump|=mobile.jump; command.jumpHeld|=mobile.jumpHeld;
+        command.dash|=mobile.dash; command.down|=mobile.down;
+        world->Step(command,GameTime::DeltaTime());
         if(oldTimer>0 && world->deathTimer==0) gameObject->transform->Teleport(world->player.position);
         else gameObject->transform->position=world->player.position;
     }
@@ -30,10 +34,10 @@ public:
 const char* LevelFiles[]={"01_foundry.level","02_conduit.level","03_core.level"};
 bool Press(int key,int pad) { return Input::GetKeyDown(key)||Input::GetGamepadButtonDown(pad); }
 }
-Stage::Stage(std::shared_ptr<World> value,bool* enabled):Scene("FORGE stage"),world(std::move(value)),playing(enabled){}
+Stage::Stage(std::shared_ptr<World> value,bool* enabled,TouchControls* controls):Scene("FORGE stage"),world(std::move(value)),playing(enabled),touch(controls){}
 void Stage::OnLoad() {
     actor=CreateGameObject("courier"); actor->transform->position=world->player.position;
-    actor->AddComponent<Pilot>(world,playing);
+    actor->AddComponent<Pilot>(world,playing,touch);
 }
 Game::Game(std::string assetDirectory,std::filesystem::path data,bool test)
     :GameEngine("FORGE / The last delivery",1280,720),assets(std::move(assetDirectory)),profile(std::move(data)),smoke(test) {
@@ -44,9 +48,11 @@ void Game::OnInit() {
     profile.Load();
     if(smoke) profile=Profile(profile.directory); // Repeated smoke runs have a stable isolated baseline.
     art.Init(assets); ApplySettings();
+#if !defined(__ANDROID__)
     Image icon=LoadImage((assets+"/icon.png").c_str());
     if(IsImageValid(icon)) SetWindowIcon(icon);
     UnloadImage(icon);
+#endif
     if(IsAudioDeviceReady()) {
         for(const char* name:{"jump","dash","land","cell","checkpoint","death","finish","ui"})
             AudioManager::LoadSound(name,assets+"/audio/"+name+".wav");
@@ -60,22 +66,24 @@ void Game::OnInit() {
     if(profile.recovered) { toast="YOUR CHECKPOINT WAS RECOVERED"; toastTime=5; }
 }
 void Game::ApplySettings() {
-    art.settings=profile.settings;
+    art.settings=profile.settings; art.touchControls=touchEnabled;
+#if !defined(__ANDROID__)
     SetWindowTitle(profile.settings.language==Language::Chinese?"FORGE / 最后的信使":"FORGE / The last delivery");
+#endif
     targetFPS=smoke?0:profile.settings.fps; SetTargetFPS(targetFPS);
-    if(!smoke) SetFullscreen(profile.settings.fullscreen);
+    if(!smoke && !touchEnabled) SetFullscreen(profile.settings.fullscreen);
     if(IsAudioDeviceReady()) AudioManager::SetMusicVolume("forge",profile.settings.music);
 }
 void Game::Switch(Page next) {
     page=next; playing=next==Page::Play; focus=0; pageTime=0;
     activate=false; mousePress=false; settingsDirection=0;
-    Input::DiscardPending(); if(stage) stage->ResetInterpolation();
+    Input::DiscardPending(); touch.Reset(Input::GetFrame()); if(stage) stage->ResetInterpolation();
 }
 void Game::StartLevel(int index,bool resume) {
     if(index<0 || index>=3) throw std::runtime_error("Invalid campaign sector");
     world=std::make_shared<World>(Level::Load(assets+"/levels/"+LevelFiles[index],index));
     if(resume) { world->Restore(profile.checkpoint,profile.collected); world->deaths=profile.deaths; world->elapsed=profile.elapsed; }
-    stage=CreateRef<Stage>(world,&playing); LoadScene(stage);
+    stage=CreateRef<Stage>(world,&playing,&touch); LoadScene(stage);
     art.particles.clear(); art.shake=0;
     art.Follow(*world,world->player.position,0,true); Switch(Page::Play);
     Persist();
@@ -89,22 +97,26 @@ void Game::Persist() {
 void Game::OnUnscaledUpdate() {
     ++frame;
     if(smoke) SmokeInput();
+    if(touchEnabled) touch.Update(Input::GetFrame(),Display::GetViewport(),page==Page::Play);
     float dt=std::min(GameTime::UnscaledDeltaTime(),0.05f);
     art.Update(dt); pageTime+=dt; toastTime=std::max(0.0f,toastTime-dt);
     activate=Input::GetFrame().focused && Press(KEY_ENTER,GAMEPAD_BUTTON_RIGHT_FACE_DOWN); settingsDirection=0;
     if(!Input::GetFrame().focused) mousePress=false;
-    if(Press(KEY_F11,GAMEPAD_BUTTON_UNKNOWN)) { ToggleFullscreen(); profile.settings.fullscreen=IsFullscreen(); Persist(); }
-    if(Press(KEY_ESCAPE,GAMEPAD_BUTTON_MIDDLE_RIGHT)||Input::GetKeyDown(KEY_P)) {
+    if(!touchEnabled && Press(KEY_F11,GAMEPAD_BUTTON_UNKNOWN)) { ToggleFullscreen(); profile.settings.fullscreen=IsFullscreen(); Persist(); }
+    bool back=touchEnabled&&Input::GetKeyDown(KEY_BACK);
+    if(Press(KEY_ESCAPE,GAMEPAD_BUTTON_MIDDLE_RIGHT)||Input::GetKeyDown(KEY_P)||back||touch.pausePressed) {
         if(page==Page::Play) { Persist(); Switch(Page::Pause); }
         else if(page==Page::Pause) Switch(Page::Play);
         else if(page==Page::Settings) { ApplySettings(); Persist(); Switch(settingsReturn); }
         else if(page!=Page::Home && page!=Page::Debrief) Switch(Page::Home);
+        else if(back && page==Page::Debrief) { Persist(); Switch(Page::Home); }
+        else if(back && page==Page::Home) { Persist(); savedExit=true; Quit(); }
     }
     if(page==Page::Play) {
         if(Input::GetKeyDown(KEY_R)) { world->Kill(); }
         if(!Input::GetFrame().focused) { Persist(); Switch(Page::Pause); }
     } else {
-        int count=page==Page::Home?4:page==Page::Pause?4:page==Page::Settings?7:page==Page::Debrief?2:page==Page::ConfirmNew?2:1;
+        int count=page==Page::Home?(touchEnabled?5:4):page==Page::Pause?4:page==Page::Settings?7:page==Page::Debrief?2:page==Page::ConfirmNew?2:1;
         if(Press(KEY_DOWN,GAMEPAD_BUTTON_LEFT_FACE_DOWN)||Input::GetKeyDown(KEY_S)) focus=(focus+1)%count;
         if(Press(KEY_UP,GAMEPAD_BUTTON_LEFT_FACE_UP)||Input::GetKeyDown(KEY_W)) focus=(focus+count-1)%count;
         if(Press(KEY_LEFT,GAMEPAD_BUTTON_LEFT_FACE_LEFT)) settingsDirection=-1;
@@ -128,10 +140,12 @@ void Game::OnUpdate() {
         art.Follow(*world,stage->actor->transform->GetRenderPosition(),GameTime::UnscaledDeltaTime(),world->deathTimer>0.6f);
 }
 bool Game::Button(int index,Rectangle r,const std::string& label,const std::string& detail,bool disabled) {
-    auto mouse=Input::GetMousePosition(); bool in=Input::IsMouseInCanvas()&&CheckCollisionPointRec(mouse,r)&&Input::GetFrame().focused;
-    bool moved=Vector2Distance(mouse,lastMouse)>0.3f;
+    auto mouse=touchEnabled?touch.pointerPosition:Input::GetMousePosition();
+    bool in=(touchEnabled?(touch.pointerHeld||touch.pointerReleased):Input::IsMouseInCanvas())&&CheckCollisionPointRec(mouse,r)&&Input::GetFrame().focused;
+    bool moved=!touchEnabled&&Vector2Distance(mouse,lastMouse)>0.3f;
     if(in && moved) focus=index;
-    if(Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)&&in) { pressedAt=mouse; mousePress=true; focus=index; }
+    if(touchEnabled && touch.pointerPressed && in) focus=index;
+    if(!touchEnabled && Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)&&in) { pressedAt=mouse; mousePress=true; focus=index; }
     bool selected=focus==index && !disabled;
     DrawRectangleRec(r,selected?Color{38,64,61,245}:Color{16,29,35,225});
     DrawRectangleLinesEx(r,1,selected?Fade(Mint,0.65f):Color{48,65,68,180});
@@ -140,9 +154,10 @@ bool Game::Button(int index,Rectangle r,const std::string& label,const std::stri
     while(labelSize>16&&art.Measure(label,labelSize,true)>available)labelSize-=1;
     art.Text(label,{r.x+40,r.y+(r.height-labelSize)/2-1},labelSize,disabled?Fade(Muted,0.5f):selected?Mint:Light,true);
     if(!detail.empty()) art.Text(detail,{r.x+r.width-art.Measure(detail,14)-20,r.y+18},14,Muted);
-    bool clicked=mousePress&&in&&Input::GetMouseButtonUp(MOUSE_BUTTON_LEFT)&&CheckCollisionPointRec(pressedAt,r);
+    bool clicked=touchEnabled?touch.Click(r):(mousePress&&in&&Input::GetMouseButtonUp(MOUSE_BUTTON_LEFT)&&CheckCollisionPointRec(pressedAt,r));
     if((selected&&activate&&Input::GetFrame().focused)||clicked) {
         activate=false; mousePress=false;
+        pointerDirection=clicked&&mouse.x<r.x+r.width/2?-1:1;
         if(!disabled) { AudioManager::PlaySound("ui",profile.settings.sfx*0.6f); return true; }
     }
     return false;
@@ -165,12 +180,15 @@ void Game::DrawHome() {
     }
     if(Button(2,{90,493,195,52},"SETTINGS")) { settingsReturn=Page::Home; Switch(Page::Settings); }
     if(Button(3,{300,493,195,52},"EXIT")) { Persist(); savedExit=true; Quit(); }
-    art.Text("MOVE  A/D     JUMP  SPACE     DASH  SHIFT",{91,592},14,Muted);
-    art.Text("KEYBOARD + CONTROLLER",{91,619},12,Fade(Muted,0.6f));
+    art.Text(touchEnabled?"LEFT: MOVE / DROP    RIGHT: JUMP / DASH":"MOVE  A/D     JUMP  SPACE     DASH  SHIFT",{91,592},14,Muted);
+    art.Text(touchEnabled?"HOLD JUMP FOR HEIGHT / TAP AGAIN TO DOUBLE JUMP":"KEYBOARD + CONTROLLER",{91,619},12,Fade(Muted,0.6f));
+    if(touchEnabled) art.Text("HOLD DOWN + JUMP TO DROP THROUGH",{91,646},12,Fade(Muted,0.6f));
     art.Text("01 / THE FOUNDRY",{935,555},14,Ember);
     art.Text("CARRY THE LIGHT",{902,579},28,Light,true);
     if(Input::GetKeyDown(KEY_C)) Switch(Page::Credits);
-    art.Text("C  CREDITS",{1100,672},12,Muted); art.Text("FORGE  /  1.0",{90,672},12,Muted);
+    if(touchEnabled) { if(Button(4,{1000,640,225,52},"CREDITS")) Switch(Page::Credits); }
+    else art.Text("C  CREDITS",{1100,672},12,Muted);
+    art.Text("FORGE  /  1.0",{90,672},12,Muted);
 }
 void Game::DrawHUD() {
     DrawRectangleGradientV(0,0,1280,115,Fade(Ink,0.95f),Fade(Ink,0));
@@ -182,7 +200,7 @@ void Game::DrawHUD() {
     }
     char timer[32]; std::snprintf(timer,sizeof(timer),"%02d:%02d",(int)world->elapsed/60,(int)world->elapsed%60);
     art.Text(timer,{1130,20},29,Light,true);
-    art.Text("ESC  PAUSE",{1140,59},11,Muted);
+    if(!touchEnabled) art.Text("ESC  PAUSE",{1140,59},11,Muted);
     DrawRectangleRec({30,675,80,3},Color{47,65,63,255});
     DrawRectangleRec({30,675,80*(1-Clamp(world->player.dashCooldown/0.65f,0.0f,1.0f)),3},Mint);
     art.Text("DASH",{30,651},11,world->player.dashCooldown==0?Mint:Muted);
@@ -197,6 +215,22 @@ void Game::DrawHUD() {
     if(world->player.position.x>world->level.goal.x-160 && world->CellCount()!=(int)world->level.cells.size())
         art.Text("RETRIEVE THE REMAINING CELLS",{640-art.Measure("RETRIEVE THE REMAINING CELLS",20)/2,615},20,Ember);
 }
+void Game::DrawTouchControls() {
+    auto panel=[&](Rectangle r,bool down) {
+        DrawRectangleRounded(r,0.25f,8,down?Color{46,89,76,205}:Color{15,30,37,170});
+        DrawRectangleRoundedLinesEx(r,0.25f,8,2,down?Mint:Fade(Muted,0.65f));
+    };
+    const auto& held=touch.Held();
+    panel(TouchControls::Left,held.move<0); panel(TouchControls::Right,held.move>0);
+    panel(TouchControls::Down,held.down); panel(TouchControls::JumpButton,held.jumpHeld);
+    panel(TouchControls::DashButton,touch.dashHeld); panel(TouchControls::PauseButton,false);
+    DrawTriangle({74,588},{102,612},{102,564},Light);
+    DrawTriangle({218,588},{190,564},{190,612},Light);
+    DrawTriangle({320,612},{342,584},{298,584},Light);
+    art.Text("JUMP",{1168-art.Measure("JUMP",20,true)/2,560},20,Light,true);
+    art.Text("DASH",{1028-art.Measure("DASH",20,true)/2,580},20,touch.dashHeld?Mint:Light,true);
+    DrawRectangle(1176,109,7,26,Light); DrawRectangle(1193,109,7,26,Light);
+}
 void Game::DrawModal() {
     DrawRectangle(0,0,1280,720,Fade(Ink,0.82f));
     DrawRectangleRec({390,125,500,490},Color{15,28,34,248}); DrawRectangleLinesEx({390,125,500,490},1,Muted);
@@ -204,7 +238,7 @@ void Game::DrawModal() {
     if(page==Page::Pause) {
         art.Text("DELIVERY PAUSED",{440,165},42,Light,true);
         art.Text("YOUR CHECKPOINT IS SAFE",{442,221},13,Muted);
-        if(Button(0,{440,270,400,52},"RESUME","ESC")) Switch(Page::Play);
+        if(Button(0,{440,270,400,52},"RESUME",touchEnabled?"":"ESC")) Switch(Page::Play);
         if(Button(1,{440,334,400,52},"SETTINGS")) { settingsReturn=Page::Pause; Switch(Page::Settings); }
         if(Button(2,{440,398,400,52},"RESTART CHECKPOINT")) { world->Respawn(); stage->actor->transform->Teleport(world->player.position); Switch(Page::Play); }
         if(Button(3,{440,462,400,52},"SAVE & RETURN")) { Persist(); Switch(Page::Home); }
@@ -232,12 +266,13 @@ void Game::DrawSettings() {
     struct Row { const char* title; std::string value; };
     auto& s=profile.settings;
     Row rows[]={{"MUSIC",std::to_string((int)std::lround(s.music*100))+"%"},{"SOUND EFFECTS",std::to_string((int)std::lround(s.sfx*100))+"%"},
-                {"SCREEN SHAKE",s.shake?"ON":"OFF"},{"DISPLAY",s.fullscreen?"FULLSCREEN":"WINDOWED"},{"FRAME LIMIT",std::to_string(s.fps)+" FPS"},
+                {"SCREEN SHAKE",s.shake?"ON":"OFF"},{"DISPLAY",(touchEnabled||s.fullscreen)?"FULLSCREEN":"WINDOWED"},{"FRAME LIMIT",std::to_string(s.fps)+" FPS"},
                 {"LANGUAGE",s.language==Language::Chinese?"简体中文":"English"}};
     for(int i=0;i<6;++i) {
-        bool clicked=Button(i,{245,182+i*55.0f,790,46},rows[i].title,art.Localize(rows[i].value)+"    <  >");
-        if(clicked || (focus==i&&settingsDirection)) {
-            int direction=settingsDirection?settingsDirection:1;
+        bool disabled=touchEnabled&&i==3;
+        bool clicked=Button(i,{245,182+i*55.0f,790,46},rows[i].title,art.Localize(rows[i].value)+(disabled?"":"    <  >"),disabled);
+        if(!disabled && (clicked || (focus==i&&settingsDirection))) {
+            int direction=settingsDirection?settingsDirection:pointerDirection;
             if(i==0) s.music=Clamp(s.music+direction*0.1f,0.0f,1.0f);
             if(i==1) s.sfx=Clamp(s.sfx+direction*0.1f,0.0f,1.0f);
             if(i==2) s.shake=!s.shake;
@@ -248,8 +283,8 @@ void Game::DrawSettings() {
             if(i==5) Persist();
         }
     }
-    if(Button(6,{245,540,790,52},"SAVE & RETURN","ESC")) { Persist(); Switch(settingsReturn); }
-    art.Text("UP / DOWN TO SELECT    LEFT / RIGHT TO ADJUST",{245,626},13,Muted);
+    if(Button(6,{245,540,790,52},"SAVE & RETURN",touchEnabled?"":"ESC")) { Persist(); Switch(settingsReturn); }
+    art.Text(touchEnabled?"TAP THE LEFT / RIGHT HALF TO ADJUST":"UP / DOWN TO SELECT    LEFT / RIGHT TO ADJUST",{245,626},13,Muted);
 }
 void Game::DrawDebrief() {
     DrawRectangle(0,0,1280,720,Fade(Ink,0.84f)); art.Glow({640,310},300,Mint,0.16f);
@@ -278,6 +313,7 @@ void Game::OnRender() {
         Vector2 p=stage && stage->actor?stage->actor->transform->GetRenderPosition():world->player.position;
         art.DrawWorld(*world,p,false);
         if(page==Page::Play || page==Page::Pause) DrawHUD();
+        if(page==Page::Play && touchEnabled) DrawTouchControls();
         if(page==Page::Pause || page==Page::ConfirmNew || page==Page::Credits) DrawModal();
         if(page==Page::Settings) DrawSettings();
         if(page==Page::Debrief) DrawDebrief();
@@ -308,7 +344,13 @@ void Game::OnRender() {
         if(frame==153) Capture("confirm-zh");
         if(frame==158) Capture("credits-zh");
         if(frame==170) Capture("complete-en");
-        if(frame>=172) Quit();
+        if(frame==177 || frame==218) Capture("touch-play");
+        if(frame==181) Capture("touch-pause");
+        if(frame==195) Capture("touch-settings");
+        if(frame==206) Capture("touch-home");
+        if(frame==209) Capture("touch-credits");
+        if(frame==213) Capture("touch-confirm");
+        if(frame>=224) Quit();
     }
 }
 void Game::Expect(bool value,const std::string& message) {
@@ -349,6 +391,25 @@ void Game::SmokeInput() {
     default: break;
     }
     if(frame==100) { InputFrame lost;lost.focused=false;Input::SetFrame(lost); }
+    auto finger=[&](int id,Vector2 position){input.touches[input.touchCount++]={id,Display::CanvasToScreen(position)};};
+    if(frame>=174 && frame<=179) finger(17,{200,590});
+    if(frame>=174 && frame<=176) finger(29,{1168,570});
+    if(frame==176) finger(41,{1028,590});
+    if(frame==180) finger(55,{1188,122});
+    if(frame==182 || frame==199) finger(65,{640,296});
+    if(frame>=182 && frame<=184) finger(88,{1168,570});
+    if(frame==188) finger(65,{640,360});
+    if(frame==191) finger(65,{300,205});
+    if(frame==193) finger(65,{980,205});
+    if(frame==196) finger(65,{980,370});
+    if(frame==201) input.focused=false;
+    if(frame==202) finger(88,{1168,570});
+    if(frame==204) finger(65,{640,488});
+    if(frame==207) finger(65,{1100,665});
+    if(frame==211) finger(65,{200,455});
+    if(frame==214) finger(65,{640,384});
+    if(frame==216) finger(65,{200,390});
+    if(frame==186 || frame==198 || frame==210 || frame==221) key(KEY_BACK);
     Input::SetFrame(input);
 }
 void Game::SmokeStep() {
@@ -454,5 +515,38 @@ void Game::SmokeStep() {
         world->collected=(std::uint64_t{1}<<world->level.cells.size())-1;world->player.position=world->level.goal;
         world->Step({},1.0f/60);Persist();Switch(Page::Debrief);
     }
+    if(frame==172) {
+        touchEnabled=true;profile.settings.language=Language::Chinese;ApplySettings();StartLevel(0,false);
+        targetFPS=60;SetTargetFPS(60);
+        Expect(art.Localize("SHIFT TO DASH")==art.Localize("TOUCH DASH"),"touch mode replaces keyboard signs");
+    }
+    if(frame==173) { smokeTouchX=world->player.position.x;smokeTouchY=world->player.position.y; }
+    if(frame==180) {
+        Expect(page==Page::Pause&&world->player.position.x>smokeTouchX&&world->player.position.y<smokeTouchY,
+               "multiple touches drive the pilot and the pause button opens the menu");
+        pausedWorldTime=world->time;
+    }
+    if(frame==182) Expect(world->time==pausedWorldTime,"touch pause freezes the simulation");
+    if(frame==184) Expect(page==Page::Play&&!touch.Held().jumpHeld,"touch resume rejects a finger held across the page change");
+    if(frame==187) Expect(page==Page::Pause,"Android Back opens the pause menu");
+    if(frame==190) {
+        Expect(page==Page::Settings&&settingsReturn==Page::Pause,"touch opens settings");
+        smokeMusic=profile.settings.music;smokeFullscreen=profile.settings.fullscreen;
+    }
+    if(frame==193) Expect(profile.settings.music<smokeMusic,"left side of a setting decreases its value");
+    if(frame==195) Expect(std::fabs(profile.settings.music-smokeMusic)<0.001f,"right side of a setting increases its value");
+    if(frame==198) Expect(page==Page::Pause&&profile.settings.fullscreen==smokeFullscreen,"mobile display stays fullscreen and Back returns from settings");
+    if(frame==201) Expect(page==Page::Pause,"focus loss saves and pauses touch gameplay");
+    if(frame==203) Expect(!touch.Held().jumpHeld,"focus regain does not create a touch jump");
+    if(frame==206) {
+        Profile loaded(profile.directory);loaded.Load();
+        Expect(page==Page::Home&&loaded.active&&loaded.collected==world->collected,"touch save-and-return persists the delivery");
+    }
+    if(frame==209) Expect(page==Page::Credits,"credits can be opened without a keyboard");
+    if(frame==213) Expect(page==Page::ConfirmNew,"touch new delivery requires overwrite confirmation");
+    if(frame==216) Expect(page==Page::Home&&profile.active,"touch cancellation retains the existing run");
+    if(frame==218) Expect(page==Page::Play&&profile.active,"touch continues the saved delivery");
+    if(frame==220) { Persist();Switch(Page::Home); }
+    if(frame==221) Expect(savedExit,"Android Back saves and exits from the home screen");
 }
 }

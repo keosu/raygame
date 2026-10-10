@@ -8,7 +8,7 @@ const char* LanguageCode(Language language) { return language==Language::English
 Language ParseLanguage(const std::string& code) { return code=="en" ? Language::English : Language::Chinese; }
 void TextCatalog::Load(const std::string& path) {
     std::string text;
-    if(!RayGame::FileSystem::ReadText(path,text,128*1024)) throw std::runtime_error("Cannot read translations: "+path);
+    if(!RayGame::FileSystem::ReadAssetText(path,text,128*1024)) throw std::runtime_error("Cannot read translations: "+path);
     std::map<std::string,std::string> loaded;
     std::istringstream lines(text);std::string line;
     while(std::getline(lines,line)) {

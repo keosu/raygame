@@ -444,3 +444,24 @@ CI 的 Windows/Linux Debug/Release 均使用默认入口构建游戏并运行 Fo
 独立 SDK 两模式、资源完整性和增量同步检查通过。31 文件 ZIP 解压到含空格
 目录后图形 smoke 零失败。Linux/macOS 本地构建、Android APK 重建/运行和
 干净机器发行验收未运行；FORGE 的 Android 入口、资源适配与触屏仍需移植。
+
+
+**21. FORGE Android APK 与多指触屏操作**
+
+2026-10-10 为 FORGE 加入 NativeActivity ARM64/API 26+/target 35/GLES 2.0
+打包，默认 Android 构建及 CI 配置扩至五游戏。Forge 自带图标、完整资源和
+第三方说明；默认 60 FPS、横屏、系统全屏及 1280×720 Fit 等比布局。
+新增有大小上限的 ReadAssetText，通过 AssetManager 加载关卡和翻译，存档
+继续使用私有文件。Android 引擎静态库显式 PIC，修复 Debug 的 ARM64 链接。
+
+触屏支持按 ID 跟踪的多指移动/跳跃/冲刺/下落、固定步短按缓存、单指菜单
+捕获和页面/焦点/映射变化取消。全部菜单、设置、制作信息与系统 Back 可操作；
+本地化补充触屏提示，中文字体子集更新至 353 字符。桌面和独立 SDK 入口保留。
+
+本地五个 Release APK 与 Forge Debug APK 的构建、签名、16 KiB 对齐、
+原生入口、图标和完整资源检查通过；增量重跑五 APK hash 不变。MSVC 两模式
+各 316 项引擎/69 项 Forge 逻辑通过，原图形 smoke 与 Forge 221 帧桌面/
+触屏模拟 smoke 均零失败。独立 SDK Release 通过，图标与中文字体可重现。
+未推送新 CI，未运行 Linux/macOS、Android 设备或模拟器，不能将桌面触屏
+模拟视为 Android 实机验证；后台/锁屏、音频、触感、安全区域、GPU 恢复和
+性能耗电仍待用户手动验收，M0 和商业发行边界保持未完成。

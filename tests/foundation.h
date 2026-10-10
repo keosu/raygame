@@ -151,6 +151,13 @@ static void StorageAndDiagnostics() {
     std::string content;
     CHECK(FileSystem::ReadText(file, content));
     CHECK(!FileSystem::ReadText(file, content, 4));
+    auto previousContent = content;
+    CHECK(FileSystem::ReadAssetText(file.u8string(), content) && content == previousContent);
+    CHECK(!FileSystem::ReadAssetText(file.u8string(), content, 4) && content == previousContent);
+    CHECK(!FileSystem::ReadAssetText((directory / "missing-asset").u8string(), content) && content == previousContent);
+    auto emptyAsset = directory / "empty-asset.txt";
+    CHECK(FileSystem::WriteAtomic(emptyAsset, "", false));
+    CHECK(FileSystem::ReadAssetText(emptyAsset.u8string(), content, 0) && content.empty());
     auto blocked = directory / "blocked";
     CHECK(fs::create_directory(blocked));
     CHECK(!FileSystem::WriteAtomic(blocked, "replacement"));

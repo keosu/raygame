@@ -2,6 +2,8 @@
 #include "AndroidPlatform.h"
 #include <android_native_app_glue.h>
 #include <android/asset_manager.h>
+#include <algorithm>
+#include <memory>
 
 namespace {
 android_app* currentApp = nullptr;
@@ -17,6 +19,26 @@ bool AndroidAssetExists(const char* path) {
     if (!asset) return false;
     AAsset_close(asset);
     return true;
+}
+bool AndroidReadAssetText(const char* path, std::string& text, size_t maxBytes) {
+    if (!currentApp || !currentApp->activity) return false;
+    std::unique_ptr<AAsset, decltype(&AAsset_close)> asset(
+        AAssetManager_open(currentApp->activity->assetManager, path, AASSET_MODE_STREAMING), AAsset_close);
+    if (!asset) return false;
+    try {
+        auto length = AAsset_getLength64(asset.get());
+        if (length < 0 || static_cast<unsigned long long>(length) > maxBytes) return false;
+        std::string value(static_cast<size_t>(length), '\0');
+        size_t offset = 0;
+        while (offset < value.size()) {
+            int count = AAsset_read(asset.get(), value.data() + offset,
+                                   std::min<size_t>(value.size() - offset, 1024 * 1024));
+            if (count <= 0) return false;
+            offset += static_cast<size_t>(count);
+        }
+        text = std::move(value);
+        return true;
+    } catch (...) { return false; }
 }
 }
 

@@ -13,7 +13,7 @@ Vector2 Drone::At(float t) const { return {origin.x + std::sin(t * 2 * PI / peri
 
 Level Level::Load(const std::string& file, int number) {
     std::string text;
-    if (!RayGame::FileSystem::ReadText(file, text, 128 * 1024)) throw std::runtime_error("Cannot read level: " + file);
+    if (!RayGame::FileSystem::ReadAssetText(file, text, 128 * 1024)) throw std::runtime_error("Cannot read level: " + file);
     Level level; level.index = number; level.version = 0;
     std::istringstream lines(text); std::string line; int lineNumber = 0;
     while (std::getline(lines, line)) {

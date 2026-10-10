@@ -16,6 +16,7 @@ public:
     std::vector<Spark> particles;
     float clock = 0, shake = 0, flash = 0, landing = 0;
     Settings settings;
+    bool touchControls = false;
     void Init(const std::string& assets);
     void Update(float dt);
     void Follow(const World& world, Vector2 renderPosition, float dt, bool snap = false);
@@ -25,7 +26,7 @@ public:
     void DrawRunner(Vector2 position, const Runner& state, float scale = 1, float alpha = 1);
     void Text(const std::string& value, Vector2 position, float size, Color color = Light, bool heading = false);
     float Measure(const std::string& value, float size, bool heading = false) const;
-    std::string Localize(const std::string& value) const { return catalog.Translate(value,settings.language); }
+    std::string Localize(const std::string& value) const;
     RayGame::FontHandle ChineseFont(float size, bool heading = false) const;
     void Glow(Vector2 position, float radius, Color color, float alpha = 0.2f);
 private:

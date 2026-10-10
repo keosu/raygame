@@ -114,6 +114,16 @@ bool FileSystem::AssetExists(const std::string& path) {
 #endif
 }
 
+bool FileSystem::ReadAssetText(const std::string& path, std::string& text, size_t maxBytes) {
+    try {
+#if defined(__ANDROID__)
+        return detail::AndroidReadAssetText(path.c_str(), text, maxBytes);
+#else
+        return ReadText(fs::u8path(path), text, maxBytes);
+#endif
+    } catch (...) { return false; }
+}
+
 bool FileSystem::ReadText(const fs::path& path, std::string& text, size_t maxBytes) {
     try {
         std::ifstream stream(path, std::ios::binary | std::ios::ate);

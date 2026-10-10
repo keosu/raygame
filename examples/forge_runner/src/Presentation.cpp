@@ -8,6 +8,15 @@ bool HasUnicode(const std::string& text) { return std::any_of(text.begin(),text.
 float TextSize(const std::string& text,float size) { return HasUnicode(text)?std::max(16.0f,size)*1.4f:size; }
 }
 float Presentation::Random(float min, float max) { random ^= random<<13; random ^= random>>17; random ^= random<<5; return min + (max-min)*(random%10000)/10000.0f; }
+std::string Presentation::Localize(const std::string& value) const {
+    std::string key=value;
+    if(touchControls) {
+        if(value=="A / D TO MOVE") key="TOUCH ARROWS TO MOVE";
+        if(value=="SPACE TO JUMP / HOLD FOR HEIGHT") key="TOUCH JUMP / HOLD FOR HEIGHT";
+        if(value=="SHIFT TO DASH") key="TOUCH DASH";
+    }
+    return catalog.Translate(key,settings.language);
+}
 void Presentation::Init(const std::string& assets) {
     catalog.Load(assets+"/locales/zh-CN.tsv");
     chineseGlyphs=catalog.ChineseCodepoints();fontDirectory=assets+"/fonts/";

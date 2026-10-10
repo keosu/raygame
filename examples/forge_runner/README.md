@@ -65,8 +65,39 @@ xmake run forge_runner
 其他示例或仓库测试。根工程入口链接当前 `raygame` 目标，在 build 目录生成
 相同命名空间的头文件布局；两者共用 `targets.lua`。字体/关卡/音频/许可均
 随本目录保存。Windows/Linux CI 均构建根工程游戏并运行逻辑测试，Windows
-还验证独立 SDK 构建；当前本地验收为 Windows/MSVC。Android
-移植、触控、Linux 实机运行和发行包签名不在这一版本的验收范围。
+还验证独立 SDK 构建。Android 通过根工程构建，独立安装 SDK 的入口仍面向桌面。
+Linux 实机运行和发行包签名尚未验收。
+
+## Android APK（实验性）
+
+已加入 Android 8.0+ / API 26、ARM64、OpenGL ES 2.0 的 NativeActivity 目标，
+target SDK 35。使用与其他示例相同的隔离构建、签名和校验脚本：
+
+```powershell
+pwsh -NoProfile -File scripts/build-android.ps1 -Game forge_runner -Mode release
+```
+
+输出为 `bin/android/arm64-v8a/release/forge_runner.apk`，包名 `org.raygame.forge`。
+不指定 `-Game` 会生成全部五个游戏；CI 的 `raygame-android-arm64-release`
+产物包含 Forge APK 和校验报告。工具安装与签名说明见 [Android 文档](../../docs/ANDROID.md)。
+
+手机采用横屏及反向横屏、固定 1280×720 等比画布、系统全屏；新设置默认 60 FPS。
+触屏操作支持同时按住多个按钮：
+
+- 左下左右箭头移动；右下“跳跃”支持按住跳高、再次点击二段跳，“冲刺”发动冲刺。
+- 按住左下的下箭头，同时点击跳跃，可穿过单向平台下落。
+- 右上暂停按钮打开暂停菜单；系统返回键切换暂停、退出设置或返回主菜单，
+  在主菜单再次返回会保存并退出。菜单、制作信息和新游戏确认均可触屏操作。
+- 设置行左半侧减少、右半侧增加；显示模式固定全屏。保留外接键盘/手柄操作。
+
+关卡、翻译、字体、音频和许可放在 APK 的 `assets/forge/`，第三方说明也随包提供。
+文本资源通过 AssetManager 读取；存档和日志仍使用应用私有文件目录
+`files/raygame.forge/`，不需要外部存储或网络权限。
+
+已验证 APK 交叉编译、签名、对齐、原生入口、图标和资源完整性；触点 ID 重排、
+多指操作、固定步短按缓存、菜单/失焦取消有桌面逻辑和隐藏窗口 smoke 检查。
+**尚未安装或启动 Android 真机/模拟器**，启动、音效、触感、后台/锁屏恢复、
+刘海/手势区域与性能耗电仍需设备验收；桌面触屏模拟不代表这些检查已通过。
 
 ## 操作
 
@@ -103,6 +134,9 @@ xmake run forge_runner
 需要 Pillow，正常构建使用已提交文件。角色和场景由 `Presentation.cpp` 绘制，
 便于直接调整动画、材质和布局。字体及各自的 SIL OFL 许可在 `assets/fonts`。
 第三方说明见 `THIRD_PARTY_NOTICES.md`。
+
+`tools/generate-android-icons.py` 从同一 Forge 图标设计生成 Android 普通、
+自适应和主题图标，资源位于 `android/res/`；正常构建使用已提交资源，无需 Python。
 
 `assets/locales/zh-CN.tsv` 使用英文原文和简体中文译文的 TAB 分隔目录，
 同一目录覆盖游戏 UI 和三关数据的名称/说明/标牌；未翻译的自定义关卡文字

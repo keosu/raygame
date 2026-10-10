@@ -15,7 +15,11 @@ int main(int argc,char** argv) {
         if(data.empty()) data=RayGame::FileSystem::UserDataDirectory("raygame.forge");
         std::filesystem::create_directories(data);
         RayGame::Diagnostics::Initialize(data/"logs/game.log"); RayGame::Diagnostics::InstallRaylibCallback();
+#if defined(__ANDROID__)
+        std::string assets="forge"; // Relative to the APK's assets root.
+#else
         std::string assets=std::string(GetApplicationDirectory())+"assets";
+#endif
         if(smoke) SetConfigFlags(FLAG_WINDOW_HIDDEN);
         Forge::Game game(assets,data,smoke); game.Run();
         if(smoke) {

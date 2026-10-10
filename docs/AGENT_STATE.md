@@ -5,13 +5,82 @@
 ## 目标与约束
 
 按 `PRODUCT_READINESS_REVIEW.md` 逐步产品化 RayGame。当前推进 M0，继续保留
-GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求持续保存 agent
+GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户明确要求持续保存 agent
 状态；每个工作包结束及交接前更新本文件。仓库 `AGENTS.md` 已固化该规则。
 
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：FORGE 接入默认桌面构建与 CI 产物（已实现并验证）
+## 最近工作包：FORGE Android APK 与多指触控（已实现并验证构建）
+
+用户继续要求支持 Android。本包基线 `09c8443`，沿用不安装/启动设备的约定。
+提交主题：`Add FORGE Android APK packaging and multitouch controls`。
+
+1. 根工程增加 Forge NativeActivity/ARM64/API 26+/target 35/OpenGL ES 2.0
+   目标，包名 `org.raygame.forge`，横屏及反向横屏。源码、三关、音频、字体和
+   本地化复用桌面版本；独立 SDK 工程仍面向桌面。新设置默认 60 FPS，移动端
+   固定系统全屏，保持 1280×720 Fit 等比画布。
+2. 新增 `FileSystem::ReadAssetText`：桌面 UTF-8 文件路径，Android 通过
+   AssetManager 分块读取压缩/未压缩资源，检查大小上限，失败保留输出。
+   Forge 关卡和翻译改用该 API；Android 资源根为 `forge`，raylib 直接读取
+   同目录字体/音频。普通 ReadText/WriteAtomic 仍只用于私有文件/存档。
+3. TouchControls 按触点 ID 捕获移动、下落、跳跃、冲刺、暂停或菜单角色。
+   支持多指组合、移动区左右滑动；跳跃/冲刺短按缓冲至固定步，之后仅消费
+   一次，下落修饰键也随短按保留。页面切换、失焦、映射变化清除操作并要求
+   已按住的手指先抬起；多指菜单不会提升其他手指或产生重复点击。
+4. 游戏增加触屏按钮与菜单、制作信息入口、左右半行调整设置、系统 Back
+   暂停/返回/保存退出。移动提示与关卡标牌改为触屏说明；新增中文翻译，
+   字体子集扩至 353 字符。桌面键盘/鼠标/手柄入口保留，触屏模式忽略 Android
+   合成鼠标，避免双重触发。普通 Android 流程不调用桌面窗口图标/标题 API。
+5. Forge 自有 Android manifest、五密度/自适应/主题图标及生成器。APK 使用
+   `assets/forge/` 的 28 个资源和单独的第三方说明；资源同步清理过期文件。
+   build-android 默认构建/检查五游戏，支持 `-Game forge_runner`；CI 同一路径
+   自动包含 Forge APK。修复 Android Debug 首次暴露的静态引擎非 PIC 链接问题，
+   Android 引擎显式 `-fPIC`，可正确链接全局变量/TLS 到 NativeActivity 共享库。
+
+### 本包通过的检查
+
+- 五个 ARM64 Release APK 构建、v2/v3 签名、ZIP/ELF 16 KiB 对齐、原生入口、
+  静态运行库、图标和全部资源 SHA-256 检查通过。Forge Release **2,952,582 B**，
+  Debug **6,086,022 B**；Forge Debug 同样通过上述检查。aapt 核对包名、API、
+  NativeActivity、ARM64 和 `forge_runner` 库元数据。
+- 同配置增量重跑保留五 APK 的 hash；人工放入 Forge staging 的过期资源
+  被清除，五游戏资源再次全部通过。没有更换或删除本地 Android 签名密钥。
+- Windows/MSVC x64 Debug/Release 全目标通过：各 **316 passed, 0 failed**
+  引擎逻辑、**69 passed, 0 failed** Forge 逻辑；原图形 smoke 零失败。
+  Forge 扩展到 221 帧的桌面/中英文/触屏 smoke 均 **0 failures**，含多指驱动
+  Pilot、暂停、设置双向调整、Back、焦点、存档、制作信息和覆盖确认。
+- Windows 独立 SDK Release：69 项逻辑、八尺寸图标和扩展图形 smoke 通过。
+  根工程最终 Release 五 EXE 图标通过；恢复 Windows/MSVC x64 Release、
+  build_examples=y、build_tests=y、example_console=n。
+- 已查看触屏游戏、主菜单和设置截图。10 个 Android 图标资源及两份中文字体
+  在隔离目录重建，逐字节一致；字体覆盖 353 字符。PowerShell/Python 语法、
+  actionlint、UTF-8/LF 与 git diff --check 通过。
+
+### 未运行与边界
+
+- **未安装或启动 Android 真机/模拟器**。APK 构建不代表 Android 启动、
+  AssetManager/音频实际运行、多指触感、后台/锁屏恢复、刘海/手势安全区、
+  GPU 上下文恢复或性能耗电已验收。设备运行继续由用户手动验证。
+- 未推送或运行本包远端 CI，未运行 Linux/macOS、本包独立 SDK Debug 或
+  其他四游戏的 Android Debug。Linux/桌面分支保留，不能据本地结果宣称新 CI
+  或全平台通过。M0 硬件/长稳与商业发行验收仍未完成。
+- Android APK 使用本地调试签名；CI 每次签名不同，覆盖安装需相同签名。
+  多指操作属于 Forge 游戏层，尚未把通用 UI 触摸路由改造扩展至其他四示例。
+
+入口：`pwsh -NoProfile -File scripts/build-android.ps1 -Game forge_runner`；
+APK：`bin/android/arm64-v8a/release/forge_runner.apk`（Debug 使用同级 debug）。
+默认不带 `-Game` 构建五 APK。校验报告 `build/android/verification-{release,debug}.json`；
+日志 `build/forge-android-{all-release,apk-debug,incremental,apk-metadata,apk-manifest}.log`，
+`build/forge-android-desktop-{debug,release}-*.log`、`build/forge-android-final-*.log`、
+`build/forge-android-sdk-release.log`。桌面触屏截图在
+`build/forge-android-smoke-{debug,release}/screenshots/`，不是 Android 设备截图。
+
+下一步：用户手动安装 Forge Release APK，优先检查启动/中英文、三指组合、
+返回键与重启后的检查点恢复；按 `docs/ANDROID.md` 记录机型/系统/日志。
+推送后核对本提交 CI 的五 APK 与桌面产物，再推进真实设备和长稳矩阵。
+
+## 上一工作包：FORGE 接入默认桌面构建与 CI 产物（已实现并验证）
 
 用户指出根目录 build 未包含 FORGE，并要求 CI 也能生成。本包基线 `445f1e3`。
 开始时 `examples/forge_runner/src/main.cpp` 有用户添加的一个空行，保留原样，

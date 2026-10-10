@@ -90,6 +90,12 @@ auto font = RayGame::ResourceManager::LoadFontResource("ui-zh", "assets/Chinese.
 `xmake run forge_runner` 运行；要验收安装后的 SDK，根目录运行
 `pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify` 可构建并验收。
 
+`FileSystem::ReadAssetText(path, text, maxBytes)` 用于关卡/翻译等只读文本资源：
+桌面读取 UTF-8 文件路径，Android 从 APK assets 根目录通过 AssetManager 读取，
+支持压缩资源与大小上限，失败保留原输出。`ReadText` / `WriteAtomic` 仍只操作
+普通文件，供私有存档使用。FORGE Android 目标在根工程中构建，其 APK 资源路径
+为 `forge/levels/...`、`forge/locales/...`；独立 SDK 消费验收仍面向桌面。
+
 ## 可重复的消费验收
 
 构建好当前配置的 `raygame` 目标后，在引擎仓库根目录执行：

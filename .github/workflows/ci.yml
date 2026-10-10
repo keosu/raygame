@@ -134,7 +134,7 @@ jobs:
         with:
           xmake-version: ${{ env.XMAKE_VERSION }}
 
-      - name: Build and verify APKs
+      - name: Build and verify five APKs including FORGE
         run: |
           ./scripts/build-android.ps1 -Mode release -SdkRoot $env:ANDROID_HOME `
             -NdkRoot "$env:ANDROID_HOME/ndk/28.2.13676358" -JavaHome $env:JAVA_HOME

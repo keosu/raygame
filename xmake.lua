@@ -50,6 +50,9 @@ target("raygame")
     elseif is_plat("macosx") then
         add_frameworks("OpenGL", "Cocoa", "IOKit", "CoreVideo", "CoreAudio", {public = true})
     elseif is_plat("android") then
+        -- This archive is linked into each NativeActivity shared library.
+        -- Debug retains global/TLS references that also require PIC on ARM64.
+        add_cxflags("-fPIC", {force = true})
         add_syslinks("log", "android", "EGL", "GLESv2", "OpenSLES", "m", "dl", {public = true})
         on_load(function (target)
             local ndk = assert(target:toolchain("ndk"):config("ndk"), "Android NDK is required")

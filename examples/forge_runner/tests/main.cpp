@@ -7,6 +7,7 @@
 using namespace Forge;
 int failures=0,passes=0;
 void Expect(bool condition,const char* name) { if(condition) ++passes; else {++failures;std::printf("FAIL: %s\n",name);} }
+#include "touch.h"
 Level Flat() {
     Level l; l.name="test"; l.size={3000,960}; l.spawn={100,720}; l.goal={2800,720};
     l.cells={{2600,650}}; l.platforms.push_back({{0,720,3000,240}}); return l;
@@ -56,6 +57,7 @@ bool Reach(World& world,Vector2 target,int cell) {
 int main(int argc,char** argv) {
     try {
         if(argc!=3) {std::printf("Usage: forge_tests <assets> <isolated-data>\n");return 2;}
+        TestTouchControls();
         TextCatalog catalog;catalog.Load(std::string(argv[1])+"/locales/zh-CN.tsv");
         Expect(catalog.Translate("CONTINUE",Language::Chinese)=="继续旅程"&&catalog.Translate("CONTINUE",Language::English)=="CONTINUE","language catalog resolves both languages");
         Expect(catalog.Translate("custom level sign",Language::Chinese)=="custom level sign","custom untranslated text falls back to its source");
