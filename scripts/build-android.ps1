@@ -74,9 +74,31 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Invalid APK alignment: $name" }
         $archive = [IO.Compression.ZipFile]::OpenRead($apk)
         try {
-            foreach ($asset in @('assets/fonts/Barlow-Medium.ttf','assets/fonts/Rajdhani-SemiBold.ttf',
-                                  'assets/fonts/Barlow-OFL.txt','assets/fonts/Rajdhani-OFL.txt')) {
-                if (-not $archive.GetEntry($asset)) { throw "Missing APK asset: $asset" }
+            # Each APK contains common fonts plus this game's assets, byte for byte.
+            $expectedAssets = @{}
+            foreach ($assetRoot in @("$projectRoot/examples/common/assets", "$projectRoot/examples/$name/assets")) {
+                $assetRoot = (Resolve-Path -LiteralPath $assetRoot).Path
+                foreach ($file in (Get-ChildItem -LiteralPath $assetRoot -Recurse -File)) {
+                    $relative = [IO.Path]::GetRelativePath($assetRoot, $file.FullName).Replace('\', '/')
+                    $asset = "assets/$relative"
+                    if ($expectedAssets.ContainsKey($asset)) { throw "Conflicting APK asset: $asset" }
+                    $expectedAssets[$asset] = $file.FullName
+                    $entry = $archive.GetEntry($asset)
+                    if (-not $entry) { throw "Missing APK asset: $asset" }
+                    $stream = $entry.Open()
+                    $sha256 = [Security.Cryptography.SHA256]::Create()
+                    try { $actualHash = [Convert]::ToHexString($sha256.ComputeHash($stream)) }
+                    finally { $stream.Dispose(); $sha256.Dispose() }
+                    if ($actualHash -ne (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash) {
+                        throw "APK asset differs from its source: $name/$relative"
+                    }
+                }
+            }
+            foreach ($entry in $archive.Entries) {
+                if ($entry.FullName.StartsWith('assets/') -and -not $entry.FullName.EndsWith('/') -and
+                    -not $expectedAssets.ContainsKey($entry.FullName)) {
+                    throw "Unexpected APK asset: $name/$($entry.FullName)"
+                }
             }
             foreach ($resource in @('res/mipmap-mdpi-v4/ic_launcher.png',
                                     'res/mipmap-anydpi-v26/ic_launcher.xml',
@@ -112,6 +134,7 @@ try {
             Game = $name; Apk = $apk; Bytes = (Get-Item -LiteralPath $apk).Length
             SHA256 = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash
             ABI = 'arm64-v8a'; MinSdk = 26; TargetSdk = 35; Signing = 'debug'; RuntimeTested = $false
+            Assets = @($expectedAssets.Keys | Sort-Object); AssetContentsVerified = $true
         }
     }
     $results | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath "build/android/verification-$Mode.json" -Encoding utf8

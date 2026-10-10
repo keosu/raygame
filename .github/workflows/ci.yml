@@ -74,10 +74,10 @@ jobs:
         with:
           name: raygame-forge-windows-x64-${{ matrix.mode }}
           path: |
-            games/forge_runner/build/windows/x64/${{ matrix.mode }}/forge_runner.exe
-            games/forge_runner/build/windows/x64/${{ matrix.mode }}/assets/
-            games/forge_runner/README.md
-            games/forge_runner/THIRD_PARTY_NOTICES.md
+            examples/forge_runner/build/windows/x64/${{ matrix.mode }}/forge_runner.exe
+            examples/forge_runner/build/windows/x64/${{ matrix.mode }}/assets/
+            examples/forge_runner/README.md
+            examples/forge_runner/THIRD_PARTY_NOTICES.md
           if-no-files-found: error
           retention-days: 14
 

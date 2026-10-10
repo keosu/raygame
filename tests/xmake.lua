@@ -17,6 +17,7 @@ if has_config("build_tests") and not is_plat("android") then
         set_default(false)
         add_files("smoke.cpp", "window_theme.cpp")
         add_deps("raygame", "example_assets")
+        add_deps("space_shooter_assets", "bouncing_balls_assets", "neon_breakout_assets", "bullet_hell_assets")
         set_targetdir("$(projectdir)/bin")
     target_end()
 end

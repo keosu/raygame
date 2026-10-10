@@ -388,7 +388,7 @@ last working target.
 
 The examples use **Rajdhani SemiBold** for headings and scores and **Barlow Medium**
 for labels, with matching HUDs and retry panels. The TTF files and SIL Open Font
-License notices live in `examples/assets/fonts`; xmake copies them to `bin/assets` through
+License notices live in `examples/common/assets/fonts`; xmake copies them to `bin/assets` through
 the shared `example_assets` target. They work without installing system fonts.
 
 In `bouncing_balls`, press `Space` or click in the arena to add a ball, `G` to toggle
@@ -399,10 +399,13 @@ balls to keep the physics playground responsive.
 
 The root `xmake.lua` defines the engine and shared dependencies, then includes
 `examples/xmake.lua` and `tests/xmake.lua` for their targets. Run xmake from the
-repository root. Example assets, artwork and Android/Windows packaging resources
-live under `examples/`; the engine's Android raylib recipe is in
-`xmake/packages/raylib.lua`. Desktop runtime assets remain in `bin/assets`, and
-Android packages remain in `bin/android/<arch>/<mode>`.
+repository root. Each example owns its assets, artwork and Android/Windows packaging
+resources under `examples/<name>/`; the four small examples share fonts in
+`examples/common/assets/fonts`. The engine's Android raylib recipe is in
+`xmake/packages/raylib.lua`. Desktop assets are copied to `bin/assets/fonts` and
+`bin/assets/<name>/`; each APK contains only common fonts and its own assets.
+Android packages remain in `bin/android/<arch>/<mode>`. See the
+[example directory guide](examples/README.md) for ownership and build entries.
 
 ```bash
 xmake            # build the library and all four examples
@@ -439,7 +442,7 @@ targets always keep their console and diagnostic output.
 
 Each game has its own embedded EXE icon, native window icon and Android launcher
 icon, including adaptive and themed Android variants. Editable SVG sources and
-regeneration instructions are in [examples/artwork/icons](examples/artwork/icons/README.md).
+regeneration instructions are in [the example icon guide](examples/common/ICONS.md).
 
 Quiet examples write raylib diagnostics to per-user rotating logs instead:
 `%LOCALAPPDATA%/raygame.<example>/logs/game.log` on Windows and
@@ -465,7 +468,7 @@ and other standard headers. Including `RayGame.h` needs no change.
 
 ## FORGE reference game
 
-[FORGE / The last delivery](games/forge_runner/README.md) is an independent SDK
+[FORGE / The last delivery](examples/forge_runner/README.md) is an independent SDK
 consumer: a three-sector industrial sci-fi platform game with jump buffering,
 coyote time, double jumps, dashes, moving platforms, checkpoints, menus/settings,
 saves, procedural artwork and original synthesized audio.
@@ -496,6 +499,7 @@ Successful runs provide downloadable artifacts for 14 days:
 | --- | --- |
 | `raygame-windows-x64-release` | Four Release EXEs and `assets/` (fonts and notices) |
 | `raygame-windows-x64-debug` | Four Debug EXEs and `assets/` |
+| `raygame-forge-windows-x64-<mode>` | FORGE EXE, its own `assets/`, README and third-party notices |
 | `raygame-android-arm64-release` | Four APKs and `verification.json` with SHA-256 hashes |
 
 Open a CI run and download from **Artifacts**. Keep `assets/` next to the extracted

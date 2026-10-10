@@ -25,16 +25,17 @@ def save(image, path, size):
 previews = Image.new("RGB", (1024, 296), "#0d1220")
 labels = ImageDraw.Draw(previews)
 for index, (name, background) in enumerate(zip(GAMES, BACKGROUNDS)):
-    source = EXAMPLES / "artwork/icons" / f"{name}.svg"
+    game = EXAMPLES / name
+    source = game / "artwork/icon.svg"
     svg = source.read_text(encoding="utf-8")
     image = Image.open(BytesIO(svg_to_bytes(svg_string=svg, width=1024, height=1024))).convert("RGBA")
-    save(image, EXAMPLES / "assets/icons" / f"{name}.png", 256)
-    windows = EXAMPLES / "resources/windows"
+    save(image, game / "assets/icon.png", 256)
+    windows = game / "resources/windows"
     windows.mkdir(parents=True, exist_ok=True)
     image.save(windows / f"{name}.ico", sizes=[(s, s) for s in (16, 20, 24, 32, 48, 64, 128, 256)])
     (windows / f"{name}.rc").write_text(f'1 ICON "{name}.ico"\n', encoding="utf-8", newline="\n")
 
-    res = EXAMPLES / "android" / name / "res"
+    res = game / "android/res"
     for density, size in (("mdpi", 48), ("hdpi", 72), ("xhdpi", 96), ("xxhdpi", 144), ("xxxhdpi", 192)):
         save(image, res / f"mipmap-{density}/ic_launcher.png", size)
     tree = ET.fromstring(svg)

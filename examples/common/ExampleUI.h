@@ -75,7 +75,7 @@ inline void Initialize(Color accent = cyan, const std::string& iconName = "") {
     RayGame::UI::accentColor = accent;
 #if !defined(__ANDROID__)
     if (!iconName.empty()) {
-        std::string path = std::string(GetApplicationDirectory()) + "assets/icons/" + iconName + ".png";
+        std::string path = std::string(GetApplicationDirectory()) + "assets/" + iconName + "/icon.png";
         Image icon = LoadImage(path.c_str());
         if (IsImageValid(icon)) SetWindowIcon(icon);
         UnloadImage(icon);

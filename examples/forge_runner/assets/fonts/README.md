@@ -15,7 +15,7 @@
 重现时应核对 hash。准备脚本使用 fonttools 4.65.0。
 
 ```powershell
-python games/forge_runner/tools/prepare-chinese-fonts.py <NotoSansSC-variable.ttf>
+python examples/forge_runner/tools/prepare-chinese-fonts.py <NotoSansSC-variable.ttf>
 ```
 
 增加中文译文时，更新 `assets/locales/zh-CN.tsv` 后重跑字体准备脚本，否则

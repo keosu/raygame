@@ -23,7 +23,7 @@
 
 ```powershell
 pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify
-./games/forge_runner/build/windows/x64/release/forge_runner.exe
+./examples/forge_runner/build/windows/x64/release/forge_runner.exe
 ```
 
 脚本在独立配置中构建/安装 SDK，然后构建游戏，不改 IDE 当前桌面配置。
@@ -34,7 +34,8 @@ x64 Redistributable。CI 下载包保留 EXE 与 assets 的相邻布局。
 没有可用 OpenGL 显示环境时可加 `-SkipGraphics`；Windows CI 使用此选项，仅运行
 构建、逻辑和内嵌图标检查，不把图形 smoke 标为通过。
 
-也可以把整个 `games/forge_runner` 复制到另一个目录，使用已安装的 SDK：
+也可以把整个 `examples/forge_runner` 复制到另一个目录，使用已安装的 SDK。
+先切换到复制后的游戏目录，再运行：
 
 ```powershell
 xmake f -p windows -a x64 --toolchain=msvc -m release --raygame_sdk=C:/SDK/raygame/windows-x64-release -y
@@ -43,7 +44,9 @@ xmake run forge_runner
 ```
 
 游戏构建只引用安装后的 `<raygame/...>` 头文件和库，不引用引擎源码、
-examples 或 tests。Linux 分支保留，当前本地验收为 Windows/MSVC；Android
+其他示例或仓库测试。目录位于 examples 下，但有独立 xmake 入口，未加入根
+工程的默认四示例目标；字体/关卡/音频/许可均随本目录保存。Linux 分支保留，
+当前本地验收为 Windows/MSVC；Android
 移植、触控、Linux 实机运行和发行包签名不在这一版本的验收范围。
 
 ## 操作

@@ -399,3 +399,29 @@ Windows/MSVC Debug/Release 游戏各 49 项逻辑通过、172 帧图形 smoke �
 本包交付游戏本地化，不代表任意中文输入/动态字形缓存/IME 或复杂文字塑形
 已实现。新增中文内容须更新目录和字体子集。真实设备、多 DPI/多显示器、
 长稳、无障碍/重绑与商业发行验收仍待完成；未运行新远端 CI 或 Linux/macOS。
+
+
+**19. 示例按目录保存专用资源**
+
+2026-10-10 按用户同意的组织方案，将 FORGE 整体移至
+`examples/forge_runner`，保留独立 SDK 消费工程和自带资源/许可。
+四个小示例的运行资源、SVG 源、Windows ICO/RC 和 Android manifest/res
+分别归入 `examples/<name>/`；共用字体和说明放入 `examples/common/`。
+当前目录与入口见 `examples/README.md`，前文旧路径属于历史实施记录。
+
+根工程默认仍是四个小示例，桌面输出保持 bin；资源复制按共用字体和专用
+资产分别进行，测试单独构建仍得到完整 smoke 资源。Android 按游戏合并
+资源到 build staging，清除过期文件；检查 APK 的完整资产集合与 SHA-256，
+确保各包只带自己的资源和共用字体。图标生成/校验、CI 和使用说明同步迁移。
+
+本包 Windows/MSVC Debug/Release 各 311 项引擎逻辑检查、图形 smoke 和
+四 EXE 图标通过；FORGE 新路径两模式各 49 项逻辑、中英文图形 smoke 和
+图标通过。tests-only 从空资源目录构建/运行通过，四 Android Release APK
+构建/签名/对齐/入口/资源通过；无改动 Android 构建复用全部产物。
+113 个迁移文件中 109 个内容不变，4 个说明文档更新；52 个图标生成资源
+隔离重建逐字节一致。语法/actionlint/UTF-8/LF/差异检查通过。
+
+未运行新远端 CI、Linux/macOS、Android 设备或 M0 硬件/长稳矩阵。
+后续优先人工完整试玩与手感/关卡打磨、真实手柄和按键重绑/无障碍；
+测量中文图集占用/首次创建卡顿后优化字号缓存；继续设备故障、多 DPI/
+多显示器、长稳与干净机器发行包验收。目录调整不替代这些产品验收。

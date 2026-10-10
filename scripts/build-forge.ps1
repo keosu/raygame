@@ -5,7 +5,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 $projectRoot=Split-Path -Parent $PSScriptRoot
-$gameRoot=Join-Path $projectRoot 'games/forge_runner'
+$gameRoot=Join-Path $projectRoot 'examples/forge_runner'
 $workRoot=Join-Path $projectRoot "build/forge/$Mode"
 $sdkRoot=Join-Path $workRoot 'sdk'
 $savedConfig=$env:XMAKE_CONFIGDIR

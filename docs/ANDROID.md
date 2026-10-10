@@ -21,7 +21,14 @@ Release 原生代码使用本地调试密钥签名，适合侧载测试。它不
 
 每个游戏有独立图标：Windows EXE 内嵌多尺寸 ICO，Android 包含普通密度图标、
 Android 8+ 自适应图标和 Android 13+ 主题单色图层。原始 SVG、生成工具和尺寸说明
-见 `examples/artwork/icons/README.md`；图标形状由系统或启动器决定。
+见 [示例图标说明](../examples/common/ICONS.md)；图标形状由系统或启动器决定。
+
+每个游戏的 manifest 和启动器资源位于 `examples/<game>/android/`，自己的
+运行资源位于 `examples/<game>/assets/`，共用字体和许可在
+`examples/common/assets/fonts/`。构建把共用与专用资源合并到
+`build/android/example-assets/<game>/`，各 APK 只包含自己的资源；窗口 PNG
+为 `assets/icon.png`，字体为 `assets/fonts/*`。增量构建会清除 staging 中已
+移除的文件，避免旧资源遗留。FORGE 保持独立桌面 SDK 工程，暂不生成 APK。
 
 包名分别是 `org.raygame.spaceshooter`、`org.raygame.bouncingballs`、
 `org.raygame.neonbreakout`、`org.raygame.bullethell`，四个包可同时安装。
@@ -65,7 +72,8 @@ pwsh -NoProfile -File scripts/build-android.ps1 `
 签名密钥首次自动生成到 `build/android/debug.keystore`，使用标准调试密码
 `android`，与用户 `~/.android/debug.keystore` 分开。每个 APK 会检查签名、
 ZIP 对齐、ARM64 ELF 的 16 KiB LOAD 段对齐、NativeActivity 导出入口、静态
-C++ 运行库以及字体/许可内容。SHA-256 等结果存入
+C++ 运行库以及各自资源/共用字体和许可的 SHA-256；缺失、多余或内容不一致的
+运行资源会使检查失败。SHA-256 等结果存入
 `build/android/verification-release.json`（Debug 对应 `verification-debug.json`）。
 构建检查也覆盖 APK 中的普通、自适应和主题图标资源。
 

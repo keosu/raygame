@@ -1,6 +1,6 @@
 # Agent 工作状态
 
-更新时间：2026-10-09。
+更新时间：2026-10-10。
 
 ## 目标与约束
 
@@ -11,7 +11,80 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：FORGE 中英文切换与清晰中文字体（已实现并验证）
+## 最近工作包：按示例归属整理游戏与资源（已实现并验证）
+
+用户同意把参考游戏放入 examples，专用资源归各示例自己的目录。本包基线
+`fb7c474`，开始时工作区干净。提交主题：
+`Group example games and their resources by ownership`。
+
+1. `games/forge_runner` 整体移至 `examples/forge_runner`，仍是只消费已安装
+   SDK 的独立 xmake 工程，未加入根工程默认四示例。字体/音频/关卡/翻译/
+   许可随本目录保存；构建脚本、CI 上传路径、SDK 和游戏说明同步更新。
+2. 四个小示例各自拥有 `assets/icon.png`、`artwork/icon.svg`、
+   `resources/windows/<name>.ico/.rc` 和 `android/`。共用字体/许可移至
+   `examples/common/assets/fonts`，图标说明移至 `examples/common/ICONS.md`。
+   新增 `examples/README.md`，列出五个示例、资源归属与构建入口。
+3. 桌面保持 `bin/<name>.exe`；共用字体复制到 `bin/assets/fonts`，专用
+   资源复制到 `bin/assets/<name>/`，窗口 PNG 的读取路径同步更新。
+   tests-only 配置下 smoke 仍依赖完整资源；资源复制不改写内容相同的文件。
+4. Android 按游戏在 `build/android/example-assets/<name>` 合并共用与专用
+   资源，打包只使用该 staging 目录；增量构建清除 staging 中已移除的文件。
+   构建脚本逐文件核对 APK 资源 SHA-256，并拒绝缺失、多余和冲突资源，
+   报告新增资源清单及 `AssetContentsVerified`；原签名/对齐/入口检查保留。
+5. Windows 图标校验与 Python 生成器按游戏寻找资源。图标说明补充 ICO →
+   RC 编译 → EXE PE 资源的过程，以及运行时窗口 PNG 的加载方式。
+
+### 本包通过的检查
+
+- Windows/MSVC x64 Debug/Release 全目标构建通过，各 **311 passed,
+  0 failed**，图形 smoke 各 **0 failures**；两模式四 EXE 八尺寸内嵌图标
+  与源 ICO 一致，四个 Release EXE 为 GUI 子系统。构建日志无新增警告。
+- 将原 `bin/assets` 移到 build 备份后，从空目录复制全部 9 个资源，逐文件
+  hash 与新源路径一致，smoke 通过。Release tests-only 配置再从空目录
+  构建/运行 tests 与 smoke，分别 311 passed / 0 failures；最后恢复
+  Windows/MSVC x64 Release、build_examples=y、build_tests=y、example_console=n。
+- FORGE 从新路径独立构建 SDK 和游戏，Debug/Release 各 **49 passed,
+  0 failed**、172 帧中英文图形 smoke **0 failures**，两模式 EXE 八尺寸
+  图标通过；游戏编译/链接无新增警告，Release 为 GUI 子系统。
+  Release 试玩 ZIP 按新路径更新，31 个文件与输出核对一致；解压到含空格的
+  新目录后，实际运行图形 smoke **0 failures**。
+- 四个 Android ARM64 Release APK 从新目录编译受影响对象、重新链接/打包，
+  v2/v3 签名、ZIP/ELF 16 KiB 对齐、NativeActivity 入口和静态运行库检查
+  通过。每 APK 的 6 个运行资源与各自源文件逐字节一致，没有其他游戏资源。
+  人工放入 staging 的过期资源探针被清除；同配置无改动再构建复用原生和
+  APK 产物，资源检查再次通过。没有安装/启动 Android 设备。
+- 113 个迁移文件中 **109 个逐字节不变**，另外 4 个仅为路径/归属说明
+  文档；所有迁移 C++、字体、音频、图片和打包资源内容不变。
+  新布局隔离重跑图标生成器，52 个生成资源逐字节一致。
+- PowerShell/Python 语法、actionlint、UTF-8/LF 与 git diff --check 通过。
+
+### 未运行与边界
+
+- 未运行本包 Linux/macOS、远端 CI、真实手柄、多 DPI/多显示器或长稳验收；
+  保留跨平台分支。Android 真机/模拟器继续按用户要求暂缓。
+- 本包是目录归属与打包调整，没有改变玩法/中文渲染，也没有将 M0 或商业
+  发行验收标为完成。FORGE 仍是桌面参考游戏，未移植到 Android。
+- 四小示例仍共享 bin 中的 EXE/字体目录；FORGE 输出与资源独立，整体复制
+  时应保留自己的 assets。既有配置标记仍保证桌面模式切换时正确链接。
+- 历史工作包中的旧路径保留为历史记录；**当前入口以下方新路径为准**。
+
+运行：`pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify`。
+FORGE EXE：`examples/forge_runner/build/windows/x64/release/forge_runner.exe`。
+原四示例：`bin/<name>.exe`；Android：`bin/android/arm64-v8a/release/<name>.apk`。
+日志：`build/migration-{debug,release}-{config,build,tests,smoke,icons}.log`、
+`build/migration-tests-only-*.log`、`build/migration-forge-{debug,release}.log`、
+`build/forge/<mode>/*.log`、`build/migration-android-{build,nochange}.log`、
+`build/android/verification-release.json`、`build/migration-icons.log`。
+迁移 hash 清单 `build/migration/moved-files.json`；原桌面资源备份也在此目录。
+试玩包 `build/forge/FORGE-windows-x64-release.zip`，解压运行验证目录
+`build/migration/packaged FORGE`；不要删除本地 Android 签名密钥。
+
+下一工作包建议优先完整试玩 FORGE，记录手感/难度/音效/真实手柄问题；
+之后增加按键重绑和无障碍选项，测量中文字体图集的内存及首次创建耗时，
+再推进 M0 的故障/DPI/多显示器/长稳矩阵与干净机器发行验收。远端 CI 尚需
+推送后核对，勿把本包本地通过或历史 CI 记作新远端通过。
+
+## 上一工作包：FORGE 中英文切换与清晰中文字体（已实现并验证）
 
 用户要求支持中英文切换，中文字体好看清晰。本包基线 `22fcbc6`，开始时工作区
 干净。提交主题：`Add Chinese and English localization with clear FORGE SC fonts`。
@@ -506,9 +579,10 @@ Release 使用 `-m release`。串行构建减少本机偶发 EXE 文件锁冲突
 1. **补齐 M0 验收**：真实设备初始化/显存失败、多 DPI/多显示器、跨平台与长稳
    验证；独立物理世界、固定阶段、插值与丢帧观测已完成，不要重复实现。
 2. **参考游戏与 SDK 后续**：FORGE 三关/菜单/设置/存档/独立 SDK 接入已
-   实现，先做人工完整体验与真实输入设备验收；核对远端 CI，再推进
-   按键重绑/无障碍、通用内容序列化/管线和发行包验收；中英文切换已完成，
-   勿重复实现现有流程。
+   实现，目录整理已完成，入口为 `examples/forge_runner`。先做人工完整体验
+   与真实输入设备验收；核对远端 CI，再推进按键重绑/无障碍、通用内容
+   序列化/管线和发行包验收；中英文切换已完成，测量字体图集大小和首次
+   创建耗时后再决定字号量化/预热等优化，勿重复实现现有流程。
 3. **后续工程化**：CI 图形 smoke、Actions Node 24 迁移、许可/发行包与稳定签名。
 
 并行于主线的待验收事项：Android 真机启动、字体/触控、存档、后台/锁屏恢复、

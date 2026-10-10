@@ -85,7 +85,7 @@ auto font = RayGame::ResourceManager::LoadFontResource("ui-zh", "assets/Chinese.
 字符集最多 8,192 个有效 Unicode 标量；非法码点/过长列表拒绝加载，替换失败
 保留旧句柄。FORGE 从翻译目录收集字符并按字号加载，仍非动态字形缓存/文字塑形。
 
-完整独立消费例子见 [FORGE](../games/forge_runner/README.md)：三关横版平台游戏，
+完整独立消费例子见 [FORGE](../examples/forge_runner/README.md)：三关横版平台游戏，
 含菜单、音频、存档和版本化关卡文件。根目录运行
 `pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify` 可构建并验收。
 
