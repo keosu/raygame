@@ -42,6 +42,8 @@ private:
     float pausedWorldTime = 0;
     float smokeMusic = 0;
     bool smokeShake = true;
+    float smokeElapsed = 0;
+    std::uint64_t smokeCollected = 0;
     void Audio(unsigned events);
     bool Button(int index, Rectangle rect, const std::string& label, const std::string& detail = "", bool disabled = false);
     void DrawHome();

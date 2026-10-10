@@ -1,10 +1,12 @@
 #pragma once
 #include <raygame/SaveSystem.h>
 #include "World.h"
+#include "Localization.h"
 #include <array>
 
 namespace Forge {
 struct Settings {
+    Language language = Language::Chinese;
     float music = 0.45f, sfx = 0.75f;
     bool shake = true, fullscreen = false;
     int fps = 120;

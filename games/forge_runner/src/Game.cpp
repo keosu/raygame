@@ -61,6 +61,7 @@ void Game::OnInit() {
 }
 void Game::ApplySettings() {
     art.settings=profile.settings;
+    SetWindowTitle(profile.settings.language==Language::Chinese?"FORGE / 最后的信使":"FORGE / The last delivery");
     targetFPS=smoke?0:profile.settings.fps; SetTargetFPS(targetFPS);
     if(!smoke) SetFullscreen(profile.settings.fullscreen);
     if(IsAudioDeviceReady()) AudioManager::SetMusicVolume("forge",profile.settings.music);
@@ -103,7 +104,7 @@ void Game::OnUnscaledUpdate() {
         if(Input::GetKeyDown(KEY_R)) { world->Kill(); }
         if(!Input::GetFrame().focused) { Persist(); Switch(Page::Pause); }
     } else {
-        int count=page==Page::Home?4:page==Page::Pause?4:page==Page::Settings?6:page==Page::Debrief?2:page==Page::ConfirmNew?2:1;
+        int count=page==Page::Home?4:page==Page::Pause?4:page==Page::Settings?7:page==Page::Debrief?2:page==Page::ConfirmNew?2:1;
         if(Press(KEY_DOWN,GAMEPAD_BUTTON_LEFT_FACE_DOWN)||Input::GetKeyDown(KEY_S)) focus=(focus+1)%count;
         if(Press(KEY_UP,GAMEPAD_BUTTON_LEFT_FACE_UP)||Input::GetKeyDown(KEY_W)) focus=(focus+count-1)%count;
         if(Press(KEY_LEFT,GAMEPAD_BUTTON_LEFT_FACE_LEFT)) settingsDirection=-1;
@@ -135,7 +136,9 @@ bool Game::Button(int index,Rectangle r,const std::string& label,const std::stri
     DrawRectangleRec(r,selected?Color{38,64,61,245}:Color{16,29,35,225});
     DrawRectangleLinesEx(r,1,selected?Fade(Mint,0.65f):Color{48,65,68,180});
     if(selected) { DrawRectangleRec({r.x,r.y,3,r.height},Mint); art.Text(">",{r.x+15,r.y+12},24,Mint); }
-    art.Text(label,{r.x+40,r.y+11},24,disabled?Fade(Muted,0.5f):selected?Mint:Light,true);
+    float labelSize=24,available=r.width-60-(detail.empty()?0:art.Measure(detail,14)+20);
+    while(labelSize>16&&art.Measure(label,labelSize,true)>available)labelSize-=1;
+    art.Text(label,{r.x+40,r.y+(r.height-labelSize)/2-1},labelSize,disabled?Fade(Muted,0.5f):selected?Mint:Light,true);
     if(!detail.empty()) art.Text(detail,{r.x+r.width-art.Measure(detail,14)-20,r.y+18},14,Muted);
     bool clicked=mousePress&&in&&Input::GetMouseButtonUp(MOUSE_BUTTON_LEFT)&&CheckCollisionPointRec(pressedAt,r);
     if((selected&&activate&&Input::GetFrame().focused)||clicked) {
@@ -155,7 +158,7 @@ void Game::DrawHome() {
     art.Text("FORGE",{81,109},142,Light,true);
     DrawRectangleRec({91,258,51,3},Mint); art.Text("THE LAST DELIVERY",{158,247},19,Mint);
     art.Text("A sleeping factory. One courier. One spark.",{91,290},19,Muted);
-    if(Button(0,{90,365,405,52},"CONTINUE",profile.active?"SECTOR 0"+std::to_string(profile.level+1):"NO SAVED RUN",!profile.active)) StartLevel(profile.level,true);
+    if(Button(0,{90,365,405,52},"CONTINUE",profile.active?art.Localize("SECTOR")+" 0"+std::to_string(profile.level+1):"NO SAVED RUN",!profile.active)) StartLevel(profile.level,true);
     if(Button(1,{90,429,405,52},"NEW DELIVERY","3 SECTORS")) {
         if(profile.active) Switch(Page::ConfirmNew);
         else { if(!profile.NewRun()){toast="SAVE FAILED / PROGRESS WILL STAY IN THIS SESSION";toastTime=6;} StartLevel(0,false); }
@@ -172,7 +175,7 @@ void Game::DrawHome() {
 void Game::DrawHUD() {
     DrawRectangleGradientV(0,0,1280,115,Fade(Ink,0.95f),Fade(Ink,0));
     art.Text("FORGE",{30,20},30,Light,true); DrawRectangleRec({141,25,1,24},Muted);
-    art.Text("0"+std::to_string(world->level.index+1)+"  /  "+world->level.name,{160,29},14,Muted);
+    art.Text("0"+std::to_string(world->level.index+1)+"  /  "+art.Localize(world->level.name),{160,29},14,Muted);
     art.Text("POWER CELLS",{858,18},11,Muted);
     for(size_t i=0;i<world->level.cells.size();++i) {
         bool found=world->collected&(std::uint64_t{1}<<i); DrawRectangleRec({858+i*16.0f,39,10,10},found?Mint:Color{49,68,67,255});
@@ -219,6 +222,7 @@ void Game::DrawModal() {
         art.Text("Engine: RayGame / raylib 5.5",{442,323},17,Muted);
         art.Text("Barlow: Jeremy Tribby / SIL OFL",{442,360},17,Muted);
         art.Text("Rajdhani: Indian Type Foundry / SIL OFL",{442,397},17,Muted);
+        art.Text("Noto Sans SC: Adobe / Google / SIL OFL",{442,434},15,Muted);
         if(Button(0,{440,490,400,52},"RETURN")) Switch(Page::Home);
     }
 }
@@ -228,9 +232,10 @@ void Game::DrawSettings() {
     struct Row { const char* title; std::string value; };
     auto& s=profile.settings;
     Row rows[]={{"MUSIC",std::to_string((int)std::lround(s.music*100))+"%"},{"SOUND EFFECTS",std::to_string((int)std::lround(s.sfx*100))+"%"},
-                {"SCREEN SHAKE",s.shake?"ON":"OFF"},{"DISPLAY",s.fullscreen?"FULLSCREEN":"WINDOWED"},{"FRAME LIMIT",std::to_string(s.fps)+" FPS"}};
-    for(int i=0;i<5;++i) {
-        bool clicked=Button(i,{245,195+i*63.0f,790,50},rows[i].title,rows[i].value+"    <  >");
+                {"SCREEN SHAKE",s.shake?"ON":"OFF"},{"DISPLAY",s.fullscreen?"FULLSCREEN":"WINDOWED"},{"FRAME LIMIT",std::to_string(s.fps)+" FPS"},
+                {"LANGUAGE",s.language==Language::Chinese?"简体中文":"English"}};
+    for(int i=0;i<6;++i) {
+        bool clicked=Button(i,{245,182+i*55.0f,790,46},rows[i].title,art.Localize(rows[i].value)+"    <  >");
         if(clicked || (focus==i&&settingsDirection)) {
             int direction=settingsDirection?settingsDirection:1;
             if(i==0) s.music=Clamp(s.music+direction*0.1f,0.0f,1.0f);
@@ -238,17 +243,20 @@ void Game::DrawSettings() {
             if(i==2) s.shake=!s.shake;
             if(i==3) s.fullscreen=!s.fullscreen;
             if(i==4) { int rates[]={60,120,144}; int n=s.fps==60?0:s.fps==120?1:2; s.fps=rates[(n+direction+3)%3]; }
+            if(i==5) { s.language=s.language==Language::Chinese?Language::English:Language::Chinese; }
             settingsDirection=0; ApplySettings();
+            if(i==5) Persist();
         }
     }
-    if(Button(5,{245,540,790,52},"SAVE & RETURN","ESC")) { Persist(); Switch(settingsReturn); }
+    if(Button(6,{245,540,790,52},"SAVE & RETURN","ESC")) { Persist(); Switch(settingsReturn); }
     art.Text("UP / DOWN TO SELECT    LEFT / RIGHT TO ADJUST",{245,626},13,Muted);
 }
 void Game::DrawDebrief() {
     DrawRectangle(0,0,1280,720,Fade(Ink,0.84f)); art.Glow({640,310},300,Mint,0.16f);
     bool final=world->level.index==2;
     std::string title=final?"THE FACTORY LIVES":"DELIVERY COMPLETE";
-    art.Text("SECTOR 0"+std::to_string(world->level.index+1)+" / SYNCHRONIZED",{640-art.Measure("SECTOR 01 / SYNCHRONIZED",14)/2,130},14,Mint);
+    auto sector=art.Localize("SECTOR")+" 0"+std::to_string(world->level.index+1)+" / "+art.Localize("SYNCHRONIZED");
+    art.Text(sector,{640-art.Measure(sector,14)/2,130},14,Mint);
     art.Text(title,{640-art.Measure(title,76,true)/2,173},76,Light,true);
     std::string line=final?"You carried the last light. Now the whole world can wake.":"One step closer to the heart of the machine.";
     art.Text(line,{640-art.Measure(line,20)/2,264},20,Muted);
@@ -290,7 +298,17 @@ void Game::OnRender() {
         if(frame==36) Capture("conduit");
         if(frame==48) Capture("heart");
         if(frame==56) Capture("complete");
-        if(frame>=108) Quit();
+        if(frame==112) Capture("settings-en");
+        if(frame==116) Capture("home-en");
+        if(frame==120) Capture("foundry-en");
+        if(frame==124) Capture("pause-en");
+        if(frame==137) Capture("settings-zh");
+        if(frame==142) Capture("pause-zh");
+        if(frame==148) Capture("home-zh");
+        if(frame==153) Capture("confirm-zh");
+        if(frame==158) Capture("credits-zh");
+        if(frame==170) Capture("complete-en");
+        if(frame>=172) Quit();
     }
 }
 void Game::Expect(bool value,const std::string& message) {
@@ -312,10 +330,10 @@ void Game::SmokeInput() {
     auto key=[&](int code){input.keys.pressed[code]=true;};
     auto pad=[&](int button){input.gamepads[0].available=true;input.gamepads[0].buttons.pressed[button]=true;};
     switch(frame) {
-    case 65: case 68: case 72: case 78: case 82: case 89: case 100: key(KEY_ENTER); break;
+    case 65: case 68: case 72: case 78: case 82: case 89: case 100: case 150: key(KEY_ENTER); break;
     case 67: case 71: case 75: case 77: case 81: case 88: case 103: key(KEY_DOWN); break;
-    case 70: case 79: case 92: case 93: case 95: case 102: case 106: key(KEY_ESCAPE); break;
-    case 73: case 76: key(KEY_RIGHT); break;
+    case 70: case 79: case 92: case 93: case 95: case 102: case 106: case 114: case 123: case 141: case 154: key(KEY_ESCAPE); break;
+    case 73: case 76: case 110: key(KEY_RIGHT); break;
     case 84: case 85: case 86: pad(GAMEPAD_BUTTON_MIDDLE_RIGHT); break;
     case 90: case 104: pad(GAMEPAD_BUTTON_RIGHT_FACE_DOWN); break;
     case 97: case 98:
@@ -324,6 +342,10 @@ void Game::SmokeInput() {
         else input.mouse.released[MOUSE_BUTTON_LEFT]=true;
         break;
     case 99: input.focused=false; break;
+    case 126: case 128: case 130: case 132: case 134: pad(GAMEPAD_BUTTON_LEFT_FACE_DOWN); break;
+    case 135: pad(GAMEPAD_BUTTON_RIGHT_FACE_LEFT); break;
+    case 136: pad(GAMEPAD_BUTTON_LEFT_FACE_RIGHT); break;
+    case 156: key(KEY_C); break;
     default: break;
     }
     if(frame==100) { InputFrame lost;lost.focused=false;Input::SetFrame(lost); }
@@ -391,5 +413,46 @@ void Game::SmokeStep() {
     if(frame==101) Expect(page==Page::Settings,"regaining focus does not activate a menu key");
     if(frame==105) Expect(page==Page::ConfirmNew&&profile.active,"starting over asks before replacing a saved delivery");
     if(frame==107) Expect(page==Page::Home&&profile.active,"cancelling new delivery preserves the save");
+    if(frame==108) {
+        auto points=art.catalog.ChineseCodepoints();
+        for(bool heading:{false,true}) {
+            auto font=art.ChineseFont(24,heading);
+            bool complete=std::all_of(points.begin(),points.end(),[&](int code){
+                for(int i=0;i<font->glyphCount;++i)if(font->glyphs[i].value==code)return true;
+                return false;
+            });
+            Expect(complete,"every translated character is present in the Chinese font atlas");
+        }
+        auto target=LoadRenderTexture(320,80);BeginTextureMode(target);ClearBackground(BLACK);
+        art.Text("继续旅程",{12,12},24,WHITE);EndTextureMode();
+        Image pixels=LoadImageFromTexture(target.texture);
+        int lit=0;
+        if(IsImageValid(pixels))for(int y=0;y<pixels.height;++y)for(int x=0;x<pixels.width;++x)
+            if(GetImageColor(pixels,x,y).r>80)++lit;
+        Expect(lit>250,"Chinese glyphs produce visible framebuffer pixels");
+        UnloadImage(pixels);UnloadRenderTexture(target);
+    }
+    if(frame==109) { settingsReturn=Page::Home;Switch(Page::Settings);focus=5; }
+    if(frame==111) {
+        Expect(profile.settings.language==Language::English&&art.Localize("CONTINUE")=="CONTINUE","keyboard switches the UI to English");
+        Profile loaded(profile.directory);loaded.Load();Expect(loaded.settings.language==Language::English,"English language persists");
+    }
+    if(frame==118) StartLevel(0,true);
+    if(frame==122) { smokeElapsed=world->elapsed;smokeCollected=world->collected; }
+    if(frame==125) { Expect(page==Page::Pause,"English pause works");settingsReturn=Page::Pause;Switch(Page::Settings); }
+    if(frame==137) {
+        Expect(profile.settings.language==Language::Chinese&&art.Localize("CONTINUE")=="继续旅程","controller switches the UI to Chinese");
+        Profile loaded(profile.directory);loaded.Load();Expect(loaded.settings.language==Language::Chinese,"Chinese language persists");
+        Expect(world->collected==smokeCollected&&world->elapsed>=smokeElapsed,"language switching preserves the campaign");
+    }
+    if(frame==143) Expect(page==Page::Pause,"language settings return to their original page");
+    if(frame==146) { Persist();Switch(Page::Home); }
+    if(frame==149) focus=1;
+    if(frame==157) Expect(page==Page::Credits,"localized credits are reachable");
+    if(frame==161) { profile.settings.language=Language::English;ApplySettings();StartLevel(2,false); }
+    if(frame==166) {
+        world->collected=(std::uint64_t{1}<<world->level.cells.size())-1;world->player.position=world->level.goal;
+        world->Step({},1.0f/60);Persist();Switch(Page::Debrief);
+    }
 }
 }

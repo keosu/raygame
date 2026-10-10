@@ -1,8 +1,17 @@
 #include "Presentation.h"
 
 namespace Forge {
+namespace {
+bool HasUnicode(const std::string& text) { return std::any_of(text.begin(),text.end(),[](unsigned char c){return c>=128;}); }
+// Noto's ascender/descender box is taller than its CJK em square. Compensate so
+// a requested 24px label has a readable 24px character body, with a 16px floor.
+float TextSize(const std::string& text,float size) { return HasUnicode(text)?std::max(16.0f,size)*1.4f:size; }
+}
 float Presentation::Random(float min, float max) { random ^= random<<13; random ^= random>>17; random ^= random<<5; return min + (max-min)*(random%10000)/10000.0f; }
 void Presentation::Init(const std::string& assets) {
+    catalog.Load(assets+"/locales/zh-CN.tsv");
+    chineseGlyphs=catalog.ChineseCodepoints();fontDirectory=assets+"/fonts/";
+    ChineseFont(15);ChineseFont(24,true);
     body = RayGame::ResourceManager::LoadFontResource("forge-body",assets+"/fonts/Barlow-Medium.ttf",72);
     title = RayGame::ResourceManager::LoadFontResource("forge-title",assets+"/fonts/Rajdhani-SemiBold.ttf",128);
     if (!body || !title) throw std::runtime_error("FORGE fonts are missing from the assets directory");
@@ -12,13 +21,31 @@ void Presentation::Init(const std::string& assets) {
     particles.reserve(512);
 }
 float Presentation::Measure(const std::string& value, float size, bool heading) const {
-    auto font = heading ? title : body;
-    return font ? MeasureTextEx(*font,value.c_str(),size,1).x : (float)MeasureText(value.c_str(),(int)size);
+    auto text=Localize(value);size=TextSize(text,size);
+    auto font=FontFor(text,size,heading);
+    return font ? MeasureTextEx(*font,text.c_str(),size,HasUnicode(text)?0.4f:1.0f).x : (float)MeasureText(text.c_str(),(int)size);
 }
 void Presentation::Text(const std::string& value, Vector2 position, float size, Color color, bool heading) {
-    auto font = heading ? title : body;
-    if (font) DrawTextEx(*font,value.c_str(),position,size,1,color);
-    else DrawText(value.c_str(),(int)position.x,(int)position.y,(int)size,color);
+    auto text=Localize(value);
+    if(HasUnicode(text)) position.y-=std::max(16.0f,size)*0.18f;
+    size=TextSize(text,size);
+    auto font=FontFor(text,size,heading);
+    if (font) DrawTextEx(*font,text.c_str(),position,size,HasUnicode(text)?0.4f:1.0f,color);
+    else DrawText(text.c_str(),(int)position.x,(int)position.y,(int)size,color);
+}
+RayGame::FontHandle Presentation::ChineseFont(float size,bool heading) const {
+    int rasterSize=(int)std::ceil(size*2);auto key=std::make_pair(rasterSize,heading);
+    auto& font=chineseFonts[key];
+    if(!font) {
+        font=RayGame::ResourceManager::LoadFontResource("forge-sc-"+std::to_string(rasterSize)+(heading?"-title":"-body"),
+            fontDirectory+(heading?"ForgeSC-SemiBold.ttf":"ForgeSC-Medium.ttf"),rasterSize,chineseGlyphs);
+        if(!font)throw std::runtime_error("FORGE SC fonts are missing or invalid");
+        SetTextureFilter(font->texture,TEXTURE_FILTER_BILINEAR);
+    }
+    return font;
+}
+RayGame::FontHandle Presentation::FontFor(const std::string& text,float size,bool heading) const {
+    return HasUnicode(text)?ChineseFont(size,heading):(heading?title:body);
 }
 void Presentation::Glow(Vector2 p,float radius,Color color,float alpha) {
     if (!glow) return;

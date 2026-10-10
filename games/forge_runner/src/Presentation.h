@@ -10,6 +10,7 @@ struct Spark { Vector2 position{}, velocity{}; float age = 0, life = 1, size = 2
 class Presentation {
 public:
     RayGame::FontHandle body, title;
+    TextCatalog catalog;
     RayGame::TextureHandle glow;
     Camera2D camera{{640,360},{640,550},0,1};
     std::vector<Spark> particles;
@@ -24,9 +25,15 @@ public:
     void DrawRunner(Vector2 position, const Runner& state, float scale = 1, float alpha = 1);
     void Text(const std::string& value, Vector2 position, float size, Color color = Light, bool heading = false);
     float Measure(const std::string& value, float size, bool heading = false) const;
+    std::string Localize(const std::string& value) const { return catalog.Translate(value,settings.language); }
+    RayGame::FontHandle ChineseFont(float size, bool heading = false) const;
     void Glow(Vector2 position, float radius, Color color, float alpha = 0.2f);
 private:
     std::uint32_t random = 0x12345678;
+    std::string fontDirectory;
+    std::vector<int> chineseGlyphs;
+    mutable std::map<std::pair<int,bool>,RayGame::FontHandle> chineseFonts;
+    RayGame::FontHandle FontFor(const std::string& text, float size, bool heading) const;
     float Random(float min, float max);
     void Background(int theme);
     void DrawPlatform(const Platform& platform, float time, int theme);

@@ -73,6 +73,18 @@ xmake run my_game
 Escape/P/F1/F11/Alt+Enter（Android 同时关闭默认返回键/触屏暂停按钮）。设置
 音乐音量使用 `AudioManager::SetMusicVolume(name, value)`，避免重新播放音乐。
 
+中文字体须显式指定 Unicode 字符集，默认字体加载只包含西文字符：
+
+```cpp
+std::vector<int> glyphs = {'?', 'A', ' ', 0x7ee7, 0x7eed}; // 继续
+auto font = RayGame::ResourceManager::LoadFontResource("ui-zh", "assets/Chinese.ttf", 48, glyphs);
+```
+
+字体文件必须包含这些字形；列表会复制给 raylib，调用者无需延长其生命周期。
+同名加载复用当前资源，修改字号/字符集使用相同参数的 `ReloadFont` 重载。
+字符集最多 8,192 个有效 Unicode 标量；非法码点/过长列表拒绝加载，替换失败
+保留旧句柄。FORGE 从翻译目录收集字符并按字号加载，仍非动态字形缓存/文字塑形。
+
 完整独立消费例子见 [FORGE](../games/forge_runner/README.md)：三关横版平台游戏，
 含菜单、音频、存档和版本化关卡文件。根目录运行
 `pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify` 可构建并验收。

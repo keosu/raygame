@@ -30,5 +30,11 @@ Barlow Medium by Jeremy Tribby and Rajdhani SemiBold by Indian Type Foundry are
 licensed under the SIL Open Font License 1.1. Their full licenses are included in
 `assets/fonts/Barlow-OFL.txt` and `assets/fonts/Rajdhani-OFL.txt`.
 
+FORGE SC Medium and SemiBold are modified subsets of Noto Sans SC by Adobe/Google,
+instantiated at weights 500 and 600 and renamed for this game. They are distributed
+under the SIL Open Font License 1.1; the full notice is included in
+`assets/fonts/NotoSansSC-OFL.txt`. Their source and reproduction steps are recorded
+in `assets/fonts/README.md`.
+
 FORGE's procedural illustrations, icon, generated effects and synthesized music are
 original project assets; no external art or audio recordings are used.

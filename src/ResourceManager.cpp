@@ -109,8 +109,22 @@ FontHandle ResourceManager::LoadFontResource(const std::string& name, const std:
     return GetFont(name);
 }
 bool ResourceManager::ReloadFont(const std::string& name, const std::string& path, int size) {
+    return ReloadFont(name,path,size,{});
+}
+FontHandle ResourceManager::LoadFontResource(const std::string& name, const std::string& path, int size,
+                                           const std::vector<int>& codepoints) {
+    if (!GetFont(name)) ReloadFont(name,path,size,codepoints);
+    return GetFont(name);
+}
+bool ResourceManager::ReloadFont(const std::string& name, const std::string& path, int size,
+                                const std::vector<int>& codepoints) {
     auto slot = Ensure(fonts, name);
-    Font value = IsWindowReady() && size > 0 ? LoadFontEx(path.c_str(), size, nullptr, 0) : Font{};
+    auto codes = codepoints;
+    bool validCodes = codes.size() <= 8192 && std::all_of(codes.begin(),codes.end(),[](int code) {
+        return code > 0 && code <= 0x10ffff && (code < 0xd800 || code > 0xdfff);
+    });
+    Font value = IsWindowReady() && size > 0 && validCodes
+        ? LoadFontEx(path.c_str(), size, codes.empty() ? nullptr : codes.data(), (int)codes.size()) : Font{};
     bool valid = value.texture.id && value.texture.id != GetFontDefault().texture.id;
     return Store(slot, value, valid, path);
 }

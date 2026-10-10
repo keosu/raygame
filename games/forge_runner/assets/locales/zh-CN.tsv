@@ -1,0 +1,87 @@
+# FORGE catalog 1: English source text, TAB, Simplified Chinese. UTF-8.
+A RAYGAME ORIGINAL	RAYGAME 原创游戏
+THE LAST DELIVERY	最后一次送达
+A sleeping factory. One courier. One spark.	沉睡的工厂。一位信使。一点火种。
+CONTINUE	继续旅程
+SECTOR	区域
+NO SAVED RUN	暂无存档
+NEW DELIVERY	开启旅程
+3 SECTORS	三个区域
+SETTINGS	设置
+EXIT	退出
+MOVE  A/D     JUMP  SPACE     DASH  SHIFT	移动 A/D    跳跃 SPACE    冲刺 SHIFT
+KEYBOARD + CONTROLLER	支持键盘与手柄
+01 / THE FOUNDRY	01 / 铸造厂
+CARRY THE LIGHT	携光前行
+C  CREDITS	C  制作信息
+POWER CELLS	能源电池
+ESC  PAUSE	ESC  暂停
+DASH	冲刺
+SIGNAL LOST	信号中断
+RETURNING TO CHECKPOINT	正在返回检查点
+RETRIEVE THE REMAINING CELLS	请收集剩余的能源电池
+DELIVERY PAUSED	旅程已暂停
+YOUR CHECKPOINT IS SAFE	检查点进度已保存
+RESUME	继续
+RESTART CHECKPOINT	从检查点重试
+SAVE & RETURN	保存并返回
+A MOMENT TO BREATHE.	稍作休息，再次出发。
+A NEW DELIVERY?	开启新的旅程？
+Your current checkpoint will be replaced.	当前旅程的检查点将被覆盖。
+Sector records and settings stay with you.	各区域纪录和设置仍会保留。
+KEEP CURRENT RUN	保留当前旅程
+START NEW DELIVERY	开始新的旅程
+BUILT WITH CARE	用心制作
+A RAYGAME REFERENCE GAME	RAYGAME 参考游戏
+Original code, procedural artwork & audio	原创代码、程序化美术与合成音频
+Engine: RayGame / raylib 5.5	引擎：RayGame / raylib 5.5
+RETURN	返回
+CONTROL ROOM	控制室
+YOUR DELIVERY. YOUR PACE.	按照你的节奏，完成这次旅程。
+MUSIC	音乐音量
+SOUND EFFECTS	音效音量
+SCREEN SHAKE	镜头震动
+DISPLAY	显示模式
+FRAME LIMIT	帧率上限
+LANGUAGE	语言 / LANGUAGE
+ON	开启
+OFF	关闭
+FULLSCREEN	全屏
+WINDOWED	窗口
+UP / DOWN TO SELECT    LEFT / RIGHT TO ADJUST	上下选择    左右调整    ENTER 确认
+THE FACTORY LIVES	工厂重获新生
+DELIVERY COMPLETE	送达完成
+SYNCHRONIZED	已同步
+You carried the last light. Now the whole world can wake.	你送来了最后的火种，整个世界即将苏醒。
+One step closer to the heart of the machine.	距离机器的心脏，又近了一步。
+DELIVERY TIME	送达用时
+RESTARTS	重试次数
+RETURN TO THE FOUNDRY	返回铸造厂
+ENTER NEXT SECTOR	进入下一区域
+THANK YOU FOR PLAYING	感谢游玩
+THE LAST DELIVERY CONTINUES	最后的旅程，仍在继续
+YOUR CHECKPOINT WAS RECOVERED	已从备份恢复检查点进度
+SAVE FAILED / CHECK YOUR DATA FOLDER	保存失败，请检查游戏数据目录
+SAVE FAILED / PROGRESS WILL STAY IN THIS SESSION	保存失败，进度暂时保留在本次游戏中
+CHECKPOINT SYNCHRONIZED	检查点已同步
+CORE ONLINE	核心已启动
+CELLS REQUIRED	需要全部电池
+THE FOUNDRY	铸造厂
+THE CONDUIT	能源通道
+THE HEART	反应炉核心
+Cold steel. A borrowed spark. Find the way out.	冷冽的钢铁，借来的火种。找到前路。
+Keep your rhythm. The factory is waking up.	保持节奏，工厂正在苏醒。
+Carry the last light. Bring the whole machine back.	携带最后的火种，让整座机器重获新生。
+A / D TO MOVE	A / D 左右移动
+SPACE TO JUMP / HOLD FOR HEIGHT	SPACE 跳跃 / 按住跳得更高
+JUMP AGAIN IN THE AIR	在空中再次按跳跃，可二段跳
+SHIFT TO DASH	SHIFT 冲刺
+COLLECT EVERY POWER CELL	收集全部能源电池
+TIME YOUR RUN THROUGH THE LASERS	找准时机，穿过激光
+TWO JUMPS / ONE CLEAN LANDING	二段跳跃，稳稳落地
+DASH THROUGH SENTINELS	冲刺穿过巡逻无人机
+MOVING LIFTS CARRY YOU	移动升降台会带你前行
+THE FINAL DELIVERY	最后一次送达
+BREATHE / JUMP / DASH	调整呼吸 / 跳跃 / 冲刺
+ONE SPARK CAN WAKE A WORLD	一点火种，唤醒整个世界
+简体中文	简体中文

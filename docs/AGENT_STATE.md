@@ -11,7 +11,69 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：FORGE 独立横版平台参考游戏（已实现并验证）
+## 最近工作包：FORGE 中英文切换与清晰中文字体（已实现并验证）
+
+用户要求支持中英文切换，中文字体好看清晰。本包基线 `22fcbc6`，开始时工作区
+干净。提交主题：`Add Chinese and English localization with clear FORGE SC fonts`。
+
+1. 新增 `TextCatalog` 与 `assets/locales/zh-CN.tsv`，86 行翻译覆盖菜单、HUD、
+   逐关/最终结算、保存提示和三关名称/序言/标牌。中英文共用布局及测量/绘制
+   路径；动态区域文本先翻译再拼接。品牌/第三方字体名保留原文。
+2. 设置增加“语言 / LANGUAGE”，键盘/鼠标/手柄可即时切换简体中文/English，
+   立即保存 `language=zh-CN/en`，标题栏同步切换；途中切换不重置世界。
+   新设置及旧存档无语言字段默认中文，其他设置/关卡进度保留；未知语言安全
+   回退中文。设置输入计数、按键 smoke 与更长中文按钮布局相应调整。
+3. 引入 Noto Sans SC 的 Medium(500)/SemiBold(600) 子集并改名 FORGE SC，
+   342 个 Unicode 标量覆盖本游戏中文及 ASCII，两文件合计约 160 KB。
+   原始 SIL OFL 和版权随包，来源 SHA-256/重建步骤在 assets/fonts/README.md。
+   `prepare-chinese-fonts.py` 固定字重/裁剪/改名/保留版权许可，普通构建无需
+   Python 或网络。正文与标题独立字重，按实际字号 2 倍光栅化、双线性采样，
+   补偿中文字面比例并设置 16px 最小字面，英文保留原字体。
+4. 公开 ResourceManager 字体 API 新增 `vector<int>` 字符集重载；保持原调用
+   兼容和类型句柄/替换失败保留规则，拒绝非法 Unicode 标量及超过 8,192 字符
+   的列表。说明见 SDK.md；原示例继续使用默认西文加载。
+5. 图形 smoke 扩展到 172 帧，检查中文全字形覆盖、实际文字像素、键盘切英文/
+   手柄切中文、设置重新加载和途中进度不变，并导出两种语言的代表页面。
+
+### 本包通过的检查
+
+- FORGE MSVC x64 Debug/Release 各 **49 passed, 0 failed**，图形 smoke 均
+  **0 failures**。包含旧设置/未知语言回退、两语言读写及原 42 项玩法回归。
+  两种模式的 EXE 八尺寸图标检查通过，游戏编译/链接没有新增警告。
+- 原引擎 MSVC Debug/Release 全目标构建通过，各 **311 passed, 0 failed**，
+  图形 smoke 零失败；新增指定字形替换和非法 Unicode/代理区替换保留测试。
+  四示例 Release 八尺寸图标检查通过。最终 IDE 为 Windows/MSVC x64 Release，
+  build_examples=y、build_tests=y、example_console=n。
+- 自动核对三关全部名称/序言/标牌有翻译；两个字体的 cmap 覆盖目录全部字符，
+  字重为 500/600、名称为 FORGE SC。隔离重建两字体，逐字节一致。
+- 中文主菜单、设置、暂停、确认、制作信息、游戏 HUD 和结算截图已查看；
+  英文设置/原布局也已查看。预览 `build/forge-localization-preview.png`。
+- Android 四 ARM64 Release APK 构建/签名/对齐/入口/资源检查通过，复用编译
+  缓存；没有新增 APK 中文资源或运行设备。
+- Python/PowerShell 语法、UTF-8/LF 与 git diff --check 通过。
+
+### 未运行与边界
+
+- 本包仅本地 Windows 验收，未运行 Linux/macOS、远端 CI、真实手柄或多 DPI/
+  多显示器/长稳检查；M0 和商业发行验收继续未完成。Android 真机仍暂缓。
+- 中文字体是本游戏目录所需字形的子集。自定义中文内容需要补翻译并重建字体；
+  未实现任意中文输入、动态字形缓存、IME 或复杂文字塑形。未翻译的自定义
+  关卡文字回退原文；现有三关文本已完整覆盖。
+- 字形图集按使用字号同步缓存，首次显示一个字号会创建图集；没有后台异步
+  字形加载。字体文件的精简大小不代表 GPU 图集同样小。
+
+运行：`games/forge_runner/build/windows/x64/release/forge_runner.exe`。
+主菜单/暂停 → 设置 → 语言 / LANGUAGE，左右或点击切换。
+日志 `build/forge-localization-{debug,release}.log`、`build/forge/<mode>/*.log`；
+截图在各模式 smoke-data/screenshots；原引擎日志
+`build/forge-i18n-engine-{debug,release}-{config,build,tests,smoke}.log`，Android
+`build/forge-i18n-android-build.log`。字体重现 `build/forge-fonts/reproduce.log`。
+Release 试玩 ZIP 更新为 `build/forge/FORGE-windows-x64-release.zip`。
+
+下一步：根据实际游玩反馈继续打磨手感/关卡，推进真实输入/多 DPI 与长稳验收；
+按键重绑和无障碍仍待推进，中英文切换已实现，勿重复建设。
+
+## 上一工作包：FORGE 独立横版平台参考游戏（已实现并验证）
 
 用户询问 M0 验收含义，并明确优先实现完整横版平台参考游戏，要求工业级效果。
 本包开始时工作区干净，基线 `8efbf85`。提交主题：
@@ -444,8 +506,9 @@ Release 使用 `-m release`。串行构建减少本机偶发 EXE 文件锁冲突
 1. **补齐 M0 验收**：真实设备初始化/显存失败、多 DPI/多显示器、跨平台与长稳
    验证；独立物理世界、固定阶段、插值与丢帧观测已完成，不要重复实现。
 2. **参考游戏与 SDK 后续**：FORGE 三关/菜单/设置/存档/独立 SDK 接入已
-   实现，先做人工完整体验与真实输入设备验收；核对远端 CI，再推进中文、
-   按键重绑/无障碍、通用内容序列化/管线和发行包验收，勿重复实现现有流程。
+   实现，先做人工完整体验与真实输入设备验收；核对远端 CI，再推进
+   按键重绑/无障碍、通用内容序列化/管线和发行包验收；中英文切换已完成，
+   勿重复实现现有流程。
 3. **后续工程化**：CI 图形 smoke、Actions Node 24 迁移、许可/发行包与稳定签名。
 
 并行于主线的待验收事项：Android 真机启动、字体/触控、存档、后台/锁屏恢复、

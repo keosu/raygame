@@ -7,6 +7,7 @@ void Profile::Load() {
     unlocked=0; collected=0; elapsed=0; best={}; recovered=false;
     RayGame::SaveSystem save;
     if (save.Load(directory / "settings.sav")) {
+        settings.language = ParseLanguage(save.GetString("language","zh-CN"));
         settings.music = Clamp(save.GetFloat("music",0.45f),0.0f,1.0f);
         settings.sfx = Clamp(save.GetFloat("sfx",0.75f),0.0f,1.0f);
         settings.shake = save.GetBool("shake",true); settings.fullscreen = save.GetBool("fullscreen",false);
@@ -25,6 +26,7 @@ void Profile::Load() {
 }
 bool Profile::SaveSettings() const {
     RayGame::SaveSystem save;
+    save.SetString("language",LanguageCode(settings.language));
     save.SetFloat("music",settings.music); save.SetFloat("sfx",settings.sfx);
     save.SetBool("shake",settings.shake); save.SetBool("fullscreen",settings.fullscreen); save.SetInt("fps",settings.fps);
     return save.Save(directory / "settings.sav");

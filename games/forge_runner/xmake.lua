@@ -31,7 +31,7 @@ if sdk then
     target("forge_tests")
         set_kind("binary")
         set_default(false)
-        add_files("tests/main.cpp", "src/World.cpp", "src/Profile.cpp")
+        add_files("tests/main.cpp", "src/World.cpp", "src/Profile.cpp", "src/Localization.cpp")
         add_raygame_sdk()
     target_end()
 end

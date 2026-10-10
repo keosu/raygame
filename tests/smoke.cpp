@@ -101,6 +101,13 @@ public:
         Expect(!ResourceManager::ReloadFont("font-handle-test", (root / "absent.ttf").string()), "missing font is a failure, not an owned default font");
         Expect(font && font->texture.id == fontId, "failed font replacement retains the old font");
         Expect(ResourceManager::ReloadFont("font-handle-test", fontPath, 48) && font->baseSize == 48, "font references observe successful replacement");
+        const std::vector<int> selectedGlyphs{'?', 'A', 'B'};
+        Expect(ResourceManager::ReloadFont("font-handle-test",fontPath,32,selectedGlyphs)
+            &&font->glyphCount==3&&font->glyphs[1].value=='A',"explicit font glyphs survive resource replacement");
+        fontId=font->texture.id;
+        Expect(!ResourceManager::ReloadFont("font-handle-test",fontPath,32,{-1})&&font->texture.id==fontId,
+            "invalid Unicode replacement preserves the current font");
+        Expect(!ResourceManager::ReloadFont("font-handle-test",fontPath,32,{0xd800}),"surrogate codepoint is rejected");
         UI::font = font; UI::headingFont = font;
         ResourceManager::UnloadFontNamed("font-handle-test");
         retainedFont = ResourceManager::LoadFontResource("font-handle-test", fontPath, 32);

@@ -19,6 +19,11 @@ public:
 
     static FontHandle LoadFontResource(const std::string& name, const std::string& filepath, int size = 32);
     static bool ReloadFont(const std::string& name, const std::string& filepath, int size = 32);
+    // Explicit Unicode scalars; the manager copies the list for raylib's loader.
+    static FontHandle LoadFontResource(const std::string& name, const std::string& filepath, int size,
+                                      const std::vector<int>& codepoints);
+    static bool ReloadFont(const std::string& name, const std::string& filepath, int size,
+                           const std::vector<int>& codepoints);
     static FontHandle GetFont(const std::string& name);
     static void UnloadFontNamed(const std::string& name);
 

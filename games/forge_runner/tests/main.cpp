@@ -56,6 +56,11 @@ bool Reach(World& world,Vector2 target,int cell) {
 int main(int argc,char** argv) {
     try {
         if(argc!=3) {std::printf("Usage: forge_tests <assets> <isolated-data>\n");return 2;}
+        TextCatalog catalog;catalog.Load(std::string(argv[1])+"/locales/zh-CN.tsv");
+        Expect(catalog.Translate("CONTINUE",Language::Chinese)=="继续旅程"&&catalog.Translate("CONTINUE",Language::English)=="CONTINUE","language catalog resolves both languages");
+        Expect(catalog.Translate("custom level sign",Language::Chinese)=="custom level sign","custom untranslated text falls back to its source");
+        auto glyphs=catalog.ChineseCodepoints();
+        Expect(std::find(glyphs.begin(),glyphs.end(),0x7ee7)!=glyphs.end()&&std::find(glyphs.begin(),glyphs.end(),'A')!=glyphs.end(),"glyph collection includes Chinese and ASCII");
         for(int i=0;i<3;++i) {
             const char* names[]={"01_foundry.level","02_conduit.level","03_core.level"};
             auto level=Level::Load(std::string(argv[1])+"/levels/"+names[i],i);
@@ -112,6 +117,15 @@ int main(int argc,char** argv) {
         Expect(profile.SaveSettings()&&profile.NewRun(),"new run and settings persist");
         profile.Record(checkpoint);Profile restored(argv[2]);restored.Load();
         Expect(restored.active&&restored.collected==1&&restored.settings.fps==144,"resume and settings round trip");
+        profile.settings.language=Language::English;profile.SaveSettings();restored.Load();
+        Expect(restored.settings.language==Language::English&&restored.collected==1,"English preference reloads without changing progress");
+        profile.settings.language=Language::Chinese;profile.SaveSettings();restored.Load();
+        Expect(restored.settings.language==Language::Chinese,"Chinese preference reloads");
+        RayGame::SaveSystem legacySettings;legacySettings.SetFloat("music",0.2f);legacySettings.SetString("language","invalid");
+        legacySettings.Save(profile.directory/"settings.sav");restored.Load();
+        Expect(restored.settings.language==Language::Chinese&&restored.settings.music==0.2f,"unknown language defaults safely without discarding settings");
+        legacySettings.Remove("language");legacySettings.Save(profile.directory/"settings.sav");restored.Load();
+        Expect(restored.settings.language==Language::Chinese,"older saves default to Chinese");
         checkpoint.collected=1;checkpoint.player.position=checkpoint.level.goal;checkpoint.Step({},1.0f/60);profile.Record(checkpoint);
         Expect(profile.unlocked==1&&profile.best[0]>0,"completion stores sector record");
         Expect(profile.level==1&&profile.collected==0&&profile.checkpoint==-1,"saved completion continues into the next sector");
