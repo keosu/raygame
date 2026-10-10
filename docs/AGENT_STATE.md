@@ -11,7 +11,69 @@ GameObject/Component 和 raylib，维持四个游戏可用。用户明确要求�
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：按示例归属整理游戏与资源（已实现并验证）
+## 最近工作包：FORGE 接入默认桌面构建与 CI 产物（已实现并验证）
+
+用户指出根目录 build 未包含 FORGE，并要求 CI 也能生成。本包基线 `445f1e3`。
+开始时 `examples/forge_runner/src/main.cpp` 有用户添加的一个空行，保留原样，
+不纳入本包提交。提交主题：`Include FORGE in default desktop builds and CI artifacts`。
+
+1. 根工程增加默认 `forge_runner` 和可单独构建的 `forge_tests`，分别服从
+   `build_examples` / `build_tests`。默认桌面 build 现在包含五个游戏；引擎
+   单独构建和 tests-only 仍可用。Android 仍仅定义原四个游戏。
+2. 游戏的 `targets.lua` 供根工程和独立 SDK 工程共同使用。根工程链接当前
+   raygame，在 build 中同步 `<raygame/...>` 头文件；phony 依赖设 build.fence，
+   确保并行编译开始前准备好头文件。独立 SDK 入口继续只使用安装目录。
+3. 根工程输出为 `bin/forge_runner/forge_runner.exe`，保留相邻 assets、README
+   和第三方说明。资源按内容同步并清除过期文件，不改动四小示例共用 assets。
+   FORGE 始终为 Windows GUI 程序；继承根工程配置标记，切换模式正确重新链接。
+4. CI 的 Windows/Linux Debug/Release 默认构建包含 FORGE，并分别构建/运行
+   forge_tests。Windows 保留独立 SDK 构建和图标检查。Windows 总游戏包增加
+   完整 forge_runner 子目录；独立 Forge 包在压缩包根目录包含 EXE/assets/说明，
+   同时新增 Linux Forge 下载包。各测试独立步骤，防止 PowerShell 后续命令
+   覆盖前一个原生命令的失败状态。相关 README/SDK 说明已更新。
+
+### 本包通过的检查
+
+- Windows/MSVC x64 根工程 Debug/Release 默认及全目标构建通过；各 **311 passed,
+  0 failed** 引擎逻辑和 **49 passed, 0 failed** Forge 逻辑，原图形 smoke 与
+  Forge 中英文图形 smoke 各 **0 failures**。两模式五 EXE 图标通过，最终五个
+  Release EXE 均为 GUI 子系统。游戏编译/链接日志没有新增警告。
+- tests-only、engine-only、examples-only 的目标列表和构建通过；tests-only
+  Forge 49 项通过。从空 Forge 输出/头文件 staging 运行默认 `-j 4` 构建成功。
+  最后恢复 Windows/MSVC x64 Release、build_examples=y、build_tests=y、example_console=n。
+- 独立 SDK Debug/Release 两种入口各 49 项逻辑及图标检查通过；Release 图形
+  smoke **0 failures**。独立 Debug 使用 CI 的 `-Verify -SkipGraphics` 路径，
+  明确未运行该入口的图形 smoke；根工程 Debug 图形已另行通过。
+- 28 个 Forge 输出资源逐一 SHA-256 匹配；损坏的输出翻译被恢复，过期探针
+  被清除，增量无编译/链接且 EXE hash 不变，四小示例资源 hash 不变。
+  按 CI 布局制作的 31 文件 ZIP 全部 hash 匹配；解压到含空格的新目录后，
+  实际运行 Forge 图形 smoke **0 failures**。
+- Android 原配置目标列表仍为引擎和原四游戏；没有新增 Forge APK 目标。
+  actionlint、UTF-8/LF 与 git diff --check 通过。
+
+### 未运行与边界
+
+- **未推送或运行本包远端 CI**，本机没有可用 Linux/WSL，未做 Linux/macOS
+  本地编译/运行。已查询到基线 `445f1e3` 的远端运行 `38047782926` 成功，
+  含 Windows Forge 两模式产物；这是基线成绩，不是本包 CI 验证。
+- 本包未重新构建 Android APK，也未运行设备；FORGE 暂无 Android 入口、
+  打包/资源适配与触屏控制。用户追问 Android 支持时已说明目前仅桌面可用。
+- 未扩展玩法或 M0 硬件/长稳验收。Linux artifact 解压后需 `chmod +x forge_runner`，
+  Windows 目标机器仍需相应 VC++ 运行库；未做干净机器发行验收。
+
+当前直接入口：根目录 `xmake build` / `xmake run forge_runner`；逻辑测试
+`xmake build forge_tests` / `xmake run forge_tests`。独立入口仍为
+`pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify`。
+根工程可试玩包：`build/forge/FORGE-root-windows-x64-release.zip`。
+日志 `build/forge-root-{debug,release}-*.log`、`build/forge-root-sdk-*.log`、
+`build/forge-root-{tests-only,engine-only,examples-only,final}-*.log`；
+资源/打包报告 `build/forge-root-package-verification.json`，图形结果在
+`build/forge-root-{debug,release,package}-smoke/`。生成物备份在 build 内保留。
+
+下一步：推送后核对本提交 Windows/Linux CI 和新的下载包；FORGE Android
+若继续实施，需作为单独移植工作包，不能把桌面构建接入描述为 APK 已支持。
+
+## 上一工作包：按示例归属整理游戏与资源（已实现并验证）
 
 用户同意把参考游戏放入 examples，专用资源归各示例自己的目录。本包基线
 `fb7c474`，开始时工作区干净。提交主题：

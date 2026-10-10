@@ -42,11 +42,11 @@ jobs:
       - name: Configure Windows (MSVC)
         # Configure Windows explicitly to avoid picking up a MinGW toolchain.
         if: runner.os == 'Windows'
-        run: xmake f -p windows -a x64 --toolchain=msvc -m ${{ matrix.mode }} --example_console=n -y
+        run: xmake f -p windows -a x64 --toolchain=msvc -m ${{ matrix.mode }} --build_examples=y --build_tests=y --example_console=n -y
 
       - name: Configure Linux
         if: runner.os == 'Linux'
-        run: xmake f -m ${{ matrix.mode }} -y
+        run: xmake f -m ${{ matrix.mode }} --build_examples=y --build_tests=y -y
 
       - name: Build examples
         run: xmake build -y
@@ -54,30 +54,37 @@ jobs:
       - name: Build tests
         run: xmake build -y tests
 
+      - name: Build FORGE tests
+        run: xmake build -y forge_tests
+
       - name: Run tests
         run: xmake run tests
+
+      - name: Run FORGE tests
+        run: xmake run forge_tests
 
       - name: Verify installed SDK from an independent project
         run: xmake lua scripts/verify-sdk.lua
 
       - name: Verify Windows embedded icons
         if: runner.os == 'Windows'
-        run: ./scripts/verify-windows-icons.ps1
+        run: |
+          ./scripts/verify-windows-icons.ps1
+          ./scripts/verify-windows-icons.ps1 -BinaryDirectory bin/forge_runner -Games forge_runner -IconDirectory examples/forge_runner/resources -IconNames forge
 
-      - name: Build and verify FORGE reference game
+      - name: Verify standalone FORGE SDK build
         if: runner.os == 'Windows'
         run: ./scripts/build-forge.ps1 -Mode ${{ matrix.mode }} -Verify -SkipGraphics
 
       - name: Upload FORGE reference game
-        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: raygame-forge-windows-x64-${{ matrix.mode }}
+          name: raygame-forge-${{ runner.os == 'Windows' && 'windows-x64' || 'linux-x86_64' }}-${{ matrix.mode }}
           path: |
-            examples/forge_runner/build/windows/x64/${{ matrix.mode }}/forge_runner.exe
-            examples/forge_runner/build/windows/x64/${{ matrix.mode }}/assets/
-            examples/forge_runner/README.md
-            examples/forge_runner/THIRD_PARTY_NOTICES.md
+            bin/forge_runner/forge_runner${{ runner.os == 'Windows' && '.exe' || '' }}
+            bin/forge_runner/assets/
+            bin/forge_runner/README.md
+            bin/forge_runner/THIRD_PARTY_NOTICES.md
           if-no-files-found: error
           retention-days: 14
 
@@ -93,6 +100,10 @@ jobs:
             bin/bullet_hell.exe
             bin/*.dll
             bin/assets/
+            bin/forge_runner/forge_runner.exe
+            bin/forge_runner/assets/
+            bin/forge_runner/README.md
+            bin/forge_runner/THIRD_PARTY_NOTICES.md
           if-no-files-found: error
           retention-days: 14
 

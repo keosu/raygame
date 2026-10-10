@@ -86,7 +86,8 @@ auto font = RayGame::ResourceManager::LoadFontResource("ui-zh", "assets/Chinese.
 保留旧句柄。FORGE 从翻译目录收集字符并按字号加载，仍非动态字形缓存/文字塑形。
 
 完整独立消费例子见 [FORGE](../examples/forge_runner/README.md)：三关横版平台游戏，
-含菜单、音频、存档和版本化关卡文件。根目录运行
+含菜单、音频、存档和版本化关卡文件。根工程默认已包含该游戏，使用
+`xmake run forge_runner` 运行；要验收安装后的 SDK，根目录运行
 `pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify` 可构建并验收。
 
 ## 可重复的消费验收
@@ -116,7 +117,8 @@ xmake build -a -j 1 -y
 ```
 
 桌面引擎库按平台/架构/模式输出到 `build/lib/<平台>/<架构>/<模式>`，防止
-Debug/Release 库相互覆盖。四示例及 tests/smoke 的可执行文件仍共用 `bin`；
+Debug/Release 库相互覆盖。四小示例及 tests/smoke 的可执行文件仍共用 `bin`，
+根工程 FORGE 与其逻辑测试位于 `bin/forge_runner`；
 构建规则在每个可执行文件旁保存 `.raygame-config` 配置标记，切换模式后强制
 重新链接，避免模式独立的缓存误判共享 EXE。相同配置的无改动构建仍复用产物。
 切换配置后需运行构建，不能将此前的 EXE 当作当前配置产物；配置标记无需分发。

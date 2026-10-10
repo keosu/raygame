@@ -12,26 +12,6 @@ option_end()
 local sdk = get_config("raygame_sdk")
 if sdk then
     includes(path.join(sdk, "share/raygame/xmake.lua"))
-    target("forge_runner")
-        set_kind("binary")
-        add_files("src/*.cpp", "resources/forge.rc")
-        if not is_plat("windows", "mingw") then remove_files("resources/forge.rc") end
-        add_includedirs("resources")
-        add_raygame_sdk()
-        if is_plat("windows") then
-            add_ldflags("/SUBSYSTEM:WINDOWS", "/ENTRY:mainCRTStartup", {force = true})
-        elseif is_plat("mingw") then
-            add_ldflags("-mwindows", {force = true})
-        end
-        after_build(function (target)
-            os.cp("assets", target:targetdir())
-        end)
-    target_end()
-
-    target("forge_tests")
-        set_kind("binary")
-        set_default(false)
-        add_files("tests/main.cpp", "src/World.cpp", "src/Profile.cpp", "src/Localization.cpp")
-        add_raygame_sdk()
-    target_end()
+    includes("targets.lua")
+    add_forge_targets({sdk = true, game = true, tests = true})
 end

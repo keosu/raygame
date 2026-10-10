@@ -1,6 +1,6 @@
 # FORGE / The last delivery
 
-独立消费 RayGame SDK 的工业科幻横版平台参考游戏。你是一名携带最后火种的
+支持根工程构建和独立消费 RayGame SDK 的工业科幻横版平台参考游戏。你是一名携带最后火种的
 信使，要穿过铸造厂、能源通道和反应炉核心，收集全部能源电池并重启机器。
 三关有递进的平台、移动升降台、周期激光和巡逻无人机；每关出口需要全部电池。
 
@@ -19,7 +19,23 @@
 
 ## Windows 构建与运行
 
-在 RayGame 仓库根目录使用 PowerShell 7、Visual Studio 2022 和 xmake 3.1.1：
+在 RayGame 仓库根目录使用 Visual Studio 2022 和 xmake 3.1.1：
+
+```powershell
+xmake f -p windows -a x64 --toolchain=msvc -m release --build_examples=y --build_tests=y -y
+xmake build -y
+xmake run forge_runner
+xmake build -y forge_tests
+xmake run forge_tests
+```
+
+默认构建包含 FORGE，也可用 `xmake build forge_runner` 单独构建。EXE 位于
+`bin/forge_runner/forge_runner.exe`，其 `assets/`、README 和第三方说明自动同步。
+Linux 在根目录配置 `xmake f -p linux -m release -y` 后使用相同的构建/运行命令，
+输出文件名不带 `.exe`。`forge_tests` 默认把测试数据放在 build 目录，游戏与
+测试分别受根工程 `build_examples` / `build_tests` 选项控制。
+
+独立 SDK 构建使用 PowerShell 7：
 
 ```powershell
 pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify
@@ -30,7 +46,9 @@ pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify
 Debug 使用 `-Mode debug`。`-Verify` 运行逻辑测试和隐藏窗口图形 smoke，
 日志和截图位于 `build/forge/<mode>/`。游戏运行需要输出目录中的 `assets/`。
 MSVC Release 使用动态 C 运行库，目标 Windows 机器需要 Visual C++ 2015–2022
-x64 Redistributable。CI 下载包保留 EXE 与 assets 的相邻布局。
+x64 Redistributable。CI 的独立 Forge 下载包根目录直接包含 EXE、assets 和说明；
+Windows 总游戏包中的 `forge_runner/` 也包含完整游戏。Linux 下载包解压后需
+运行 `chmod +x forge_runner` 恢复可执行权限。
 没有可用 OpenGL 显示环境时可加 `-SkipGraphics`；Windows CI 使用此选项，仅运行
 构建、逻辑和内嵌图标检查，不把图形 smoke 标为通过。
 
@@ -43,10 +61,11 @@ xmake build -y
 xmake run forge_runner
 ```
 
-游戏构建只引用安装后的 `<raygame/...>` 头文件和库，不引用引擎源码、
-其他示例或仓库测试。目录位于 examples 下，但有独立 xmake 入口，未加入根
-工程的默认四示例目标；字体/关卡/音频/许可均随本目录保存。Linux 分支保留，
-当前本地验收为 Windows/MSVC；Android
+独立入口只引用安装后的 `<raygame/...>` 头文件和库，不引用引擎源码、
+其他示例或仓库测试。根工程入口链接当前 `raygame` 目标，在 build 目录生成
+相同命名空间的头文件布局；两者共用 `targets.lua`。字体/关卡/音频/许可均
+随本目录保存。Windows/Linux CI 均构建根工程游戏并运行逻辑测试，Windows
+还验证独立 SDK 构建；当前本地验收为 Windows/MSVC。Android
 移植、触控、Linux 实机运行和发行包签名不在这一版本的验收范围。
 
 ## 操作

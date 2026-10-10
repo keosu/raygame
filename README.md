@@ -408,9 +408,10 @@ Android packages remain in `bin/android/<arch>/<mode>`. See the
 [example directory guide](examples/README.md) for ownership and build entries.
 
 ```bash
-xmake            # build the library and all four examples
+xmake            # build the library and all five desktop games, including FORGE
 xmake run neon_breakout
 xmake run bullet_hell
+xmake run forge_runner
 xmake build tests
 xmake run tests   # unit tests (no window)
 ```
@@ -434,13 +435,13 @@ with `--build_examples=n --build_tests=n`. Install with
 headers and library through the supplied SDK integration script. See
 [SDK setup and verification](docs/SDK.md).
 
-The four examples build as Windows GUI applications by default: launching an EXE
+All five desktop games build as Windows GUI applications by default: launching an EXE
 does not open a console, and raylib trace output is disabled. To enable the console
-and logs for debugging, run `xmake f --example_console=y` and rebuild. Use
+and logs for debugging the four small examples, run `xmake f --example_console=y` and rebuild. Use
 `xmake f --example_console=n` to return to quiet launches. The `tests` and `smoke`
 targets always keep their console and diagnostic output.
 
-Each game has its own embedded EXE icon, native window icon and Android launcher
+Each of the four small games has its own embedded EXE icon, native window icon and Android launcher
 icon, including adaptive and themed Android variants. Editable SVG sources and
 regeneration instructions are in [the example icon guide](examples/common/ICONS.md).
 
@@ -468,14 +469,17 @@ and other standard headers. Including `RayGame.h` needs no change.
 
 ## FORGE reference game
 
-[FORGE / The last delivery](examples/forge_runner/README.md) is an independent SDK
-consumer: a three-sector industrial sci-fi platform game with jump buffering,
+[FORGE / The last delivery](examples/forge_runner/README.md) is a three-sector
+industrial sci-fi platform game and an independent SDK consumer, with jump buffering,
 coyote time, double jumps, dashes, moving platforms, checkpoints, menus/settings,
 saves, procedural artwork and original synthesized audio.
 The game switches between Simplified Chinese and English in Settings, with bundled
-Noto Sans SC font subsets for readable Chinese menus and level text. On Windows,
-build and verify it with `pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify`.
-The original four examples remain the default engine build targets.
+Noto Sans SC font subsets for readable Chinese menus and level text. The root
+`xmake build` includes FORGE on desktop; use `xmake run forge_runner` to play.
+Its executable, assets and notices live together in `bin/forge_runner/`.
+Build and run its headless tests with `xmake build forge_tests` and `xmake run forge_tests`.
+The separate installed-SDK entry remains available on Windows through
+`pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify`.
 
 ## Tests & CI
 
@@ -487,8 +491,9 @@ tilemaps, tween callback mutation, timers, pooling, events and saves.
 an independent consumer with no engine source/example paths. It checks fixed-step
 physics, input, storage, and configuration mismatch diagnostics; `--graphics` also
 checks a native window and texture cleanup. Desktop CI runs the headless consumer.
-GitHub Actions builds and runs the logic suite in Debug and Release on Linux and
-Windows; Windows explicitly selects MSVC. A separate Windows job builds and verifies
+GitHub Actions builds all five desktop games and runs the engine and FORGE logic
+suites in Debug and Release on Linux and Windows; Windows explicitly selects MSVC
+and also verifies FORGE's standalone SDK build. A separate Windows job builds and verifies
 the four ARM64 Android Release APKs with JDK 17, SDK 35 and NDK r28c. All jobs use
 xmake 3.1.1 (`.github/workflows/ci.yml`). CI runs on pushes/PRs to `main` and supports
 manual **Actions → CI → Run workflow** runs.
@@ -497,13 +502,16 @@ Successful runs provide downloadable artifacts for 14 days:
 
 | Artifact | Contents |
 | --- | --- |
-| `raygame-windows-x64-release` | Four Release EXEs and `assets/` (fonts and notices) |
-| `raygame-windows-x64-debug` | Four Debug EXEs and `assets/` |
+| `raygame-windows-x64-release` | Four small-game Release EXEs, shared `assets/`, and complete FORGE in `forge_runner/` |
+| `raygame-windows-x64-debug` | The same five games and assets in Debug mode |
 | `raygame-forge-windows-x64-<mode>` | FORGE EXE, its own `assets/`, README and third-party notices |
+| `raygame-forge-linux-x86_64-<mode>` | FORGE Linux executable, `assets/`, README and third-party notices |
 | `raygame-android-arm64-release` | Four APKs and `verification.json` with SHA-256 hashes |
 
 Open a CI run and download from **Artifacts**. Keep `assets/` next to the extracted
-Windows EXEs. Android CI generates a fresh debug signing key for each run; builds
+Windows EXEs. The separate FORGE artifacts put the executable and assets at the
+archive root; after extracting the Linux artifact, run `chmod +x forge_runner`.
+Android CI generates a fresh debug signing key for each run; builds
 from different runs cannot update one another in place. Android execution remains
 a manual device check; CI does not launch an emulator. See [Android notes](docs/ANDROID.md).
 

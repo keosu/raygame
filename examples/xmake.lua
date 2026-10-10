@@ -109,3 +109,8 @@ end
 if has_config("build_examples") then
     for _, name in ipairs(example_names) do add_example(name) end
 end
+
+if not is_plat("android") and (has_config("build_examples") or has_config("build_tests")) then
+    includes("forge_runner/targets.lua")
+    add_forge_targets({game = has_config("build_examples"), tests = has_config("build_tests")})
+end

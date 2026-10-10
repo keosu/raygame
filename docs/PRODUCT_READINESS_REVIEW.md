@@ -425,3 +425,22 @@ Windows/MSVC Debug/Release 游戏各 49 项逻辑通过、172 帧图形 smoke �
 后续优先人工完整试玩与手感/关卡打磨、真实手柄和按键重绑/无障碍；
 测量中文图集占用/首次创建卡顿后优化字号缓存；继续设备故障、多 DPI/
 多显示器、长稳与干净机器发行包验收。目录调整不替代这些产品验收。
+
+
+**20. FORGE 接入根工程默认构建与 CI 产物**
+
+2026-10-10 修复根目录 `xmake build` 未包含 FORGE：默认桌面构建现在包含
+五个游戏，支持直接 `xmake run forge_runner`，其输出位于 `bin/forge_runner`。
+根工程链接当前引擎；独立 SDK 入口仍保留，两者共享目标定义、资源同步和
+逻辑测试。build_examples/build_tests 分别控制游戏与测试，Android 仍为四 APK。
+
+CI 的 Windows/Linux Debug/Release 均使用默认入口构建游戏并运行 Forge
+逻辑测试；Windows 继续配置独立 SDK 和图标检查。Windows 总游戏包增加 Forge
+子目录，独立 Forge 下载包的根目录直接包含可执行文件、assets 和说明文件，
+另增 Linux Forge 产物。这里描述的是工作流配置，本包未推送或运行新远端 CI。
+
+本地 Windows/MSVC 根工程两模式各 311 项引擎逻辑、49 项 Forge 逻辑通过，
+两种图形 smoke 均零失败，五游戏图标通过。默认空输出构建、选项组合、
+独立 SDK 两模式、资源完整性和增量同步检查通过。31 文件 ZIP 解压到含空格
+目录后图形 smoke 零失败。Linux/macOS 本地构建、Android APK 重建/运行和
+干净机器发行验收未运行；FORGE 的 Android 入口、资源适配与触屏仍需移植。
