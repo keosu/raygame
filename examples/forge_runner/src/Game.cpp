@@ -648,6 +648,8 @@ void Game::OnRender() {
             Capture("conduit");
         if (frame == 48)
             Capture("heart");
+        if (frame == 50)
+            Capture("heart-rebuild");
         if (frame == 56)
             Capture("complete");
         if (frame == 112)
@@ -852,7 +854,7 @@ void Game::SmokeStep() {
     if (frame == 12)
         StartLevel(0, false);
     if (frame == 14) {
-        world->player.position = {1390, 590};
+        world->player.position = {2310, 610};
         stage->actor->transform->Teleport(world->player.position);
         art.Follow(*world, world->player.position, 0, true);
     }
@@ -879,9 +881,24 @@ void Game::SmokeStep() {
     if (frame == 42)
         StartLevel(2, false);
     if (frame == 44) {
+        world->time = 0;
+        for (size_t i = 0; i < world->level.platforms.size(); ++i)
+            if (world->level.platforms[i].surface == Surface::Fragile)
+                world->platformTimers[i] = 0.3f;
         world->player.position = {4330, 540};
         stage->actor->transform->Teleport(world->player.position);
         art.Follow(*world, world->player.position, 0, true);
+    }
+    if (frame == 49) {
+        world->time = 0.83f;
+        for (size_t i = 0; i < world->level.platforms.size(); ++i)
+            if (world->level.platforms[i].surface == Surface::Fragile) {
+                world->platformTimers[i] = world->level.platforms[i].breakDelay + 0.5f;
+                Expect(!world->PlatformActive(i), "collapsed platforms render without collision");
+            }
+        Vector2 bolt;
+        Expect(world->SentryBolt(world->level.sentries[2], bolt),
+               "reactor preview includes a live sentry bolt");
     }
     if (frame == 52) {
         world->collected = (std::uint64_t{1} << world->level.cells.size()) - 1;

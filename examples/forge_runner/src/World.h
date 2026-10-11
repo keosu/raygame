@@ -3,11 +3,14 @@
 #include <cstdint>
 
 namespace Forge {
+enum class Surface { Steel, Ice, Conveyor, Fragile };
 struct Platform {
     Rectangle rect{};
     Vector2 travel{};
     float period = 4, phase = 0;
     bool oneWay = false;
+    Surface surface = Surface::Steel;
+    float grip = 1, beltSpeed = 0, breakDelay = 0.7f, rebuildDelay = 2.5f;
     Rectangle At(float time) const;
 };
 struct Laser {
@@ -19,6 +22,22 @@ struct Drone {
     Vector2 origin{};
     float range = 100, period = 4;
     Vector2 At(float time) const;
+};
+struct Crawler {
+    Vector2 origin{}; // Centre of the chassis; patrol endpoints must be on a floor.
+    float range = 100, period = 4;
+    Vector2 At(float time) const;
+};
+struct Airflow {
+    Rectangle rect{};
+    Vector2 force{};
+};
+struct Sentry {
+    Vector2 origin{}; // Muzzle; one horizontal bolt per cycle after a visible charge.
+    int direction = -1;
+    float range = 420, period = 3.6f, phase = 0;
+    static constexpr float chargeTime = 0.75f, boltSpeed = 360;
+    float Cycle(float time) const;
 };
 struct Sign {
     Vector2 position{};
@@ -33,6 +52,9 @@ struct Level {
     std::vector<Vector2> cells, checkpoints;
     std::vector<Laser> lasers;
     std::vector<Drone> drones;
+    std::vector<Crawler> crawlers;
+    std::vector<Airflow> airflows;
+    std::vector<Sentry> sentries;
     std::vector<Sign> signs;
     static Level Load(const std::string& file, int index);
     void Validate() const;
@@ -69,12 +91,17 @@ public:
     std::uint64_t collected = 0;
     unsigned events = 0;
     bool complete = false;
+    // -1: intact, then seconds since the first landing; reset on respawn.
+    std::vector<float> platformTimers;
     explicit World(Level value);
     void Step(Command input, float dt);
     void Respawn();
     void Restore(int checkpointIndex, std::uint64_t mask);
     void Kill();
     int CellCount() const;
+    bool PlatformActive(size_t index) const;
+    float SentryRange(const Sentry& sentry) const;
+    bool SentryBolt(const Sentry& sentry, Vector2& position) const;
     unsigned TakeEvents() {
         auto result = events;
         events = 0;
@@ -84,5 +111,6 @@ public:
 private:
     void MoveAxis(float amount, bool vertical);
     void ScanInteractions();
+    void ScanThreats(Rectangle before, float previousTime);
 };
 } // namespace Forge

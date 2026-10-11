@@ -29,6 +29,7 @@ void Step(World& w, int frames, Command c = {}) {
     for (int i = 0; i < frames; ++i)
         w.Step(c, 1.0f / 60);
 }
+#include "mechanics.h"
 // Find a route using the same command/physics contract as a human player.
 // No teleports, injected collection bits or modified collision geometry.
 bool Reach(World& world, Vector2 target, int cell) {
@@ -112,6 +113,7 @@ int main(int argc, char** argv) {
             return 2;
         }
         TestTouchControls();
+        TestMechanics(std::filesystem::path(argv[2]) / "mechanics");
         TextCatalog catalog;
         catalog.Load(std::string(argv[1]) + "/locales/zh-CN.tsv");
         Expect(catalog.Translate("CONTINUE", Language::Chinese) == "继续旅程" &&
@@ -126,8 +128,20 @@ int main(int argc, char** argv) {
         for (int i = 0; i < 3; ++i) {
             const char* names[] = {"01_foundry.level", "02_conduit.level", "03_core.level"};
             auto level = Level::Load(std::string(argv[1]) + "/levels/" + names[i], i);
-            Expect(level.version == 1 && level.cells.size() >= 8 && level.checkpoints.size() >= 3,
+            Expect(level.version == 2 && level.cells.size() >= 8 && level.checkpoints.size() >= 3,
                    "campaign content is complete");
+            bool translated = true;
+            for (const auto& sign : level.signs)
+                translated &= catalog.Translate(sign.text, Language::Chinese) != sign.text;
+            Expect(translated, "campaign mechanic signs all have Chinese translations");
+            bool safeCheckpoints = true;
+            for (size_t cp = 0; cp < level.checkpoints.size(); ++cp) {
+                World restored(level);
+                restored.Restore((int)cp, 0);
+                Step(restored, 300);
+                safeCheckpoints &= restored.deaths == 0;
+            }
+            Expect(safeCheckpoints, "campaign checkpoints stay safe through enemy firing cycles");
             World w(level);
             Step(w, 60);
             Expect(w.player.grounded && w.deaths == 0, "campaign spawn is safe");
@@ -145,6 +159,10 @@ int main(int argc, char** argv) {
                 if (!Reach(route, level.cells[cell], (int)cell)) {
                     std::printf("Route blocked: sector %d, cell %zu, at %.0f %.0f\n", i + 1,
                                 cell + 1, route.player.position.x, route.player.position.y);
+                    std::printf("t=%.2f velocity=(%.0f, %.0f) ground=%d air=%d dash=%.2f/%.2f\n",
+                                route.time, route.player.velocity.x, route.player.velocity.y,
+                                route.player.grounded, route.player.airJumps, route.player.dashTime,
+                                route.player.dashCooldown);
                     navigable = false;
                     break;
                 }

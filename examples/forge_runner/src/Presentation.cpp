@@ -409,8 +409,71 @@ void Presentation::DrawWorld(const World& w, Vector2 runner, bool menu) {
         view.offset.y += std::cos(clock * 97) * shake * 0.6f;
     }
     BeginMode2D(view);
-    for (const auto& p : w.level.platforms)
+    for (const auto& a : w.level.airflows) {
+        auto r = a.rect;
+        Color air{134, 224, 255, 255};
+        DrawRectangleGradientV((int)r.x, (int)r.y, (int)r.width, (int)r.height, Fade(air, 0.02f),
+                               Fade(air, 0.16f));
+        DrawRectangleRec({r.x, r.y + r.height - 12, r.width, 12}, Steel);
+        for (float x = r.x + 18; x < r.x + r.width - 10; x += 34) {
+            DrawCircleLines((int)x, (int)(r.y + r.height - 5), 10, air);
+            float blade = w.time * 15;
+            DrawLineEx({x - std::cos(blade) * 9, r.y + r.height - 5 - std::sin(blade) * 5},
+                       {x + std::cos(blade) * 9, r.y + r.height - 5 + std::sin(blade) * 5}, 2, air);
+            for (int n = 0; n < 5; ++n) {
+                float y = r.y + r.height - std::fmod(w.time * 150 + n * 83 + x, r.height);
+                DrawLineEx({x, y + 10}, {x, y - 10}, 1, Fade(air, 0.45f));
+                DrawLineEx({x - 4, y - 4}, {x, y - 10}, 1, air);
+                DrawLineEx({x + 4, y - 4}, {x, y - 10}, 1, air);
+            }
+        }
+    }
+    for (size_t i = 0; i < w.level.platforms.size(); ++i) {
+        const auto& p = w.level.platforms[i];
+        auto r = p.At(w.time);
+        if (!w.PlatformActive(i)) {
+            DrawRectangleLinesEx(r, 1, Fade(Ember, 0.28f));
+            float recovery =
+                Clamp((w.platformTimers[i] - p.breakDelay) / p.rebuildDelay, 0.0f, 1.0f);
+            DrawRectangleRec({r.x, r.y + r.height / 2, r.width * recovery, 2}, Fade(Mint, 0.65f));
+            continue;
+        }
         DrawPlatform(p, w.time, w.level.index);
+        if (p.surface == Surface::Ice) {
+            Color ice{163, 237, 255, 255};
+            DrawRectangleRec({r.x, r.y, r.width, 8}, ice);
+            DrawRectangleGradientV((int)r.x, (int)r.y + 8, (int)r.width, 22, Fade(ice, 0.65f),
+                                   Fade(ice, 0));
+            for (float x = r.x + 16; x < r.x + r.width - 12; x += 43) {
+                DrawLineEx({x, r.y + 2}, {x + 8, r.y + 15}, 2, WHITE);
+                DrawLineEx({x + 8, r.y + 15}, {x + 5, r.y + 23}, 1, ice);
+            }
+        } else if (p.surface == Surface::Conveyor) {
+            DrawRectangleRec({r.x, r.y, r.width, 20}, Ink);
+            DrawLineEx({r.x, r.y}, {r.x + r.width, r.y}, 3, Ember);
+            float offset = std::fmod(w.time * p.beltSpeed, 36.0f);
+            if (offset < 0)
+                offset += 36;
+            float direction = p.beltSpeed > 0 ? 1.0f : -1.0f;
+            for (float x = r.x + offset + 12; x < r.x + r.width - 12; x += 36) {
+                DrawLineEx({x - direction * 6, r.y + 5}, {x + direction * 6, r.y + 10}, 2, Ember);
+                DrawLineEx({x - direction * 6, r.y + 15}, {x + direction * 6, r.y + 10}, 2, Ember);
+            }
+            DrawCircleV({r.x + 8, r.y + 11}, 5, Muted);
+            DrawCircleV({r.x + r.width - 8, r.y + 11}, 5, Muted);
+        } else if (p.surface == Surface::Fragile) {
+            float load = std::max(0.0f, w.platformTimers[i]) / p.breakDelay;
+            DrawRectangleRec({r.x, r.y, r.width, 4}, load > 0 ? Red : Ember);
+            for (float x = r.x + 20; x < r.x + r.width - 15; x += 32) {
+                DrawLineEx({x, r.y + 2}, {x + 7, r.y + 9}, 2, Ink);
+                DrawLineEx({x + 7, r.y + 9}, {x + 2, r.y + 19}, 2, Ink);
+            }
+            if (load > 0) {
+                DrawRectangleRec({r.x, r.y - 7, r.width * (1 - load), 3}, Red);
+                Glow({r.x + r.width / 2, r.y}, 80, Red, load * 0.2f);
+            }
+        }
+    }
     for (auto h : w.level.hazards) {
         DrawRectangleRec(h, {71, 34, 28, 255});
         for (float x = h.x; x < h.x + h.width; x += 16)
@@ -470,6 +533,45 @@ void Presentation::DrawWorld(const World& w, Vector2 runner, bool menu) {
         DrawCircleV({p.x + 2, p.y - 2}, 3, Light);
         DrawLineEx({p.x - 32, p.y - 10}, {p.x - 18, p.y - 10}, 2, Mint);
         DrawLineEx({p.x + 18, p.y - 10}, {p.x + 32, p.y - 10}, 2, Mint);
+    }
+    for (const auto& c : w.level.crawlers) {
+        auto p = c.At(w.time);
+        DrawRectangleRounded({p.x - 24, p.y - 12, 48, 25}, 0.3f, 6, Steel);
+        DrawRectangleRec({p.x - 21, p.y - 10, 42, 6}, Ember);
+        for (int k = -1; k <= 1; ++k) {
+            float x = p.x + k * 16;
+            DrawCircleV({x, p.y + 10}, 6, Ink);
+            DrawCircleLines((int)x, (int)(p.y + 10), 5, Muted);
+            DrawLineEx({x, p.y + 10},
+                       {x + std::cos(w.time * 12) * 4, p.y + 10 + std::sin(w.time * 12) * 4}, 2,
+                       Ember);
+            DrawTriangle({x - 5, p.y - 10}, {x + 5, p.y - 10}, {x, p.y - 18}, Ember);
+        }
+        DrawCircleV({p.x - 14, p.y - 2}, 3, Red);
+        DrawCircleV({p.x + 14, p.y - 2}, 3, Red);
+    }
+    for (const auto& s : w.level.sentries) {
+        auto p = s.origin;
+        float cycle = s.Cycle(w.time), range = w.SentryRange(s);
+        bool charging = cycle < Sentry::chargeTime;
+        DrawRectangleRec({p.x - 11, p.y + 9, 22, 34}, Steel);
+        DrawPoly(p, 6, 21, 30, Steel);
+        DrawPolyLinesEx(p, 6, 22, 30, 2, Ember);
+        DrawLineEx(p, {p.x + s.direction * 25, p.y}, 12, Muted);
+        DrawCircleV(p, 9, charging ? Ember : Red);
+        if (charging) {
+            for (float x = 30; x < range; x += 24)
+                DrawLineEx({p.x + s.direction * x, p.y}, {p.x + s.direction * (x + 8), p.y}, 1,
+                           Fade(Ember, 0.6f));
+            Glow(p, 40 + cycle * 45, Ember, 0.2f + cycle * 0.2f);
+            DrawCircleLines((int)p.x, (int)p.y, 28 - cycle * 12, Ember);
+        }
+        Vector2 bolt;
+        if (w.SentryBolt(s, bolt)) {
+            Glow(bolt, 45, Red, 0.35f);
+            DrawRectangleRec({bolt.x - 9, bolt.y - 5, 18, 10}, Red);
+            DrawLineEx({bolt.x - 7, bolt.y}, {bolt.x + 7, bolt.y}, 3, Light);
+        }
     }
     auto g = w.level.goal;
     bool unlocked = w.CellCount() == (int)w.level.cells.size();
