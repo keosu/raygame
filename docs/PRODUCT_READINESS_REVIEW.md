@@ -497,3 +497,12 @@ Forge 独立 Release 编译/逻辑通过。未运行本包新 CI、Linux/macOS �
 已查看三关及平台警告/恢复画面；Forge 独立 SDK Release 编译/逻辑/图标通过，
 Forge ARM64 Release APK 构建/签名/对齐/资源检查通过。未运行新 CI、Linux/macOS
 或 Android 设备，未完成新玩法人工完整通关与手感调优；本包不替代 M0 硬件/长稳验收。
+
+**24. FORGE Windows 换行兼容修复**
+
+2026-10-11 针对第二关启动报错反馈，在仅第二关使用 CRLF 的游戏副本中复现
+空行被误判为未知指令。修复关卡 CRLF/BOM/空白行处理及文本键末尾空白，保留
+内容校验并补充文件/行号诊断；新增八项兼容回归，以及实际结算进入第二关、
+保存后继续第二关的图形路径。Windows Debug/Release 各 127 项 Forge、335 项
+引擎逻辑及原示例图形通过，原失败副本两模式图形均通过。独立 SDK Release 和
+Forge Release APK 构建校验通过；用户原始报错尚未提供，设备/远端 CI 未验收。

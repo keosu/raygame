@@ -141,6 +141,8 @@ pwsh -NoProfile -File scripts/build-android.ps1 -Game forge_runner -Mode release
 
 `assets/levels/*.level` 是有版本、字段范围和数量检查的纯文本关卡。当前三关使用
 version 2，加载器仍兼容不含新机关的 version 1 文件。
+文本读取兼容 LF / Windows CRLF、UTF-8 BOM、空白行与缩进后的 `;` 注释；名称和
+提示末尾的空白会被去除，避免影响翻译匹配。解析错误会记录文件路径及原始行号。
 `solid`、`ledge`、`moving`、`hazard`、`laser`、`drone`、`cell`、`checkpoint`
 和 `sign` 定义内容；可以修改平台位置/移动周期和电池分布，无需改引擎代码。
 当前 campaign 固定为三关，增加第四关需要扩展游戏的关卡索引与进度 schema。

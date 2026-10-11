@@ -11,7 +11,49 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：Forge 三关玩法差异（已实现并本地验证）
+## 最近工作包：Windows 第二关 CRLF 加载错误（已修复并验证）
+
+基线 `28c3e78`，开始时工作区干净。用户反馈 Windows 第二关启动报错，尚未
+提供具体报错原文。本机标准 LF 资源正常；在隔离游戏副本中只将第二关转换为
+Windows CRLF，旧程序进入第二关确实退出，日志为
+`Unknown level directive at line 35`。该行是上一包删除激光后留下的空行。
+ReadAssetText 保留原始字节，解析器把残留的 CR 当成非空指令；此外名字/标牌
+末尾的 CR 会妨碍中文翻译匹配。这是本地确认的复现条件，并非已读取用户的报错。
+
+- 关卡解析兼容 LF/CRLF、UTF-8 BOM、纯空白行和缩进注释，去掉文本末尾空白。
+  保留非法指令/字段拒绝，解析错误补充文件路径和原始行号。没有修改通用文件
+  读取语义、全局 Git 换行配置或用户存档，也没有靠删除第二关空行规避问题。
+- 增加真实三关的 CRLF/BOM、翻译键一致性、混合换行/空白/注释、错误定位检查；
+  修复前 **119 passed / 8 failed**，修复后全部通过。
+- Forge 图形 smoke 改为实际经第一关结算按钮进入第二关，再保存返回并通过
+  “继续旅程”重新进入第二关，覆盖用户可能遇到的两个入口。README 说明文本格式。
+
+### 通过的检查
+
+- Windows/MSVC x64 Debug/Release 全目标构建、各 **127 项 Forge 逻辑**和
+  **335 项引擎逻辑**通过，原四示例图形 smoke 两模式均零失败。
+- 保留原 CRLF 第二关资源的隔离游戏，换入修复后 Debug/Release EXE 均图形
+  smoke **0 failures**；根工程正常 LF Release 同样 **0 failures**。两种进入
+  第二关的实际菜单路径均通过，验证目录与真实用户存档隔离。
+- 独立 SDK Release 编译、127 项逻辑、八尺寸图标通过；其图形入口使用
+  `-SkipGraphics`。两个 Windows 输出目录均已更新，最终根配置为 MSVC x64
+  Release、examples/tests 开启、example_console=n。
+- Forge ARM64 Release APK **2,981,254 B** 构建/签名/16 KiB 对齐/原生入口/
+  静态运行库/图标/资源校验通过；保留原签名密钥，未安装或运行设备。
+- clang-format 19.1.5、修改文本 UTF-8/LF、`git diff --check` 通过。
+
+日志/隔离副本：`build/forge-conduit-fix/`。`baseline-data/logs/game.log` 保留
+旧 EXE 的失败证据，`regression-before.log` 为修复前八项失败；
+`fixed-crlf-{debug,release}` 与 `normal-release` 保存修复后的图形结果。
+
+### 未运行与下一步
+
+未运行 Linux/macOS、新远端 CI、Android 真机/模拟器、Android Debug 或独立
+SDK Debug；未进行人工完整通关与长稳。用户可启动更新后的
+`bin/forge_runner/forge_runner.exe` 再试第二关；若原始报错不同，继续依据用户
+提供的原文和实际启动目录定位，勿把本次 CRLF 复现当成已确认的用户日志。
+
+## 上一工作包：Forge 三关玩法差异（已实现并本地验证）
 
 基线 `a9a0f79`，开始时工作区干净。用户要求三关除了背景之外，在敌人、场景
 元素和摩擦手感上有更多变化。本包只改 Forge 游戏及其文档，不改引擎接口。

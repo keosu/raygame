@@ -717,6 +717,8 @@ void Game::SmokeInput() {
         input.gamepads[0].buttons.pressed[button] = true;
     };
     switch (frame) {
+    case 32:
+    case 39:
     case 65:
     case 68:
     case 72:
@@ -871,13 +873,30 @@ void Game::SmokeStep() {
         Expect(world->time == pausedWorldTime, "custom pause freezes world simulation");
         Switch(Page::Play);
     }
+    if (frame == 30) {
+        world->collected = (std::uint64_t{1} << world->level.cells.size()) - 1;
+        world->player.position = world->level.goal;
+        world->Step({}, 1.0f / 60);
+        Expect(world->complete, "first sector completes before entering the second sector");
+    }
     if (frame == 32)
-        StartLevel(1, false);
+        Expect(page == Page::Debrief && world->level.index == 0,
+               "first sector opens the next-sector menu");
+    if (frame == 33)
+        Expect(page == Page::Play && world->level.index == 1,
+               "next-sector menu loads the second sector");
     if (frame == 34) {
         world->player.position = {2200, 565};
         stage->actor->transform->Teleport(world->player.position);
         art.Follow(*world, world->player.position, 0, true);
     }
+    if (frame == 38) {
+        Persist();
+        Switch(Page::Home);
+    }
+    if (frame == 40)
+        Expect(page == Page::Play && world->level.index == 1,
+               "continue menu reloads the second sector from its saved progress");
     if (frame == 42)
         StartLevel(2, false);
     if (frame == 44) {

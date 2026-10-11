@@ -114,6 +114,7 @@ int main(int argc, char** argv) {
         }
         TestTouchControls();
         TestMechanics(std::filesystem::path(argv[2]) / "mechanics");
+        TestLevelText(argv[1], std::filesystem::path(argv[2]) / "level-text");
         TextCatalog catalog;
         catalog.Load(std::string(argv[1]) + "/locales/zh-CN.tsv");
         Expect(catalog.Translate("CONTINUE", Language::Chinese) == "继续旅程" &&

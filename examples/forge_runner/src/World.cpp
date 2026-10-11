@@ -47,16 +47,25 @@ Level Level::Load(const std::string& file, int number) {
     std::string text;
     if (!RayGame::FileSystem::ReadAssetText(file, text, 128 * 1024))
         throw std::runtime_error("Cannot read level: " + file);
+    if (text.compare(0, 3, "\xef\xbb\xbf") == 0)
+        text.erase(0, 3);
     Level level;
     level.index = number;
     level.version = 0;
     std::istringstream lines(text);
     std::string line;
     int lineNumber = 0;
+    auto parseError = [&](const std::string& reason) {
+        return std::runtime_error(reason + " in " + file + " at line " +
+                                  std::to_string(lineNumber));
+    };
     while (std::getline(lines, line)) {
         ++lineNumber;
-        if (line.empty() || line[0] == ';')
+        // Asset reads preserve bytes: CRLF leaves a carriage return even on a blank line.
+        auto first = line.find_first_not_of(" \t\r\v\f");
+        if (first == std::string::npos || line[first] == ';')
             continue;
+        line.erase(line.find_last_not_of(" \t\r\v\f") + 1);
         std::istringstream fields(line);
         std::string key;
         fields >> key;
@@ -125,19 +134,18 @@ Level Level::Load(const std::string& file, int number) {
             std::getline(fields >> std::ws, s.text);
             level.signs.push_back(s);
         } else
-            throw std::runtime_error("Unknown level directive at line " +
-                                     std::to_string(lineNumber));
+            throw parseError("Unknown level directive '" + key + "'");
         if (fields.fail())
-            throw std::runtime_error("Invalid level field at line " + std::to_string(lineNumber));
+            throw parseError("Invalid level field");
         std::string extra;
         if (key != "name" && key != "subtitle" && key != "sign" && fields >> extra)
-            throw std::runtime_error("Extra level field at line " + std::to_string(lineNumber));
+            throw parseError("Extra level field");
         if (level.platforms.size() + level.cells.size() + level.checkpoints.size() +
                 level.hazards.size() + level.lasers.size() + level.drones.size() +
                 level.signs.size() + level.crawlers.size() + level.airflows.size() +
                 level.sentries.size() >
             1024)
-            throw std::runtime_error("Level exceeds the content limit");
+            throw parseError("Level exceeds the content limit");
     }
     level.Validate();
     return level;

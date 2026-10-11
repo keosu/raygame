@@ -224,3 +224,65 @@ void TestMechanics(const std::filesystem::path& directory) {
           "cell 2600 650\nsolid 0 720 3000 240\n");
     Expect(Level::Load(file.string(), 0).version == 1, "legacy version one levels still load");
 }
+
+void TestLevelText(const std::string& assets, const std::filesystem::path& directory) {
+    std::filesystem::create_directories(directory);
+    auto file = directory / "line-endings.level";
+    auto write = [&](const std::string& content) {
+        std::ofstream out(file, std::ios::binary);
+        out << content;
+    };
+    const char* names[] = {"01_foundry.level", "02_conduit.level", "03_core.level"};
+    for (int i = 0; i < 3; ++i) {
+        std::string source;
+        if (!RayGame::FileSystem::ReadAssetText(assets + "/levels/" + names[i], source))
+            throw std::runtime_error("Cannot read campaign text fixture");
+        source.erase(std::remove(source.begin(), source.end(), '\r'), source.end());
+        write(source);
+        auto original = Level::Load(file.string(), i);
+        for (bool bom : {false, true}) {
+            std::string windows = bom ? "\xef\xbb\xbf" : "";
+            for (char c : source) {
+                if (c == '\n')
+                    windows += '\r';
+                windows += c;
+            }
+            write(windows);
+            try {
+                auto loaded = Level::Load(file.string(), i);
+                bool sameText = loaded.name == original.name &&
+                                loaded.subtitle == original.subtitle &&
+                                loaded.signs.size() == original.signs.size();
+                for (size_t s = 0; sameText && s < loaded.signs.size(); ++s)
+                    sameText = loaded.signs[s].text == original.signs[s].text;
+                Expect(sameText && loaded.platforms.size() == original.platforms.size() &&
+                           loaded.cells.size() == original.cells.size(),
+                       bom ? "BOM and CRLF preserve campaign content and localized text keys"
+                           : "CRLF campaign loads with blank lines and unchanged text keys");
+            } catch (const std::runtime_error&) {
+                Expect(false, bom ? "BOM and CRLF campaign must load" : "CRLF campaign must load");
+            }
+        }
+    }
+    const std::string level =
+        "version 1\nname legacy\nsize 3000 960\nspawn 100 720\ngoal 2800 720\n"
+        "cell 2600 650\nsolid 0 720 3000 240\n";
+    write(" \t\r\n\t ; indented comment\r\n" + level + "sign 200 500 A / D TO MOVE \t\r\n \t");
+    try {
+        auto loaded = Level::Load(file.string(), 0);
+        Expect(loaded.name == "legacy" && loaded.signs[0].text == "A / D TO MOVE",
+               "mixed line endings whitespace-only lines and indented comments load");
+    } catch (const std::runtime_error&) {
+        Expect(false, "mixed line endings whitespace-only lines and indented comments must load");
+    }
+    write(level + "bogus 123\r\n");
+    bool rejected = false;
+    try {
+        Level::Load(file.string(), 0);
+    } catch (const std::runtime_error& error) {
+        std::string message = error.what();
+        rejected = message.find(file.string()) != std::string::npos &&
+                   message.find("line 8") != std::string::npos;
+    }
+    Expect(rejected, "unknown directives still fail with file and physical line diagnostics");
+}
