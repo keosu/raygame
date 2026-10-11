@@ -1,6 +1,6 @@
 param(
     [string]$BinaryDirectory = 'bin',
-    [string[]]$Games = @('space_shooter', 'bouncing_balls', 'neon_breakout', 'bullet_hell'),
+    [string[]]$Games = @('space_shooter', 'bouncing_balls', 'neon_breakout', 'bullet_hell', 'engine_lab'),
     [string]$IconDirectory = '',
     [string[]]$IconNames = @()
 )

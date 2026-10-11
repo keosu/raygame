@@ -63,6 +63,63 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 本包未改。下一步：可考虑渲染组件注册/可见性裁剪、粒子曲线与
 局部空间、UI 控件状态与输入路由（审查文档第 5、6 节）。
 
+## 最近工作包：Windows/Android TTS 与 Engine Lab（已实现并本地验证）
+
+基线 `0fc15f8`，开始时工作区干净。用户要求添加 Windows/Android 系统 TTS，
+并增加一个展示引擎各类对象的 example；继续沿用 Android 不安装/启动设备的约定。
+
+- 新增公开 `TextToSpeech` / `SpeechOptions` / `SpeechState`，支持 UTF-8、指定语言、
+  语速、独立音量、替换朗读、停止及错误查询。Windows 用 SAPI 异步合成；Android
+  用引擎内统一 Java/JNI 桥接，游戏无需单独写 Java。初始化期间只保留最新请求，
+  JNI 用 UTF-16 传文本、通过 Activity ClassLoader 找类、轮询状态而非回调原生对象。
+- GameEngine 每帧更新语音，失焦/暂停/旧场景卸载后停止，Shutdown 释放；独立使用
+  API 时需同线程 Update/Shutdown。Linux/macOS 安全返回 Unavailable，未实现后端。
+- `engine_lab` 六页演示真实对象：层级/生命周期、刚体/碰撞/触发器/相机、共享纹理与
+  动画、粒子/定时器/事件/补间/对象池、瓦片绘制/实体查询、TTS/音效/存档/输入。
+  带原创新图标、纹理、短音效，Windows GUI/主题、等比布局、鼠标与触摸按钮。
+- 根构建/Android/CI 增至六示例。Android 用 javac/D8 打包桥接及 manifest 查询声明，
+  不依赖 Gradle；规则显式 add_orders 保证 NativeActivity 完成后再添 dex/对齐/签名。
+  批量构建曾暴露缺少顺序约束，已修正；生成类目录会清除旧 class。Lab 资源路径使用
+  APK 相对名字，避免 ./ 前缀。SDK 导出新头文件并传递 Windows SAPI/COM 链接库。
+- 新增 `docs/TEXT_TO_SPEECH.md`、示例 API 对照/运行说明；格式范围扩至 30 个 C++ 文件。
+
+### 通过的检查
+
+- Windows/MSVC x64 Debug/Release 六示例构建，分别 **359 项引擎逻辑**、
+  **127 项 Forge 逻辑**通过；原四示例 graphics smoke、Forge smoke、Lab smoke
+  两模式均 **0 failures**。Lab 覆盖按钮/触摸、动画推进、资源 replacement、跨场景
+  事件/补间取消、碰撞/触发、瓦片映射、保存恢复与四种窗口比例。
+- Windows 原生 `tts_smoke` 两模式均 **0 failures**：静音真实合成、UTF-8/补充字符、
+  XML 按普通文本、缺语言错误及恢复、长度上限、替换、失焦/暂停/切场景停止、重新初始化。
+  该成绩不等于人工试听或中文声音质量验收。
+- 桌面 SDK 独立消费 Debug/Release（含隐藏窗口）通过：单头文件 include、新接口
+  输入拒绝、SAPI 链接、SDK 搬迁与配置不匹配检查；Forge 独立 SDK Release 编译、
+  127 项逻辑和八尺寸图标通过，独立入口 graphics 使用 `-SkipGraphics`。
+- 六个 ARM64 Release APK 构建、v2/v3 签名、16 KiB ZIP/ELF 对齐、入口、图标、完整
+  资源 hash、classes.dex 中桥接类与 manifest 声明通过。Engine Lab Release
+  **1,271,622 B**、Debug **4,429,638 B**；Lab Debug 同样通过打包校验。
+  保留原签名密钥。无改动重建六 APK hash 一致；删除 Lab APK 后重建恢复，并确认
+  注入的无效旧 class 被清理。最终报告 `build/android/verification-release.json` 含六包。
+- 六 Windows Release EXE 图标通过；已查看六页截图及布局。clang-format 19.1.5、
+  actionlint 1.7.7、Python/PowerShell 语法、修改文本 UTF-8/LF、git diff --check 通过。
+
+日志 `build/tts-*`；Lab 截图/结果在 `build/tts-lab-final-{debug,release}/`，
+原生语音日志 `build/tts-{debug,release}-tts_smoke.log`，Forge 图形在
+`build/tts-forge-{debug,release}/`，概览 `build/tts-lab-overview.png`。
+最终根配置 Windows/MSVC x64 Release、examples/tests 开启、example_console=n。
+
+### 未运行、限制与下一步
+
+未安装/运行 Android 设备或模拟器，未运行新远端 CI、Linux/macOS、人工音频试听、
+中文声音质量/真实无引擎与缺语言场景、后台/销毁/锁屏及长稳验收。其余五包未构建
+Android Debug。Android 打包扩展依赖 xmake 3.1.1 的 NativeActivity 中间 APK，升级
+xmake 需重验；Android 安装 SDK 接口尚未提供，使用根工程规则。
+
+用户可启动 `bin/engine_lab.exe`，或手动安装 Engine Lab APK，在 Services 页试听
+English/Chinese、Stop 和速率/音量；中文须安装可被 SAPI 或 Android TTS 使用的声音。
+接着手动验收 Android 页面资源、触摸、切页停止、后台返回和无语音包错误提示。
+本包不替代 M0 硬件/多 DPI/长稳与商业发行验收。
+
 ## 上一工作包：Windows 第二关 CRLF 加载错误（已修复并验证）
 
 基线 `28c3e78`，开始时工作区干净。用户反馈 Windows 第二关启动报错，尚未

@@ -54,6 +54,7 @@ paths, touch ID tracking, adaptive UI anchors, lifecycle boundaries and C++ form
 - **Touch and layout helpers**: `TouchTracker` preserves contact IDs and cancels interrupted gestures;
   `CanvasLayout` anchors controls and centered menus on expanding canvases
 - **Audio**: sound/music with master volume (own `Audio.h`)
+- **System TTS**: one C++ API for Windows SAPI and Android speech; see [usage](docs/TEXT_TO_SPEECH.md) and [Engine Lab](examples/engine_lab/README.md)
 - **Immediate-mode UI**: labels, panels, buttons, progress bars
 - **Save system**: dependency-free key/value persistence
 - **Safe storage & diagnostics**: atomic saves with checksums and backup recovery, per-user data directories, rotating file logs
@@ -75,7 +76,7 @@ GameEngine ── Scene ── GameObject
 
 Each `Scene` owns an independent `PhysicsWorld`, including registrations, contacts
 and callback traversal state. Cross-cutting services are static/singleton: `TweenManager`,
-`EventBus`, `ResourceManager`, `AudioManager`, `Input`, `UI`, `GameTime`.
+`EventBus`, `ResourceManager`, `AudioManager`, `TextToSpeech`, `Input`, `UI`, `GameTime`.
 Events and tweens have application/scene/object/component lifetime scopes. Scene
 changes cancel the old scene's callbacks while preserving application services.
 Physics worlds can be stepped and cleared independently. Graphics, input and time
@@ -383,7 +384,7 @@ save.Save("save.txt");
 
 ## Android APK (experimental)
 
-All five games, including FORGE, can be packaged as ARM64 NativeActivity APKs with xmake and raylib.
+All six examples, including FORGE and Engine Lab, can be packaged as ARM64 NativeActivity APKs with xmake and raylib.
 The current build targets Android 8.0+ (API 26), target SDK 35, and includes bundled
 fonts, touch controls, pause/exit UI and application-private saves/logs.
 
@@ -405,6 +406,11 @@ and platform limits](docs/ANDROID.md) (Chinese) for prerequisites and commands.
 | `bouncing_balls` | Shape Lab: circles, squares and bars; solid/outline styles; mixed circle/box physics |
 | `neon_breakout` | Layered neon rendering, tweens, timers, trigger callbacks, camera shake, HUD, save |
 | `bullet_hell` | Boss fight with briefing, practice mode, automatic fire, pooled bullets and parent-child turrets |
+| `engine_lab` | Six interactive pages: components, physics, sprites, particles/events/pools, tilemaps, system TTS and saves |
+
+[Engine Lab](examples/engine_lab/README.md) demonstrates the APIs with live objects and controls.
+Run `xmake run engine_lab`; use its Services page for Windows/Android speech, sound and saves.
+Use `1`–`6` to change pages, `R` to rebuild the scene, `F11` for fullscreen, and Esc/Back to exit.
 
 Shape Lab lets you choose shape and drawing style independently, then click/tap the
 arena to add bodies. `1`–`4` select mixed/circle/square/bar, `F` cycles mixed/solid/outline,
@@ -416,7 +422,7 @@ before losing three shields. Start with **Practice / No Damage**, or choose **St
 both give three seconds to prepare. Use WASD/arrows and hold Shift for slow movement;
 on Android drag to move and hold **FOCUS** with a second finger. `P`/Android Back pauses.
 
-All four examples share the following window controls:
+The original four game examples share the following window controls:
 
 | Key | Action |
 | --- | --- |
@@ -467,7 +473,7 @@ balls to keep the physics playground responsive.
 The root `xmake.lua` defines the engine and shared dependencies, then includes
 `examples/xmake.lua` and `tests/xmake.lua` for their targets. Run xmake from the
 repository root. Each example owns its assets, artwork and Android/Windows packaging
-resources under `examples/<name>/`; the four small examples share fonts in
+resources under `examples/<name>/`; the five small examples share fonts in
 `examples/common/assets/fonts`. The engine's Android raylib recipe is in
 `xmake/packages/raylib.lua`. Desktop assets are copied to `bin/assets/fonts` and
 `bin/assets/<name>/`; each APK contains only common fonts and its own assets.
@@ -475,7 +481,7 @@ Android packages remain in `bin/android/<arch>/<mode>`. See the
 [example directory guide](examples/README.md) for ownership and build entries.
 
 ```bash
-xmake            # build the library and all five desktop games, including FORGE
+xmake            # build the library and all six desktop examples, including FORGE
 xmake run neon_breakout
 xmake run bullet_hell
 xmake run forge_runner
@@ -502,13 +508,13 @@ with `--build_examples=n --build_tests=n`. Install with
 headers and library through the supplied SDK integration script. See
 [SDK setup and verification](docs/SDK.md).
 
-All five desktop games build as Windows GUI applications by default: launching an EXE
+All six desktop examples build as Windows GUI applications by default: launching an EXE
 does not open a console, and raylib trace output is disabled. To enable the console
 and logs for debugging the four small examples, run `xmake f --example_console=y` and rebuild. Use
 `xmake f --example_console=n` to return to quiet launches. The `tests` and `smoke`
 targets always keep their console and diagnostic output.
 
-Each of the four small games has its own embedded EXE icon, native window icon and Android launcher
+Each small example has its own embedded EXE icon, native window icon and Android launcher
 icon, including adaptive and themed Android variants. Editable SVG sources and
 regeneration instructions are in [the example icon guide](examples/common/ICONS.md).
 
@@ -561,10 +567,10 @@ tilemaps, tween callback mutation, timers, pooling, events and saves.
 an independent consumer with no engine source/example paths. It checks fixed-step
 physics, input, storage, and configuration mismatch diagnostics; `--graphics` also
 checks a native window and texture cleanup. Desktop CI runs the headless consumer.
-GitHub Actions builds all five desktop games and runs the engine and FORGE logic
+GitHub Actions builds all six desktop examples and runs the engine and FORGE logic
 suites in Debug and Release on Linux and Windows; Windows explicitly selects MSVC
 and also verifies FORGE's standalone SDK build. A separate Windows job builds and verifies
-the five ARM64 Android Release APKs with JDK 17, SDK 35 and NDK r28c. All jobs use
+the six ARM64 Android Release APKs with JDK 17, SDK 35 and NDK r28c. All jobs use
 xmake 3.1.1 (`.github/workflows/ci.yml`). CI runs on pushes/PRs to `main` and supports
 manual **Actions → CI → Run workflow** runs.
 
@@ -572,11 +578,11 @@ Successful runs provide downloadable artifacts for 14 days:
 
 | Artifact | Contents |
 | --- | --- |
-| `raygame-windows-x64-release` | Four small-game Release EXEs, shared `assets/`, and complete FORGE in `forge_runner/` |
-| `raygame-windows-x64-debug` | The same five games and assets in Debug mode |
+| `raygame-windows-x64-release` | Five small-example Release EXEs (including Engine Lab), shared `assets/`, and complete FORGE in `forge_runner/` |
+| `raygame-windows-x64-debug` | The same six examples and assets in Debug mode |
 | `raygame-forge-windows-x64-<mode>` | FORGE EXE, its own `assets/`, README and third-party notices |
 | `raygame-forge-linux-x86_64-<mode>` | FORGE Linux executable, `assets/`, README and third-party notices |
-| `raygame-android-arm64-release` | Five APKs including FORGE, and `verification.json` with SHA-256 hashes |
+| `raygame-android-arm64-release` | Six APKs including FORGE and Engine Lab, and `verification.json` with SHA-256 hashes |
 
 Open a CI run and download from **Artifacts**. Keep `assets/` next to the extracted
 Windows EXEs. The separate FORGE artifacts put the executable and assets at the

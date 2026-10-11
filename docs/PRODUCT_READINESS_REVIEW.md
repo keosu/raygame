@@ -506,3 +506,17 @@ Forge ARM64 Release APK 构建/签名/对齐/资源检查通过。未运行新 C
 保存后继续第二关的图形路径。Windows Debug/Release 各 127 项 Forge、335 项
 引擎逻辑及原示例图形通过，原失败副本两模式图形均通过。独立 SDK Release 和
 Forge Release APK 构建校验通过；用户原始报错尚未提供，设备/远端 CI 未验收。
+
+**25. 系统 TTS 与引擎对象实验室**
+
+2026-10-11 增加 Windows SAPI / Android TextToSpeech 的统一 C++ API，支持 UTF-8、
+语速/音量/语言、异步状态、停止及生命周期清理。Android Java 桥接由引擎统一打包，
+无需各游戏另建模块；NativeActivity 打包规则增加明确依赖顺序，检查 dex 与 manifest。
+新增 Engine Lab 六页，以真实对象展示组件、物理/相机、精灵/资源、粒子/事件/池、
+瓦片及 TTS/音效/存档；根构建与 CI 配置包含六示例，SDK 导出新接口和 Windows 链接库。
+
+Windows Debug/Release 各 359 项引擎、127 项 Forge 逻辑，以及原示例/Forge/Lab 图形
+和原生静音 TTS 检查通过；SDK 两模式消费与 Forge 独立 Release 通过。六 Release
+APK 与 Lab Debug 的签名/对齐/资源/Java 桥接检查通过，增量复用与删除包重建通过。
+未运行 Android 设备、Linux/macOS、新远端 CI 或人工试听；中文声音取决于系统安装，
+后端只实现 Windows/Android，设备生命周期/语音质量及 M0 验收仍待完成。

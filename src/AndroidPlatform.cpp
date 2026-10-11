@@ -10,6 +10,9 @@ android_app* currentApp = nullptr;
 }
 
 namespace RayGame::detail {
+ANativeActivity* AndroidActivity() {
+    return currentApp ? currentApp->activity : nullptr;
+}
 const char* AndroidDataDirectory() {
     return currentApp && currentApp->activity ? currentApp->activity->internalDataPath : nullptr;
 }

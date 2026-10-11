@@ -1,5 +1,15 @@
 -- Desktop tests; the smoke target also exercises the real example games.
 if has_config("build_tests") and not is_plat("android") then
+    if is_plat("windows", "mingw") then
+        target("tts_smoke")
+            set_kind("binary")
+            set_languages("c++17")
+            set_default(false)
+            add_files("tts_smoke.cpp")
+            add_deps("raygame")
+            set_targetdir("$(projectdir)/bin")
+        target_end()
+    end
     target("tests")
         set_kind("binary")
         set_languages("c++17")

@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('all', 'space_shooter', 'bouncing_balls', 'neon_breakout', 'bullet_hell', 'forge_runner')]
+    [ValidateSet('all', 'space_shooter', 'bouncing_balls', 'neon_breakout', 'bullet_hell', 'forge_runner', 'engine_lab')]
     [string]$Game = 'all',
     [ValidateSet('debug', 'release')][string]$Mode = 'release',
     [string]$SdkRoot,
@@ -64,7 +64,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Android build failed' }
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $names = if ($Game -eq 'all') { @('space_shooter','bouncing_balls','neon_breakout','bullet_hell','forge_runner') } else { @($Game) }
+    $names = if ($Game -eq 'all') { @('space_shooter','bouncing_balls','neon_breakout','bullet_hell','forge_runner','engine_lab') } else { @($Game) }
     $readelf = Join-Path $NdkRoot 'toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-readelf.exe'
     $results = foreach ($name in $names) {
         $apk = Join-Path $projectRoot "bin/android/arm64-v8a/$Mode/$name.apk"
@@ -74,6 +74,14 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Invalid APK alignment: $name" }
         $archive = [IO.Compression.ZipFile]::OpenRead($apk)
         try {
+            $dex = $archive.GetEntry('classes.dex')
+            if (-not $dex) { throw "Missing Java bridge classes.dex: $name" }
+            $reader = [IO.StreamReader]::new($dex.Open(), [Text.Encoding]::Latin1)
+            try { $dexText = $reader.ReadToEnd() } finally { $reader.Dispose() }
+            if (-not $dexText.Contains('Lorg/raygame/SpeechBridge;')) { throw "Missing SpeechBridge class: $name" }
+            $manifest = (& "$buildTools/aapt.exe" dump xmltree $apk AndroidManifest.xml) -join "`n"
+            if ($LASTEXITCODE -ne 0 -or $manifest -notmatch 'android.intent.action.TTS_SERVICE' -or
+                $manifest -notmatch 'android:hasCode[^\r\n]*0xffffffff') { throw "Missing Android TTS manifest declarations: $name" }
             # Small games share fonts; FORGE owns its complete resource set.
             $expectedAssets = @{}
             $assetRoots = if ($name -eq 'forge_runner') { @("$projectRoot/examples/$name/assets") }
@@ -143,6 +151,7 @@ try {
             SHA256 = (Get-FileHash -LiteralPath $apk -Algorithm SHA256).Hash
             ABI = 'arm64-v8a'; MinSdk = 26; TargetSdk = 35; Signing = 'debug'; RuntimeTested = $false
             Assets = @($expectedAssets.Keys | Sort-Object); AssetContentsVerified = $true
+            SpeechBridgeVerified = $true
         }
     }
     $results | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath "build/android/verification-$Mode.json" -Encoding utf8

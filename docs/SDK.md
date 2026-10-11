@@ -106,7 +106,7 @@ xmake lua scripts/verify-sdk.lua --graphics
 ```
 
 脚本将 SDK 安装到新临时目录，再搬到含空格的新路径；将独立消费项目复制到
-另一子目录，编译并检查头文件、物理/固定 tick、输入和存档。不引用引擎源码
+另一子目录，编译并检查头文件、物理/固定 tick、输入、TTS 参数拒绝和存档。不引用引擎源码
 或示例资源。脚本还验证模式、架构及 Windows C 运行库不匹配会被明确拒绝。
 `--graphics` 额外创建真实隐藏窗口、程序生成纹理并绘制四帧，检查退出清理，
 需要 OpenGL 环境。Windows/Linux CI 使用无窗口模式。
@@ -123,8 +123,12 @@ xmake build -a -j 1 -y
 ```
 
 桌面引擎库按平台/架构/模式输出到 `build/lib/<平台>/<架构>/<模式>`，防止
-Debug/Release 库相互覆盖。四小示例及 tests/smoke 的可执行文件仍共用 `bin`，
+Debug/Release 库相互覆盖。五小示例（含 Engine Lab）及 tests/smoke 的可执行文件仍共用 `bin`，
 根工程 FORGE 与其逻辑测试位于 `bin/forge_runner`；
 构建规则在每个可执行文件旁保存 `.raygame-config` 配置标记，切换模式后强制
 重新链接，避免模式独立的缓存误判共享 EXE。相同配置的无改动构建仍复用产物。
 切换配置后需运行构建，不能将此前的 EXE 当作当前配置产物；配置标记无需分发。
+
+SDK 导出 `raygame/TextToSpeech.h`，Windows 的 SAPI/COM 系统库由接入脚本传递。
+语音用法与 Android Java 打包要求见 [TTS](TEXT_TO_SPEECH.md)；当前安装 SDK 入口
+仍面向桌面，Android APK 使用根工程规则。

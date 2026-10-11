@@ -1,6 +1,6 @@
 # Example game icons
 
-The four `examples/<game>/artwork/icon.svg` files are original geometric artwork: a cyan ship,
+The five `examples/<game>/artwork/icon.svg` files are original geometric artwork (including Engine Lab's connected circle, square and triangle): a cyan ship,
 mint/blue/gold bouncing balls, neon bricks and a paddle, and a pink radial bullet core.
 They share a dark rounded tile while keeping distinct silhouettes at small sizes.
 

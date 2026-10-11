@@ -2,6 +2,7 @@ set_project("raygame")
 set_version("0.2.0")
 
 includes("xmake/rules/desktop-config.lua")
+includes("xmake/rules/android-tts.lua")
 add_rules("mode.debug", "mode.release", "raygame.desktop_config")
 set_encodings("utf-8")
 
@@ -42,9 +43,9 @@ target("raygame")
                   or "$(builddir)/lib/$(plat)/$(arch)/$(mode)")
 
     if is_plat("windows") then
-        add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", "shell32", "ole32", {public = true})
+        add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", "shell32", "ole32", "sapi", {public = true})
     elseif is_plat("mingw") then
-        add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", "shell32", "ole32", {public = true})
+        add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", "shell32", "ole32", "sapi", {public = true})
     elseif is_plat("linux") then
         add_syslinks("pthread", "m", "dl", "rt", {public = true})
     elseif is_plat("macosx") then

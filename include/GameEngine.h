@@ -5,6 +5,7 @@
 #include "GameTime.h"
 #include "Input.h"
 #include "Audio.h"
+#include "TextToSpeech.h"
 #include "ResourceManager.h"
 #include "Physics.h"
 #include "Tween.h"
@@ -103,6 +104,7 @@ public:
         if (shuttingDown) return;
         if (!initialized && !currentScene && !hasPendingScene) {
             applicationCallbacks.Cancel();
+            TextToSpeech::Shutdown();
             return;
         }
         shuttingDown = true;
@@ -115,6 +117,7 @@ public:
         fixedAccumulator = 0;
         Input::Reset();
 
+        TextToSpeech::Shutdown();
         TweenManager::Clear();
         EventBus::Clear();
         if (initialized) {
@@ -165,6 +168,7 @@ public:
     void SetPaused(bool value) {
         if (paused == value) return;
         paused = value;
+        if (paused) TextToSpeech::Stop();
         UI::ResetInteraction();
         fixedAccumulator = 0;
         Input::DiscardPending();
@@ -279,6 +283,7 @@ private:
         hasPendingScene = false;
 
         UnloadCurrentScene();
+        TextToSpeech::Stop();
         Input::DiscardPending();
         fixedAccumulator = 0;
         UI::ResetInteraction();

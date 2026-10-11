@@ -162,6 +162,7 @@ static void TestPhysicsCallbacks() {
 #include "worlds_and_timing.h"
 #include "touch_layout.h"
 #include "engine_extensions.h"
+#include "speech.h"
 
 int main() {
     printf("RayGame tests\n=============\n");
@@ -178,6 +179,7 @@ int main() {
     world_tests::Run();
     TestTouchLayout();
     extension_tests::Run();
+    TestSpeech();
 
     printf("=============\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

@@ -63,6 +63,7 @@ function add_forge_targets(options)
                     keystore_pass = "android", package_name = "org.raygame.forge",
                     native_app_glue = false, logcat_filters = {"raygame", "raylib"}
                 })
+                add_rules("raygame.android_tts")
                 before_build(function ()
                     sync_files(path.join(forge_root, "assets"), path.join(staged_assets, "forge"), os, io, assert)
                     local source = path.join(forge_root, "THIRD_PARTY_NOTICES.md")

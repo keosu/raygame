@@ -11,6 +11,7 @@
 #include "CanvasLayout.h"
 #include "TouchTracker.h"
 #include "Audio.h"
+#include "TextToSpeech.h"
 #include "Event.h"
 #include "Tween.h"
 #include "Pool.h"

@@ -28,6 +28,8 @@ void GameEngine::Tick(float dt) {
         timing.totalDroppedSeconds += timing.droppedSeconds;
         GameTime::Advance(realDelta, simulationDelta);
         GameTime::SetTimeScale(timeScale);
+        if (!Input::GetFrame().focused) TextToSpeech::Stop();
+        TextToSpeech::Update();
         OnUnscaledUpdate();
         if (paused) { Input::DiscardPending(); return; }
         GameTime::SetFixedDeltaTime(fixedDelta);

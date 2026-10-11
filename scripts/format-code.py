@@ -16,6 +16,14 @@ DEFAULT_PATHS = (
     "include/TouchTracker.h",
     "tests/touch_layout.h",
     "tests/engine_extensions.h",
+    "examples/engine_lab",
+    "include/TextToSpeech.h",
+    "src/TextToSpeech.cpp",
+    "src/SpeechBackend.h",
+    "src/SpeechWindows.cpp",
+    "src/SpeechAndroid.cpp",
+    "tests/speech.h",
+    "tests/tts_smoke.cpp",
 )
 
 

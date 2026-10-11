@@ -109,6 +109,8 @@ jobs:
             bin/bouncing_balls.exe
             bin/neon_breakout.exe
             bin/bullet_hell.exe
+            bin/engine_lab.exe
+            bin/engine_lab-README.md
             bin/*.dll
             bin/assets/
             bin/forge_runner/forge_runner.exe
@@ -145,7 +147,7 @@ jobs:
         with:
           xmake-version: ${{ env.XMAKE_VERSION }}
 
-      - name: Build and verify five APKs including FORGE
+      - name: Build and verify six APKs including FORGE and Engine Lab
         run: |
           ./scripts/build-android.ps1 -Mode release -SdkRoot $env:ANDROID_HOME `
             -NdkRoot "$env:ANDROID_HOME/ndk/28.2.13676358" -JavaHome $env:JAVA_HOME

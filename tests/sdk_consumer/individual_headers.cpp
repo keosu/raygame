@@ -7,8 +7,12 @@
 #include <raygame/SaveSystem.h>
 #include <raygame/CanvasLayout.h>
 #include <raygame/TouchTracker.h>
+#include <raygame/TextToSpeech.h>
 
 bool CheckIndividualHeaders() {
+    // Invalid input exercises the installed implementation without speaking.
+    bool speechValid = !RayGame::TextToSpeech::Speak("") && !RayGame::TextToSpeech::GetLastError().empty();
+    RayGame::TextToSpeech::Shutdown();
     RayGame::Scene scene("individual headers");
     auto object = scene.CreateGameObject("ball");
     object->AddComponent<RayGame::CircleCollider>(8.0f);
@@ -22,5 +26,5 @@ bool CheckIndividualHeaders() {
     bool valid = scene.GetPhysicsWorld().GetColliderCount() == 1
                  && RayGame::Input::GetKeyDown(KEY_SPACE) && sizeof(std::time_t) > 0;
     scene.Clear();
-    return valid && scene.GetPhysicsWorld().GetColliderCount() == 0;
+    return valid && speechValid && scene.GetPhysicsWorld().GetColliderCount() == 0;
 }

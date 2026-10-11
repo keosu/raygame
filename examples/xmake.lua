@@ -10,7 +10,7 @@ option("example_console")
     set_description("Enable the Windows console and raylib logs for examples")
 option_end()
 
-local example_names = {"space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell"}
+local example_names = {"space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "engine_lab"}
 local examples_root = os.scriptdir()
 
 -- Each game owns its assets; only the small examples share fonts.
@@ -45,6 +45,9 @@ if not is_plat("android") and (has_config("build_examples") or has_config("build
             set_default(false)
             on_build(function ()
                 copy_assets(path.join(examples_root, name, "assets"), path.join(os.projectdir(), "bin/assets", name), os, io)
+                if name == "engine_lab" then
+                    os.cp(path.join(examples_root, name, "README.md"), path.join(os.projectdir(), "bin/engine_lab-README.md"))
+                end
             end)
         target_end()
     end
@@ -73,6 +76,7 @@ local function add_example(name)
                 native_app_glue = false,
                 logcat_filters = {"raygame", "raylib"}
             })
+            add_rules("raygame.android_tts")
             before_build(function ()
                 local shared = copy_assets(path.join(examples_root, "common/assets"), staged_assets, os, io)
                 local owned = copy_assets(path.join(examples_root, name, "assets"), staged_assets, os, io)
