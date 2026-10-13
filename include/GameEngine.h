@@ -319,6 +319,8 @@ private:
         Tick(GetFrameTime());
     }
 
+protected:
+    // The same presentation path is used by Run and deterministic graphics checks.
     void Render() {
         ScopeActivation scope(GetCallbackScope());
         Display::Begin();
@@ -356,7 +358,7 @@ private:
             UI::LabelCentered(Display::GetWidth() - 70, Display::GetHeight() - 38, "PAUSE", 18);
         }
 #endif
-        if (paused) {
+        if (defaultShortcuts && paused) {
             float width = Display::GetWidth(), height = Display::GetHeight();
             DrawRectangle(0, 0, (int)std::ceil(width), (int)std::ceil(height), {4, 7, 16, 190});
             UI::Panel({width / 2 - 190, height / 2 - 78, 380, 156});
@@ -371,6 +373,7 @@ private:
         }
     }
 
+private:
     static Rectangle PauseButtonBounds() {
         return {Display::GetWidth() - 124, Display::GetHeight() - 46, 108, 34};
     }

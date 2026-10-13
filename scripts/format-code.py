@@ -28,6 +28,12 @@ DEFAULT_PATHS = (
     "examples/garden_guard",
     "examples/common/CampaignGame.h",
     "tests/campaigns.cpp",
+    "examples/common/CampaignText.h",
+    "include/PointerGesture.h",
+    "include/UIButton.h",
+    "include/Display.h",
+    "include/UI.h",
+    "tests/pointer_gesture.h",
 )
 
 

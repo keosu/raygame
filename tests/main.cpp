@@ -163,6 +163,7 @@ static void TestPhysicsCallbacks() {
 #include "touch_layout.h"
 #include "engine_extensions.h"
 #include "speech.h"
+#include "pointer_gesture.h"
 
 int main() {
     printf("RayGame tests\n=============\n");
@@ -180,6 +181,7 @@ int main() {
     TestTouchLayout();
     extension_tests::Run();
     TestSpeech();
+    TestPointerGesture();
 
     printf("=============\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

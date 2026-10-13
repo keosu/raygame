@@ -21,3 +21,19 @@ Windows 输出 `bin/marble_temple.exe`，保留同级 assets；Android APK 在
 逻辑检查：`xmake run campaign_tests`。图形/输入检查使用隔离数据：
 `xmake run marble_temple --smoke --data build/marble-smoke`，结果在 smoke.log。
 Android 构建校验不等于真机触感/音效验收。
+
+菜单和游戏界面支持简体中文 / English（默认中文），设置页可即时切换语言、
+音效开关/音量、精细/标准画质、60/120 FPS，以及桌面全屏/窗口；退出重启仍保留。
+菜单按可用区域等比缩放，支持鼠标、触屏以及方向键/Tab + Enter 导航。
+精细画质使用框架 CanvasQuality::Smooth 超采样，受 4096 像素纹理上限约束；
+低性能设备可选择标准画质。游戏画布保持等比，宽屏/竖屏额外区域不拉伸玩法几何。
+中文字体为 Noto Sans SC 子集，许可和重建说明在 assets/fonts/。
+启动显示主菜单，玩法与快捷键说明放在“玩法说明”页，游戏中仅显示状态与危险提醒。
+
+彩球只按颜色区分，使用原创带高光/反射/柔和阴影和透明边缘的纹理；三关神庙背景
+及发射器经过超采样生成，轨道绘制与模型使用同一组曲线。重建素材需要 Pillow：
+
+```powershell
+python examples/marble_temple/artwork/generate-marbles.py
+python examples/marble_temple/artwork/generate-scenery.py
+```

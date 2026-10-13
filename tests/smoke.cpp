@@ -410,6 +410,10 @@ public:
             scene->enemyField->Spawn(scene->player->transform->position,{0,0},8,RED);
             player->PostFixedUpdate();
             Expect(player->lives==lives-1,"normal mode still loses shields");
+            // The native hidden window may have lost focus during fullscreen checks.
+            // Establish a focused, released frame before injecting fresh touch presses.
+            Input::SetFrame(InputFrame{});scene->ReadTouches();
+            Input::SetFrame(InputFrame{});scene->ReadTouches();
             InputFrame input;
             input.touchCount=2;
             input.touches[0]={101,Display::CanvasToScreen({400,500})};
@@ -506,6 +510,20 @@ public:
     void OnRender() override { throw std::runtime_error("injected render error"); }
 };
 
+class PausePresentationGame : public GameEngine {
+public:
+    PausePresentationGame() : GameEngine("pause presentation regression", 640, 480) {}
+    void OnRender() override { ClearBackground(GREEN); }
+    Color DrawFrame() {
+        Render();
+        auto img = LoadImageFromTexture(Display::GetCanvasTexture());
+        ImageFlipVertical(&img);
+        auto pixel = GetImageColor(img, 10, 10);
+        UnloadImage(img);
+        return pixel;
+    }
+};
+
 int main() {
     SetConfigFlags(FLAG_WINDOW_HIDDEN);
     SmokeGame game;
@@ -516,6 +534,22 @@ int main() {
     game.Expect(TweenManager::Count() == 0, "shutdown clears tweens");
     game.Expect(UI::font == nullptr && UI::headingFont == nullptr, "shutdown resets cached UI font handles");
     game.Expect(Display::GetCanvasTexture().id == 0, "shutdown releases the game canvas");
+    {
+        SetConfigFlags(FLAG_WINDOW_HIDDEN);
+        PausePresentationGame presentation;
+        presentation.Init();
+        presentation.SetPaused(true);
+        game.Expect(presentation.DrawFrame().g < GREEN.g / 2,
+            "default pause dims the world");
+        presentation.SetDefaultShortcutsEnabled(false);
+        game.Expect(presentation.DrawFrame().g == GREEN.g && presentation.IsPaused(),
+            "custom menus pause simulation without an engine overlay");
+        presentation.SetDefaultShortcutsEnabled(true);
+        presentation.SetPaused(false);
+        game.Expect(presentation.DrawFrame().g == GREEN.g,
+            "resuming removes the default overlay");
+        presentation.Shutdown();
+    }
     for (bool failInit : {true, false}) {
         SetConfigFlags(FLAG_WINDOW_HIDDEN);
         bool caught = false;

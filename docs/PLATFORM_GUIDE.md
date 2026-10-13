@@ -84,3 +84,27 @@ python scripts/format-code.py --check
 CI 检查同一范围。其他历史文件逐步迁移；显式传入路径可格式化更多文件，例如
 `python scripts/format-code.py include/FileSystem.h`。编辑器的 Format Document 也会
 读取根目录配置。格式调整不改变接口、存档或关卡数据。
+
+## 拖拽、按钮绘制与画质
+
+`PointerGesture` 统一鼠标与单个触屏指针捕获。每渲染帧调用
+`Update(Input::GetFrame(), Display::GetViewport())`，读取画布坐标 `start/position`、
+`pressed/held/released/dragging/cancelled` 和 `IsTouch()`；移动超过 dragThreshold
+（默认 8 个画布单位）开始拖动。多指不提升已有第二根手指；失焦/映射变化/非法
+位置取消且不生成 release。切页调用 Reset(frame)，已有手指必须抬起再按。
+释放边沿仅保留一帧，固定 tick 命令仍需缓存。花园示例演示种子拖放、预览及取消。
+
+`ButtonPainter::Draw(rect, state, style)` 只绘制表面（阴影、边缘、高光、按压/选中/
+禁用），不读取输入；`Icon` 提供箭头、跳跃、冲刺、暂停等矢量图标。
+UI::Button、campaign 菜单和 Forge 使用同一绘制接口，各自保留输入路由。
+`UI::unicodeFont/unicodeHeadingFont` 是含所需 Unicode 字形的可选字体句柄；
+测量和绘制一致，Shutdown 清空。框架不会自动翻译或替使用者补齐字体字形。
+
+`Display::SetQuality(CanvasQuality::Smooth)` 在原生像素密度之上使用两倍采样，
+然后双线性缩放；Standard 为原有密度。纹理边长最多 4096，失败保留旧画布。
+新 campaign 可在设置切换，Forge 使用 Smooth；这不是自动硬件性能分档，也不
+代替透明边缘素材与足够分段的几何。高画质的设备显存/帧时间仍需真机验证。
+
+自带菜单的游戏调用 `SetDefaultShortcutsEnabled(false)` 后，`SetPaused` 只暂停
+模拟，不叠加引擎默认暂停 UI。派生类的图形检查可以调用受保护的 `Render()`，
+使用与正常 `Run()` 相同的场景、菜单和引擎叠层绘制流程。

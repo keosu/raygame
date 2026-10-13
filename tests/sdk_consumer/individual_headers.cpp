@@ -7,6 +7,8 @@
 #include <raygame/SaveSystem.h>
 #include <raygame/CanvasLayout.h>
 #include <raygame/TouchTracker.h>
+#include <raygame/PointerGesture.h>
+#include <raygame/UIButton.h>
 #include <raygame/TextToSpeech.h>
 
 bool CheckIndividualHeaders() {
@@ -22,6 +24,8 @@ bool CheckIndividualHeaders() {
     input.keys.pressed[KEY_SPACE] = true;
     RayGame::Input::SetFrame(input);
     RayGame::TouchTracker touches;
+    RayGame::PointerGesture pointer;
+    pointer.Update(input, RayGame::CanvasViewport::Fit(800, 600, 1600, 900));
     touches.Update(input, RayGame::CanvasViewport::Fit(800, 600, 1600, 900));
     bool valid = scene.GetPhysicsWorld().GetColliderCount() == 1
                  && RayGame::Input::GetKeyDown(KEY_SPACE) && sizeof(std::time_t) > 0;

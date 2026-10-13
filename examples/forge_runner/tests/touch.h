@@ -32,11 +32,20 @@ static void TestTouchControls() {
     auto quick = touch.Consume();
     Expect(quick.jump && !quick.jumpHeld && !touch.Consume().jump,
            "a tap between fixed ticks is retained once");
-    touch.Update(frame({{45, {320, 590}}, {46, {1168, 570}}}), viewport, true);
+    touch.showDown = true;
+    touch.Update(frame({{45, {368, 590}}, {46, {1168, 570}}}), viewport, true);
     touch.Update(frame({}), viewport, true);
     auto drop = touch.Consume();
     Expect(drop.jump && drop.down && !touch.Consume().down,
            "short down-plus-jump retains the drop modifier until consumed");
+    touch.showDown = false;
+    touch.Update(frame({{45, {90, 560}}}), viewport, true);
+    touch.Update(frame({{45, {90, 624}}, {46, {1168, 570}}}), viewport, true);
+    auto gestureDrop = touch.Consume();
+    Expect(gestureDrop.down && gestureDrop.jump,
+           "movement down gesture replaces the optional down button");
+    touch.Update(frame({}), viewport, true);
+    touch.Consume();
     auto held = frame({{44, {1168, 570}}});
     touch.Update(held, viewport, true);
     touch.Reset(held);
@@ -105,7 +114,7 @@ static void TestTouchControls() {
     Expect(actions.move == 1 && actions.jump && actions.dash,
            "phone aspect anchors both hands to the screen edges");
     auto jumpBounds = touch.Bounds(TouchControls::JumpButton);
-    Expect(std::fabs(wide.logicalSize.x - jumpBounds.x - jumpBounds.width - 56) < 0.01f,
+    Expect(std::fabs(wide.logicalSize.x - jumpBounds.x - jumpBounds.width - 48) < 0.01f,
            "jump keeps a stable right margin after canvas expansion");
     mobile.touches[1].position = {NAN, 0};
     touch.Update(mobile, wide, true);

@@ -10,6 +10,8 @@
 #include "Input.h"
 #include "CanvasLayout.h"
 #include "TouchTracker.h"
+#include "PointerGesture.h"
+#include "UIButton.h"
 #include "Audio.h"
 #include "TextToSpeech.h"
 #include "Event.h"

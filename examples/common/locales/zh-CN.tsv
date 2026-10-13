@@ -1,0 +1,44 @@
+# Shared campaign interface, merged into each game's own catalog by prepare-campaign-fonts.py.
+ADVENTURE COMPLETE	旅程完成
+BACK	返回
+BEST	最高分
+CHOOSE A LEVEL	选择关卡
+CONTINUE ADVENTURE	继续旅程
+Changes apply immediately and are saved.	设置立即生效并自动保存
+Clear each stage to unlock the next.	完成当前关卡即可解锁下一关
+Could not save progress. See game.log.	保存失败，请查看 game.log 日志
+DISPLAY	显示模式
+EXIT	退出
+FULLSCREEN	全屏
+HOW TO PLAY	玩法说明
+LANGUAGE	语言
+LEVEL CLEARED	关卡完成
+LOCKED	未解锁
+MAIN MENU	主菜单
+NEXT LEVEL	下一关
+OFF	关闭
+ON	开启
+PAUSE	暂停
+PAUSED	已暂停
+PLAY AGAIN	再次挑战
+Progress saved. Your next challenge awaits.	进度已保存，继续下一场挑战
+QUALITY	画质
+R  restart     P / Back  pause     F11  fullscreen	R 重试    P / 返回键 暂停    F11 全屏
+RAYGAME  /  ARCADE ADVENTURE	RAYGAME / 休闲冒险
+RESTART	重新开始
+RESUME	继续游戏
+SAVE & RETURN	保存并返回
+SCORE	得分
+SETTINGS	设置
+SMOOTH	精细
+SOUND	音效
+SOUND OFF	音效关闭
+SOUND ON	音效开启
+STANDARD	标准
+START ADVENTURE	开始旅程
+TRY AGAIN	再试一次
+Take a break. The world is waiting.	休息一下，随时继续
+VOLUME +	增大音量
+VOLUME -	减小音量
+WINDOWED	窗口
+简体中文	简体中文

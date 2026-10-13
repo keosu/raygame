@@ -1,5 +1,6 @@
 #include "Game.h"
 #include <fstream>
+#include <raygame/UIButton.h>
 
 namespace Forge {
 using namespace RayGame;
@@ -120,6 +121,9 @@ void Game::OnInit() {
 void Game::ApplySettings() {
     art.settings = profile.settings;
     art.touchControls = touchEnabled;
+    touch.sizeScale = profile.settings.controlSize;
+    touch.showDown = profile.settings.showDown;
+    Display::SetQuality(CanvasQuality::Smooth);
 #if !defined(__ANDROID__)
     SetWindowTitle(profile.settings.language == Language::Chinese ? "FORGE / 最后的信使"
                                                                   : "FORGE / The last delivery");
@@ -224,7 +228,7 @@ void Game::OnUnscaledUpdate() {
     } else {
         int count = page == Page::Home         ? (touchEnabled ? 5 : 4)
                     : page == Page::Pause      ? 4
-                    : page == Page::Settings   ? 7
+                    : page == Page::Settings   ? (touchEnabled ? 9 : 7)
                     : page == Page::Debrief    ? 2
                     : page == Page::ConfirmNew ? 2
                                                : 1;
@@ -292,8 +296,9 @@ bool Game::Button(int index, Rectangle r, const std::string& label, const std::s
         focus = index;
     }
     bool selected = focus == index && !disabled;
-    DrawRectangleRec(r, selected ? Color{38, 64, 61, 245} : Color{16, 29, 35, 225});
-    DrawRectangleLinesEx(r, 1, selected ? Fade(Mint, 0.65f) : Color{48, 65, 68, 180});
+    bool pressed = touchEnabled ? touch.pointerHeld && in
+                                : mousePress && in && Input::GetMouseButton(MOUSE_BUTTON_LEFT);
+    ButtonPainter::Draw(r, {in, pressed, selected, disabled}, {{16, 29, 35, 245}, Mint, Light});
     if (selected) {
         DrawRectangleRec({r.x, r.y, 3, r.height}, Mint);
         art.Text(">", {r.x + 15, r.y + 12}, 24, Mint);
@@ -429,33 +434,28 @@ void Game::DrawHUD() {
                  {width / 2 - art.Measure("RETRIEVE THE REMAINING CELLS", 20) / 2, 615}, 20, Ember);
 }
 void Game::DrawTouchControls() {
-    auto panel = [&](Rectangle r, bool down) {
-        DrawRectangleRounded(r, 0.25f, 8, down ? Color{46, 89, 76, 205} : Color{15, 30, 37, 170});
-        DrawRectangleRoundedLinesEx(r, 0.25f, 8, 2, down ? Mint : Fade(Muted, 0.65f));
-    };
     const auto& held = touch.Held();
-    auto left = touch.Bounds(TouchControls::Left), right = touch.Bounds(TouchControls::Right);
-    auto down = touch.Bounds(TouchControls::Down), jump = touch.Bounds(TouchControls::JumpButton);
-    auto dash = touch.Bounds(TouchControls::DashButton),
-         pause = touch.Bounds(TouchControls::PauseButton);
-    panel(left, held.move < 0);
-    panel(right, held.move > 0);
-    panel(down, held.down);
-    panel(jump, held.jumpHeld);
-    panel(dash, touch.dashHeld);
-    panel(pause, false);
-    DrawTriangle({left.x + 34, left.y + 48}, {left.x + 62, left.y + 72}, {left.x + 62, left.y + 24},
-                 Light);
-    DrawTriangle({right.x + 62, right.y + 48}, {right.x + 34, right.y + 24},
-                 {right.x + 34, right.y + 72}, Light);
-    DrawTriangle({down.x + 40, down.y + 48}, {down.x + 62, down.y + 20}, {down.x + 18, down.y + 20},
-                 Light);
-    art.Text("JUMP", {jump.x + (jump.width - art.Measure("JUMP", 20, true)) / 2, jump.y + 44}, 20,
-             Light, true);
-    art.Text("DASH", {dash.x + (dash.width - art.Measure("DASH", 20, true)) / 2, dash.y + 32}, 20,
-             touch.dashHeld ? Mint : Light, true);
-    DrawRectangleRec({pause.x + 24, pause.y + 17, 7, 26}, Light);
-    DrawRectangleRec({pause.x + 41, pause.y + 17, 7, 26}, Light);
+    auto draw = [&](Rectangle reference, bool down, ButtonIcon icon, bool primary = false) {
+        auto r = touch.Bounds(reference);
+        ButtonPainter::Draw(
+            r, {false, down},
+            {{17, 33, 43, 205}, primary ? Mint : Color{150, 181, 189, 255}, Light, 0.65f});
+        ButtonPainter::Icon(icon, {r.x + r.width / 2, r.y + r.height / 2 + (down ? 2 : 0)},
+                            std::min(r.width, r.height) * 0.49f, down ? Mint : Light);
+    };
+    draw(TouchControls::Left, held.move < 0, ButtonIcon::Left);
+    draw(TouchControls::Right, held.move > 0, ButtonIcon::Right);
+    if (touch.showDown)
+        draw(TouchControls::Down, held.down, ButtonIcon::Drop);
+    draw(TouchControls::JumpButton, held.jumpHeld, ButtonIcon::Jump, true);
+    draw(TouchControls::DashButton, touch.dashHeld, ButtonIcon::Dash, true);
+    draw(TouchControls::PauseButton, false, ButtonIcon::Pause);
+    if (world->player.dashCooldown > 0) {
+        auto r = touch.Bounds(TouchControls::DashButton);
+        DrawRectangleRounded({r.x + 20, r.y + r.height - 14,
+                              (r.width - 40) * (1 - world->player.dashCooldown / 0.65f), 4},
+                             1, 12, Mint);
+    }
 }
 void Game::DrawModal() {
     DrawMenuShade(Fade(Ink, 0.82f));
@@ -515,15 +515,23 @@ void Game::DrawSettings() {
         std::string value;
     };
     auto& s = profile.settings;
-    Row rows[] = {{"MUSIC", std::to_string((int)std::lround(s.music * 100)) + "%"},
-                  {"SOUND EFFECTS", std::to_string((int)std::lround(s.sfx * 100)) + "%"},
-                  {"SCREEN SHAKE", s.shake ? "ON" : "OFF"},
-                  {"DISPLAY", (touchEnabled || s.fullscreen) ? "FULLSCREEN" : "WINDOWED"},
-                  {"FRAME LIMIT", std::to_string(s.fps) + " FPS"},
-                  {"LANGUAGE", s.language == Language::Chinese ? "简体中文" : "English"}};
-    for (int i = 0; i < 6; ++i) {
+    std::vector<Row> rows = {
+        {"MUSIC", std::to_string((int)std::lround(s.music * 100)) + "%"},
+        {"SOUND EFFECTS", std::to_string((int)std::lround(s.sfx * 100)) + "%"},
+        {"SCREEN SHAKE", s.shake ? "ON" : "OFF"},
+        {"DISPLAY", (touchEnabled || s.fullscreen) ? "FULLSCREEN" : "WINDOWED"},
+        {"FRAME LIMIT", std::to_string(s.fps) + " FPS"},
+        {"LANGUAGE", s.language == Language::Chinese ? "简体中文" : "English"}};
+    if (touchEnabled) {
+        rows.push_back({"CONTROL SIZE",
+                        std::to_string(static_cast<int>(std::lround(s.controlSize * 100))) + "%"});
+        rows.push_back({"DOWN BUTTON", s.showDown ? "ON" : "OFF"});
+    }
+    float firstY = touchEnabled ? 170.0f : 182.0f;
+    float rowStep = touchEnabled ? 47.0f : 55.0f;
+    for (int i = 0; i < static_cast<int>(rows.size()); ++i) {
         bool disabled = touchEnabled && i == 3;
-        bool clicked = Button(i, {245, 182 + i * 55.0f, 790, 46}, rows[i].title,
+        bool clicked = Button(i, {245, firstY + i * rowStep, 790, 42}, rows[i].title,
                               art.Localize(rows[i].value) + (disabled ? "" : "    <  >"), disabled);
         if (!disabled && (clicked || (focus == i && settingsDirection))) {
             int direction = settingsDirection ? settingsDirection : pointerDirection;
@@ -544,13 +552,19 @@ void Game::DrawSettings() {
                 s.language =
                     s.language == Language::Chinese ? Language::English : Language::Chinese;
             }
+            if (i == 6)
+                s.controlSize = Clamp(s.controlSize + direction * 0.2f, 1.0f, 1.4f);
+            if (i == 7)
+                s.showDown = !s.showDown;
             settingsDirection = 0;
+            touch.Reset(Input::GetFrame());
             ApplySettings();
             if (i == 5)
                 Persist();
         }
     }
-    if (Button(6, {245, 540, 790, 52}, "SAVE & RETURN", touchEnabled ? "" : "ESC")) {
+    if (Button(static_cast<int>(rows.size()), {245, touchEnabled ? 559.0f : 540.0f, 790, 52},
+               "SAVE & RETURN", touchEnabled ? "" : "ESC")) {
         Persist();
         Switch(settingsReturn);
     }
@@ -802,10 +816,24 @@ void Game::SmokeInput() {
     }
     auto finger = [&](int id, Vector2 position) {
         if (page == Page::Play) {
-            if (position.x > 640)
-                position.x += Display::GetWidth() - 1280;
-            if (position.y > 360)
-                position.y += Display::GetHeight() - 720;
+            Rectangle reference{};
+            if (position.x == 200 && position.y == 590)
+                reference = TouchControls::Right;
+            if (position.x == 1168 && position.y == 570)
+                reference = TouchControls::JumpButton;
+            if (position.x == 1028 && position.y == 590)
+                reference = TouchControls::DashButton;
+            if (position.x == 1188 && position.y == 122)
+                reference = TouchControls::PauseButton;
+            if (reference.width > 0) {
+                auto bounds = touch.Bounds(reference);
+                position = {bounds.x + bounds.width / 2, bounds.y + bounds.height / 2};
+            } else {
+                if (position.x > 640)
+                    position.x += Display::GetWidth() - 1280;
+                if (position.y > 360)
+                    position.y += Display::GetHeight() - 720;
+            }
         } else
             position = Vector2Add(position, MenuOffset());
         input.touches[input.touchCount++] = {id, Display::CanvasToScreen(position)};
@@ -829,7 +857,7 @@ void Game::SmokeInput() {
     if (frame == 193)
         finger(65, {980, 205});
     if (frame == 196)
-        finger(65, {980, 370});
+        finger(65, {980, 332});
     if (frame == 201)
         input.focused = false;
     if (frame == 202)

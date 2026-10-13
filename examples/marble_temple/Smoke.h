@@ -19,7 +19,16 @@ inline int Game::Smoke() {
     SetTargetFPS(0);
     Step();
     Step();
-    Capture("menu");
+    CheckStartup(check);
+    CheckSettings(check);
+    chinese = false;
+    ApplySettings();
+    Step();
+    Capture("menu-en");
+    chinese = true;
+    ApplySettings();
+    SetTargetFPS(0);
+    check(BallTextures[0] && BallTextures[4] && BallShadow, "filtered marble assets loaded");
     check(screen == Campaign::Screen::Menu, "starts in menu");
     Click({640, 508}, true);
     check(screen == Campaign::Screen::Help, "touch opens instructions");
@@ -32,6 +41,9 @@ inline int Game::Smoke() {
     Click({640, 584});
     Click({640, 376}, true);
     check(screen == Campaign::Screen::Play && model.stage == 0, "start adventure");
+    check(HudVisible(), "top HUD is fully visible after starting");
+    CheckPauseSettings(check);
+    CheckFullscreenHud(check);
     int shots = model.shotsFired;
     InputFrame held;
     held.touchCount = 1;
@@ -84,6 +96,13 @@ inline int Game::Smoke() {
         Begin(stage);
         Step();
         Capture(stage == 0 ? "stage1" : stage == 1 ? "stage2" : "stage3");
+        chinese = false;
+        ApplySettings();
+        Step();
+        Capture(TextFormat("stage%d-en", stage + 1));
+        chinese = true;
+        ApplySettings();
+        SetTargetFPS(0);
         model.balls.clear();
         model.remaining = 0;
         Step();
@@ -103,10 +122,17 @@ inline int Game::Smoke() {
         SetWindowSize(static_cast<int>(size.x), static_cast<int>(size.y));
         Step();
         Step();
+        check(HudVisible(), "adaptive layout retains the full top HUD");
         Click({1090, 49}, true);
         check(screen == Campaign::Screen::Pause, "adaptive touch hit boxes");
         Capture(TextFormat("layout-%dx%d", static_cast<int>(size.x), static_cast<int>(size.y)));
         Click({640, 418}, true);
+        SetScreen(Campaign::Screen::Menu);
+        Step();
+        Capture(TextFormat("menu-%dx%d", static_cast<int>(size.x), static_cast<int>(size.y)));
+        check(MenuPanelVisible(), "menu renders at its adaptive logical position");
+        Click({640, 376}, true);
+        check(screen == Campaign::Screen::Play, "responsive menu touch mapping");
     }
     SaveSystem saved;
     check(saved.Load(data / "campaign.save") && saved.GetInt("unlocked") == 3,
@@ -119,6 +145,8 @@ inline int Game::Smoke() {
     restored.Init();
     restored.Step();
     check(restored.unlocked == 3 && restored.muted, "progress and mute restored after restart");
+    check(restored.chinese && restored.smooth && restored.fps == 120,
+          "language, quality and frame settings restored");
     restored.Shutdown();
     log << failures << " failures\n";
     return failures ? 1 : 0;

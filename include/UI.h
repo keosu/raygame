@@ -3,21 +3,32 @@
 #include "Core.h"
 #include "ResourceHandle.h"
 #include "Input.h"
+#include "UIButton.h"
 
 namespace RayGame {
 
 // Immediate-mode UI helpers. Call per-frame during a Scene's Render (screen space).
 class RAYGAME_API UI {
 public:
-    static FontHandle font;              // optional custom font
+    static FontHandle font; // optional custom font
     static inline FontHandle headingFont = nullptr;
+    static inline FontHandle unicodeFont = nullptr, unicodeHeadingFont = nullptr;
+    static inline float unicodeScale = 1;
     static inline bool inputEnabled = true;
     static Color textColor;
     static Color accentColor;
     static Color panelColor;
 
-    static void ResetFonts() { font = nullptr; headingFont = nullptr; }
-    static void ResetInteraction() { hasPress = false; }
+    static void ResetFonts() {
+        font = nullptr;
+        headingFont = nullptr;
+        unicodeFont = nullptr;
+        unicodeHeadingFont = nullptr;
+        unicodeScale = 1;
+    }
+    static void ResetInteraction() {
+        hasPress = false;
+    }
 
     // Pointer capture lets gameplay ignore clicks aimed at the UI. Panels, buttons and
     // progress bars register themselves; call Capture for custom widgets. GameEngine
@@ -29,43 +40,52 @@ public:
     }
     static bool IsMouseOverUI() { return overLastFrame || overThisFrame; }
 
-    static void Title(float x, float y, const std::string& text, int size = 36, Color color = RAYWHITE) {
+    static void Title(float x, float y, const std::string& text, int size = 36,
+                      Color color = RAYWHITE) {
         DrawTextCustom(text, x, y, size, color, true);
     }
-    static void TitleCentered(float cx, float y, const std::string& text, int size = 36, Color color = RAYWHITE) {
+    static void TitleCentered(float cx, float y, const std::string& text, int size = 36,
+                              Color color = RAYWHITE) {
         Title(cx - MeasureWidth(text, size, true) / 2, y, text, size, color);
     }
-    static void LabelRight(float right, float y, const std::string& text, int size = 20, Color color = RAYWHITE) {
+    static void LabelRight(float right, float y, const std::string& text, int size = 20,
+                           Color color = RAYWHITE) {
         Label(right - MeasureWidth(text, size), y, text, size, color);
     }
-    static void TitleRight(float right, float y, const std::string& text, int size = 36, Color color = RAYWHITE) {
+    static void TitleRight(float right, float y, const std::string& text, int size = 36,
+                           Color color = RAYWHITE) {
         Title(right - MeasureWidth(text, size, true), y, text, size, color);
     }
 
-    static void Label(float x, float y, const std::string& text, int size = 20, Color color = {0,0,0,0}) {
-        Color c = (color.a == 0 && color.r == 0 && color.g == 0 && color.b == 0) ? textColor : color;
+    static void Label(float x, float y, const std::string& text, int size = 20,
+                      Color color = {0, 0, 0, 0}) {
+        Color c =
+            (color.a == 0 && color.r == 0 && color.g == 0 && color.b == 0) ? textColor : color;
         DrawTextCustom(text, x, y, size, c);
     }
 
-    static void LabelCentered(float cx, float y, const std::string& text, int size = 20, Color color = {0,0,0,0}) {
+    static void LabelCentered(float cx, float y, const std::string& text, int size = 20,
+                              Color color = {0, 0, 0, 0}) {
         float w = MeasureWidth(text, size);
         Label(cx - w / 2, y, text, size, color);
     }
 
-    static void Panel(Rectangle rect, Color color = {0,0,0,0}) {
-        Color c = (color.a == 0 && color.r == 0 && color.g == 0 && color.b == 0) ? panelColor : color;
+    static void Panel(Rectangle rect, Color color = {0, 0, 0, 0}) {
+        Color c =
+            (color.a == 0 && color.r == 0 && color.g == 0 && color.b == 0) ? panelColor : color;
         Capture(rect);
         DrawRectangleRounded(rect, 0.12f, 8, c);
         DrawRectangleRoundedLines(rect, 0.12f, 8, {66, 86, 119, 100});
     }
 
-    static void ProgressBar(Rectangle rect, float value01, Color fill = {0,0,0,0}) {
+    static void ProgressBar(Rectangle rect, float value01, Color fill = {0, 0, 0, 0}) {
         Color f = (fill.a == 0 && fill.r == 0 && fill.g == 0 && fill.b == 0) ? accentColor : fill;
         Capture(rect);
         DrawRectangleRounded(rect, 0.4f, 6, Fade(DARKGRAY, 0.6f));
         Rectangle inner = rect;
         inner.width = rect.width * Clamp(value01, 0.0f, 1.0f);
-        if (inner.width > 2) DrawRectangleRounded(inner, 0.4f, 6, f);
+        if (inner.width > 2)
+            DrawRectangleRounded(inner, 0.4f, 6, f);
     }
 
     // Returns true on click (mouse released inside while pressed inside).
@@ -73,23 +93,29 @@ public:
         Vector2 m = Input::GetMousePosition();
         bool acceptsInput = inputEnabled && Input::GetFrame().focused;
         // A disabled background widget must not cancel a foreground menu's press.
-        if (!Input::GetFrame().focused) hasPress = false;
+        if (!Input::GetFrame().focused)
+            hasPress = false;
         if (acceptsInput && Input::GetMouseButtonDown(MOUSE_BUTTON_LEFT)) {
             pressPosition = m;
             hasPress = true;
         }
         bool hover = acceptsInput && Input::IsMouseInCanvas() && CheckCollisionPointRec(m, rect);
         Capture(rect);
-        Color bg = hover ? Fade(accentColor, 0.4f) : Fade(accentColor, 0.15f);
-        DrawRectangleRounded(rect, 0.25f, 8, bg);
-        DrawRectangleRoundedLines(rect, 0.25f, 8, Fade(accentColor, hover ? 1.0f : 0.4f));
+        ButtonPainter::Draw(rect,
+                            {hover, hasPress && hover && Input::GetMouseButton(MOUSE_BUTTON_LEFT)},
+                            {panelColor, accentColor, textColor});
         float w = MeasureWidth(label, size);
-        DrawTextCustom(label, rect.x + (rect.width - w) / 2,
-                       rect.y + (rect.height - size) / 2, size, textColor);
-        bool clicked = hasPress && hover && CheckCollisionPointRec(pressPosition, rect)
-                       && Input::GetMouseButtonUp(MOUSE_BUTTON_LEFT);
-        if (clicked) hasPress = false;
+        DrawTextCustom(label, rect.x + (rect.width - w) / 2, rect.y + (rect.height - size) / 2,
+                       size, textColor);
+        bool clicked = hasPress && hover && CheckCollisionPointRec(pressPosition, rect) &&
+                       Input::GetMouseButtonUp(MOUSE_BUTTON_LEFT);
+        if (clicked)
+            hasPress = false;
         return clicked;
+    }
+
+    static float TextWidth(const std::string& text, int size, bool heading = false) {
+        return MeasureWidth(text, size, heading);
     }
 
 private:
@@ -97,18 +123,30 @@ private:
     static inline bool hasPress = false;
     static inline bool overThisFrame = false, overLastFrame = false;
     static float MeasureWidth(const std::string& text, int size, bool heading = false) {
-        auto selected = heading && headingFont ? headingFont : font;
+        bool unicode = HasUnicode(text) && unicodeFont;
+        auto selected = unicode ? (heading && unicodeHeadingFont ? unicodeHeadingFont : unicodeFont)
+                                : (heading && headingFont ? headingFont : font);
+        float drawSize = unicode ? size * unicodeScale : static_cast<float>(size);
         if (selected && selected->texture.id != 0)
-            return MeasureTextEx(*selected, text.c_str(), (float)size, 0.5f).x;
+            return MeasureTextEx(*selected, text.c_str(), drawSize, 0.5f).x;
         return (float)MeasureText(text.c_str(), size);
     }
 
-    static void DrawTextCustom(const std::string& text, float x, float y, int size, Color color, bool heading = false) {
-        auto selected = heading && headingFont ? headingFont : font;
+    static void DrawTextCustom(const std::string& text, float x, float y, int size, Color color,
+                               bool heading = false) {
+        bool unicode = HasUnicode(text) && unicodeFont;
+        auto selected = unicode ? (heading && unicodeHeadingFont ? unicodeHeadingFont : unicodeFont)
+                                : (heading && headingFont ? headingFont : font);
+        float drawSize = unicode ? size * unicodeScale : static_cast<float>(size);
+        if (unicode)
+            y -= size * 0.18f;
         if (selected && selected->texture.id != 0)
-            DrawTextEx(*selected, text.c_str(), {x, y}, (float)size, 0.5f, color);
+            DrawTextEx(*selected, text.c_str(), {x, y}, drawSize, 0.5f, color);
         else
             DrawText(text.c_str(), (int)x, (int)y, size, color);
+    }
+    static bool HasUnicode(const std::string& text) {
+        return std::any_of(text.begin(), text.end(), [](unsigned char c) { return c >= 128; });
     }
 };
 
@@ -117,4 +155,4 @@ inline Color UI::textColor = {226, 234, 248, 255};
 inline Color UI::accentColor = {80, 180, 255, 255};
 inline Color UI::panelColor = {12, 19, 34, 235};
 
-}
+} // namespace RayGame

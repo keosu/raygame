@@ -1,0 +1,67 @@
+# Shared campaign interface, merged into each game's own catalog by prepare-campaign-fonts.py.
+ADVENTURE COMPLETE	旅程完成
+BACK	返回
+BEST	最高分
+CHOOSE A LEVEL	选择关卡
+CONTINUE ADVENTURE	继续旅程
+Changes apply immediately and are saved.	设置立即生效并自动保存
+Clear each stage to unlock the next.	完成当前关卡即可解锁下一关
+Could not save progress. See game.log.	保存失败，请查看 game.log 日志
+DISPLAY	显示模式
+EXIT	退出
+FULLSCREEN	全屏
+HOW TO PLAY	玩法说明
+LANGUAGE	语言
+LEVEL CLEARED	关卡完成
+LOCKED	未解锁
+MAIN MENU	主菜单
+NEXT LEVEL	下一关
+OFF	关闭
+ON	开启
+PAUSE	暂停
+PAUSED	已暂停
+PLAY AGAIN	再次挑战
+Progress saved. Your next challenge awaits.	进度已保存，继续下一场挑战
+QUALITY	画质
+R  restart     P / Back  pause     F11  fullscreen	R 重试    P / 返回键 暂停    F11 全屏
+RAYGAME  /  ARCADE ADVENTURE	RAYGAME / 休闲冒险
+RESTART	重新开始
+RESUME	继续游戏
+SAVE & RETURN	保存并返回
+SCORE	得分
+SETTINGS	设置
+SMOOTH	精细
+SOUND	音效
+SOUND OFF	音效关闭
+SOUND ON	音效开启
+STANDARD	标准
+START ADVENTURE	开始旅程
+TRY AGAIN	再试一次
+Take a break. The world is waiting.	休息一下，随时继续
+VOLUME +	增大音量
+VOLUME -	减小音量
+WINDOWED	窗口
+简体中文	简体中文
+MARBLE TEMPLE	彩球神庙
+Aim. Match three. Keep the ancient gate sealed.	瞄准三连消除，守住古老神庙
+Mossy Courtyard	青苔庭院
+Moonlit Ruins	月光遗迹
+The Spiral Vault	螺旋宝库
+Swap colours to reach pairs. Every ninth shot is a blast.	交换颜色寻找同色组合，每九发有一次爆破
+SWAP COLOURS	交换彩球
+TO CLEAR	剩余彩球
+COMBO	连锁
+NEXT	下一颗
+GATE	终点
+BLAST IN %d SHOTS	再发射 %d 次获得爆破
+BLAST SHOT READY	爆破彩球已就绪
+DANGER! THE CHAIN IS NEAR THE GATE	危险！球链即将抵达终点
+Match 3+ adjacent colours. Gaps close into chain reactions.	三个相邻同色球消除，缺口闭合可触发连锁
+Mouse: click to fire / Space to swap. Touch: drag aim, lift to fire.	鼠标点击发射，空格换球；触屏拖动瞄准，抬手发射
+1. Aim at the moving chain, then click to launch a marble.	1. 瞄准移动球链，点击发射彩球
+2. Touch: drag to aim; lift your finger to shoot.	2. 触屏拖动瞄准，抬起手指发射
+3. Three or more adjacent colours disappear together.	3. 三个或更多相邻同色球一起消除
+4. Matching ends close the gap and create chain reactions.	4. 缺口两端同色时，闭合可形成连锁
+5. Space / right click / SWAP exchanges current and next.	5. 空格、右键或交换按钮切换当前与下一颗
+6. Every ninth shot blasts nearby marbles of any colour.	6. 每九发获得爆破，消除周围任意颜色彩球
+7. Clear all marbles before the leading one enters the gate.	7. 在领头彩球抵达终点前清空全部彩球

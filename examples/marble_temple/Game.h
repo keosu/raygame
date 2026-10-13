@@ -3,34 +3,27 @@
 #include "../common/CampaignGame.h"
 
 namespace Marble {
-using RayGame::UI;
+using Campaign::UI;
 inline constexpr Color Colors[] = {{226, 83, 72, 255},
                                    {243, 181, 61, 255},
                                    {74, 172, 123, 255},
                                    {65, 148, 207, 255},
                                    {164, 102, 196, 255}};
+inline std::array<RayGame::TextureHandle, 5> BallTextures;
+inline RayGame::TextureHandle BallShadow;
 inline void DrawBall(Vector2 p, int color, float radius = 17, bool blast = false) {
-    DrawCircleV({p.x + 2, p.y + 4}, radius + 2, {17, 28, 22, 135});
-    DrawCircleV(p, radius + 1, {42, 44, 31, 255});
-    DrawCircleV(p, radius, Colors[color]);
-    DrawCircleV({p.x - radius * 0.3f, p.y - radius * 0.3f}, radius * 0.58f, Fade(WHITE, 0.15f));
-    DrawCircleV({p.x - radius * 0.4f, p.y - radius * 0.48f}, radius * 0.18f, Fade(WHITE, 0.5f));
-    // Each colour also has a distinct glyph.
-    if (color == 0)
-        DrawLineEx({p.x - 5, p.y + 4}, {p.x + 5, p.y + 4}, 3, Campaign::Cream);
-    if (color == 1) {
-        DrawLineEx({p.x, p.y - 4}, {p.x, p.y + 5}, 2, Campaign::Cream);
-        DrawLineEx({p.x - 4, p.y}, {p.x + 4, p.y}, 2, Campaign::Cream);
-    }
-    if (color == 2)
-        DrawCircleLines(static_cast<int>(p.x), static_cast<int>(p.y), 5, Campaign::Cream);
-    if (color == 3)
-        DrawRectangleLines(static_cast<int>(p.x - 4), static_cast<int>(p.y - 4), 8, 8,
-                           Campaign::Cream);
-    if (color == 4)
-        Campaign::Triangle({p.x, p.y - 5}, {p.x - 5, p.y + 4}, {p.x + 5, p.y + 4}, Campaign::Cream);
+    float extent = radius * 1.12f;
+    if (BallShadow)
+        DrawTexturePro(*BallShadow, {0, 0, 128, 128},
+                       {p.x - radius * 1.4f, p.y - radius * 0.6f, radius * 2.8f, radius * 1.8f}, {},
+                       0, WHITE);
+    if (BallTextures[color])
+        DrawTexturePro(*BallTextures[color], {0, 0, 256, 256},
+                       {p.x - extent, p.y - extent, extent * 2, extent * 2}, {}, 0, WHITE);
+    else
+        DrawCircleV(p, radius, Colors[color]);
     if (blast)
-        DrawCircleLines(static_cast<int>(p.x), static_cast<int>(p.y), radius + 5, WHITE);
+        DrawRing(p, radius + 3, radius + 4.5f, 0, 360, 96, Fade(WHITE, 0.9f));
 }
 class Game;
 class World : public RayGame::Component {
@@ -45,12 +38,39 @@ class Game : public Campaign::Game {
 public:
     static constexpr const char* AppId = "raygame.marble_temple";
     Model model;
+    std::array<RayGame::TextureHandle, 3> backdrops;
+    RayGame::TextureHandle launcherTexture;
     int heardShot = 0, heardClear = 0;
     explicit Game(std::filesystem::path directory)
         : Campaign::Game(
               "marble_temple", "MARBLE TEMPLE", "Aim. Match three. Keep the ancient gate sealed.",
               {"Mossy Courtyard", "Moonlit Ruins", "The Spiral Vault"}, std::move(directory)) {
         hint = "Swap colours to reach pairs. Every ninth shot is a blast.";
+    }
+    void OnInit() override {
+        Campaign::Game::OnInit();
+        for (int i = 0; i < 5; ++i) {
+            BallTextures[i] = RayGame::ResourceManager::LoadTexture(
+                "marble-ball-" + std::to_string(i), Asset("ball-" + std::to_string(i) + ".png"));
+            if (!BallTextures[i])
+                throw std::runtime_error("Marble texture is missing");
+            SetTextureFilter(*BallTextures[i], TEXTURE_FILTER_BILINEAR);
+        }
+        for (int i = 0; i < 3; ++i) {
+            backdrops[i] = RayGame::ResourceManager::LoadTexture(
+                "temple-" + std::to_string(i), Asset("temple-" + std::to_string(i) + ".png"));
+            if (!backdrops[i])
+                throw std::runtime_error("Temple backdrop is missing");
+            SetTextureFilter(*backdrops[i], TEXTURE_FILTER_BILINEAR);
+        }
+        launcherTexture =
+            RayGame::ResourceManager::LoadTexture("temple-launcher", Asset("launcher.png"));
+        if (!launcherTexture)
+            throw std::runtime_error("Temple launcher is missing");
+        SetTextureFilter(*launcherTexture, TEXTURE_FILTER_BILINEAR);
+        BallShadow = RayGame::ResourceManager::LoadTexture("marble-shadow", Asset("shadow.png"));
+        if (BallShadow)
+            SetTextureFilter(*BallShadow, TEXTURE_FILTER_BILINEAR);
     }
     void StartLevel(int selected) override {
         model.Reset(selected);
@@ -87,35 +107,30 @@ public:
         return model.score;
     }
     void DrawHUD() override {
-        using RayGame::UI;
+        using Campaign::UI;
         DrawRectangleRounded({28, 20, 1224, 62}, 0.15f, 8, {23, 39, 34, 245});
         UI::Title(48, 29, "MARBLE TEMPLE", 34, Campaign::Cream);
-        UI::Label(347, 32, TextFormat("%d / 3  %s", level + 1, levelNames[level].c_str()), 22,
+        UI::Label(347, 32, TextFormat("%d / 3  %s", level + 1, Tr(levelNames[level]).c_str()), 22,
                   Campaign::Cream);
         UI::Label(347, 58,
-                  TextFormat("TO CLEAR  %d     COMBO  x%d",
+                  TextFormat((Tr("TO CLEAR") + "  %d     " + Tr("COMBO") + "  x%d").c_str(),
                              static_cast<int>(model.balls.size()) + model.remaining, model.combo),
                   16, {169, 203, 160, 255});
         UI::Title(850, 28, TextFormat("%05d", model.score), 36, {245, 208, 108, 255});
         if (!model.balls.empty() && model.balls.front().distance > model.path.length - 400) {
             UI::LabelCentered(640, 104, "DANGER! THE CHAIN IS NEAR THE GATE", 22,
                               {250, 153, 104, 255});
-        } else
-            UI::LabelCentered(640, 97,
-                              "Match 3+ adjacent colours. Gaps close into chain reactions.", 17,
-                              Campaign::Cream);
+        }
         UI::Label(36, 647, "NEXT", 18, Campaign::Cream);
         DrawBall({112, 654}, model.next, 17);
         UI::Label(814, 645,
                   (model.shotsFired + 1) % 9 == 0
                       ? "BLAST SHOT READY"
-                      : TextFormat("BLAST IN %d SHOTS", 9 - model.shotsFired % 9),
+                      : TextFormat(Tr("BLAST IN %d SHOTS").c_str(), 9 - model.shotsFired % 9),
                   20, {239, 209, 135, 255});
-        UI::Label(36, 670, "Mouse: click to fire / Space to swap. Touch: drag aim, lift to fire.",
-                  16, Campaign::Cream);
     }
     void DrawHelp() override {
-        using RayGame::UI;
+        using Campaign::UI;
         const char* lines[] = {"1. Aim at the moving chain, then click to launch a marble.",
                                "2. Touch: drag to aim; lift your finger to shoot.",
                                "3. Three or more adjacent colours disappear together.",
@@ -130,37 +145,14 @@ public:
     }
     void DrawWorld() {
         auto o = Campaign::Origin();
-        BeginMode2D({{}, o, 0, 1});
-        Color backgrounds[] = {{35, 65, 45, 255}, {30, 49, 75, 255}, {66, 45, 38, 255}};
-        Color stone[] = {{85, 103, 64, 255}, {75, 96, 115, 255}, {123, 88, 56, 255}};
-        DrawRectangleRounded({28, 90, 1224, 590}, 0.05f, 10, backgrounds[model.stage]);
-        for (int y = 124; y < 625; y += 76)
-            for (int x = 46; x < 1230; x += 112) {
-                DrawRectangleLinesEx(
-                    {static_cast<float>(x + (y % 3) * 15), static_cast<float>(y), 92, 57}, 1,
-                    Fade(stone[model.stage], 0.17f));
-            }
-        for (int i = 0; i < 18; ++i) {
-            float x = 58 + (i * 193 % 1160), y = 127 + (i * 97 % 490);
-            DrawEllipse(static_cast<int>(x), static_cast<int>(y), 25, 8, {25, 46, 28, 155});
-            DrawLineEx({x, y}, {x - 10, y - 16}, 3, {63, 118, 71, 120});
-        }
-        for (size_t i = 1; i < model.path.points.size(); ++i) {
-            auto a = model.path.points[i - 1], b = model.path.points[i];
-            DrawLineEx({a.x + 3, a.y + 6}, {b.x + 3, b.y + 6}, 50, {8, 21, 19, 170});
-            DrawLineEx(a, b, 46, stone[model.stage]);
-            DrawLineEx(a, b, 32, {38, 41, 29, 255});
-            DrawLineEx(a, b, 24, {46, 47, 32, 255});
-        }
-        for (float s = 40; s < model.path.length; s += 64) {
-            auto p = model.path.At(s), t = model.path.Tangent(s);
-            DrawLineEx({p.x - t.y * 20, p.y + t.x * 20}, {p.x + t.y * 20, p.y - t.x * 20}, 2,
-                       Fade(BLACK, 0.3f));
-        }
+        rlPushMatrix();
+        rlTranslatef(o.x, o.y, 0);
+        if (backdrops[model.stage])
+            DrawTexturePro(*backdrops[model.stage], {0, 0, 2560, 1440}, {0, 0, 1280, 720}, {}, 0,
+                           WHITE);
         auto gate = model.path.At(model.path.length);
-        DrawCircleV({gate.x, gate.y + 3}, 34, {13, 23, 21, 255});
-        DrawCircleLines(static_cast<int>(gate.x), static_cast<int>(gate.y), 35,
-                        {214, 167, 86, 255});
+        DrawCircleSector({gate.x, gate.y + 3}, 34, 0, 360, 96, {13, 23, 21, 255});
+        DrawRing(gate, 33, 35, 0, 360, 128, {214, 167, 86, 255});
         UI::LabelCentered(gate.x, gate.y + 39, "GATE", 15, Campaign::Cream);
         for (const auto& b : model.balls)
             DrawBall(model.path.At(b.distance), b.color);
@@ -183,19 +175,11 @@ public:
                 DrawCircleV({p.x + std::cos(angle) * i * 16, p.y + std::sin(angle) * i * 16}, 2,
                             Fade(Campaign::Cream, 0.28f));
         }
-        DrawCircleV({p.x + 3, p.y + 8}, 58, {9, 24, 19, 155});
-        DrawCircleV(p, 54, {110, 119, 67, 255});
-        DrawCircleLines(static_cast<int>(p.x), static_cast<int>(p.y), 49, {226, 197, 99, 255});
-        DrawEllipse(static_cast<int>(p.x), static_cast<int>(p.y + 5), 40, 31, {57, 123, 73, 255});
+        DrawTexturePro(*launcherTexture, {0, 0, 256, 256}, {p.x, p.y, 128, 128}, {64, 64},
+                       angle * RAD2DEG, WHITE);
         Vector2 nozzle{p.x + std::cos(angle) * 35, p.y + std::sin(angle) * 35};
-        DrawLineEx(p, nozzle, 32, {119, 169, 82, 255});
-        DrawCircleV(nozzle, 16, {35, 69, 38, 255});
         DrawBall(nozzle, model.current, 13, (model.shotsFired + 1) % 9 == 0);
-        DrawCircleV({p.x - std::sin(angle) * 23, p.y + std::cos(angle) * 23}, 9, Campaign::Cream);
-        DrawCircleV({p.x + std::sin(angle) * 23, p.y - std::cos(angle) * 23}, 9, Campaign::Cream);
-        DrawCircleV({p.x - std::sin(angle) * 23 + 2, p.y + std::cos(angle) * 23}, 4, BLACK);
-        DrawCircleV({p.x + std::sin(angle) * 23 + 2, p.y - std::cos(angle) * 23}, 4, BLACK);
-        EndMode2D();
+        rlPopMatrix();
     }
     int Smoke();
 };

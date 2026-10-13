@@ -21,6 +21,8 @@ void Profile::Load() {
         settings.sfx = Clamp(save.GetFloat("sfx", 0.75f), 0.0f, 1.0f);
         settings.shake = save.GetBool("shake", true);
         settings.fullscreen = save.GetBool("fullscreen", false);
+        settings.controlSize = Clamp(save.GetFloat("controlSize", 1.2f), 1.0f, 1.4f);
+        settings.showDown = save.GetBool("showDown", false);
         int fps = save.GetInt("fps", settings.fps);
         if (fps == 60 || fps == 120 || fps == 144)
             settings.fps = fps;
@@ -54,6 +56,8 @@ bool Profile::SaveSettings() const {
     save.SetFloat("sfx", settings.sfx);
     save.SetBool("shake", settings.shake);
     save.SetBool("fullscreen", settings.fullscreen);
+    save.SetFloat("controlSize", settings.controlSize);
+    save.SetBool("showDown", settings.showDown);
     save.SetInt("fps", settings.fps);
     return save.Save(directory / "settings.sav");
 }

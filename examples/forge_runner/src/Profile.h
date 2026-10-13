@@ -9,6 +9,8 @@ struct Settings {
     Language language = Language::Chinese;
     float music = 0.45f, sfx = 0.75f;
     bool shake = true, fullscreen = false;
+    float controlSize = 1.2f;
+    bool showDown = false;
 #if defined(__ANDROID__)
     int fps = 60;
 #else

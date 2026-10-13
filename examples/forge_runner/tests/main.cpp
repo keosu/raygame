@@ -265,12 +265,16 @@ int main(int argc, char** argv) {
         std::filesystem::create_directories(profile.directory);
         profile.settings.music = 0.3f;
         profile.settings.fps = 144;
+        profile.settings.controlSize = 1.4f;
+        profile.settings.showDown = true;
         Expect(profile.SaveSettings() && profile.NewRun(), "new run and settings persist");
         profile.Record(checkpoint);
         Profile restored(argv[2]);
         restored.Load();
         Expect(restored.active && restored.collected == 1 && restored.settings.fps == 144,
                "resume and settings round trip");
+        Expect(restored.settings.controlSize == 1.4f && restored.settings.showDown,
+               "touch size and optional down button persist");
         profile.settings.language = Language::English;
         profile.SaveSettings();
         restored.Load();
@@ -291,6 +295,8 @@ int main(int argc, char** argv) {
         legacySettings.Save(profile.directory / "settings.sav");
         restored.Load();
         Expect(restored.settings.language == Language::Chinese, "older saves default to Chinese");
+        Expect(restored.settings.controlSize == 1.2f && !restored.settings.showDown,
+               "older saves use larger controls and hide down button");
         checkpoint.collected = 1;
         checkpoint.player.position = checkpoint.level.goal;
         checkpoint.Step({}, 1.0f / 60);

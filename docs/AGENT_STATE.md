@@ -63,7 +63,93 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 本包未改。下一步：可考虑渲染组件注册/可见性裁剪、粒子曲线与
 局部空间、UI 控件状态与输入路由（审查文档第 5、6 节）。
 
-## 最近工作包：祖玛与植物大战僵尸玩法示例（已实现并本地验证）
+## 最近工作包：示例画质、菜单、拖拽与移动控制（已实现并本地验证）
+
+基线 `da09343`。用户要求两款 campaign 的适配/菜单/中英文/设置、彩球质感、
+花园拖种植，以及 Forge 放大触屏图标按钮。随后反馈启动 PAUSED、设置被上层
+遮罩盖住、左下操作说明遮挡、全屏顶部内容缺失。本包未创建子 agent；Android
+仍只构建/校验 APK，不安装或启动设备。
+
+- 框架增加 `PointerGesture` 鼠标/单指捕获、拖动阈值、释放及失焦/映射取消，
+  复用 TouchTracker；公开头文件由 SDK 导出。`ButtonPainter` 提供统一阴影、
+  边缘、高光、按压/选中/禁用及跳跃/冲刺等图标，UI、campaign 和 Forge 共用。
+- `Display::CanvasQuality` 增加 Smooth 两倍原生采样，保持 4096 边长限额与
+  分配失败保留旧画布。UI 可用 Unicode 正文/标题字体；测量/绘制一致，Shutdown
+  清空。campaign 中英目录和 Noto Sans SC 子集可重建，语言默认中文。
+- 两款共享设置：中英、音效/音量、标准/精细、60/120 FPS、桌面窗口/全屏，
+  即时保存；菜单等比居中缩放、鼠标/触屏/键盘导航。启动固定主菜单；从暂停
+  打开设置后返回原暂停页。完整操作说明只在帮助页，游戏中仅状态与短暂反馈。
+- 修复 `GameEngine::Render` 无条件叠加暂停框：关闭默认快捷键的自定义游戏
+  暂停模拟时不再绘制引擎 PAUSED。Render 作为 protected 方法让图形检查走正常
+  Run 相同的完整流程，新增实际像素回归，保留原示例默认暂停框。
+  campaign 原先把居中 origin 作为 Camera2D target，产生反向平移；改为明确的
+  正向矩阵平移/缩放，修复竖屏/非 16:9 全屏的顶部裁切与按钮绘制/命中错位。
+- Marble 彩球仅颜色区分，使用原创柔边高光/反射/阴影纹理；三关神庙背景和
+  青蛙发射器经超采样生成，轨道节点与模型一致。没有使用原作素材。
+- Garden 种子/铲子可拖到格子，预览跟随指针、有效/无效格标色，触屏向上偏移；
+  松手种植一次，外部/失焦/切页取消不扣费，落点阳光不会抢走种植操作。
+  保留点击选择再点击种植。
+- Forge 左右/跳跃/冲刺/暂停图标按钮放大，默认 120%，可选 100/120/140%；
+  绘制与触摸同布局。独立下落默认隐藏，移动手指向下拉再用另一指跳跃可穿过
+  单向平台；独立按钮可开启，键盘原操作保留。中文字体更新为 394 字符。
+
+### 已通过的最终检查
+
+- Windows/MSVC x64 Debug/Release 八示例完整重建，各 **371 引擎逻辑**、
+  **130 Forge 逻辑**、**37 campaign 逻辑**通过；原四示例 graphics、Forge、
+  Engine Lab、两款新游戏图形/输入检查均零失败。默认/自定义暂停像素回归
+  加入后单独重建并重跑两模式 smoke，通过；六关普通命令逻辑通关保持通过。
+- 两款图形检查走正常 Render，覆盖初始失焦仍停在菜单且无引擎叠层、菜单/
+  暂停进入设置、全屏设置/完整顶部 HUD、全屏窗口往返、4:3/超宽/竖屏实际
+  面板像素与输入对应、中英/质量切换、存档重启；Garden 另覆盖鼠标/触屏拖放、
+  冷却/占用/成本、外部取消、失焦取消及阳光重叠。已查看最终代表截图。
+- Release 正常启动（非 --smoke）两款游戏，等待资源初始化后主菜单正常；
+  1280×720 原生客户区截图 `build/polish-normal-<name>/normal-menu-client.png`。
+  仅向本次启动的 PID 发 WM_CLOSE，未终止用户进程。早期截图捕获过早/工具
+  DPI 坐标不一致，已用线程 DPI awareness 重新捕获；不作为最终画面证据。
+- 桌面 SDK Debug/Release 独立消费、单头文件、搬迁、配置不匹配拒绝与隐藏窗口
+  图形检查通过；八 Windows Release EXE 的八尺寸图标通过。Forge 独立 SDK
+  Release 编译、130 项逻辑与图标也通过，该独立入口使用 -SkipGraphics，
+  Forge 两模式图形成绩来自根工程。
+- 八 ARM64 Release APK 完整重建并验证签名、16 KiB ZIP/ELF 对齐、入口/静态
+  运行库、图标、资源 hash、Java TTS 桥接/manifest；Marble **4,287,423 B**、
+  Garden **1,423,680 B**、Forge **2,993,599 B**。保留原签名。三个受影响 Debug
+  APK 关闭缓存完整重建/复验通过：Marble **7,248,831 B**、Garden **4,405,568 B**、
+  Forge **6,299,071 B**；常规缓存的 Forge Debug 曾为 6,303,167 B，最终记录以
+  无缓存新包为准。最后补全帮助页快捷键后，两款重建两模式并重跑图形和 APK
+  校验通过；最终 Release 报告含八包，Debug 报告最后单独校验 Garden，
+  其他两包的通过结果保留在对应日志；全部 RuntimeTested=false。
+- 彩球/背景/发射器 PNG、四份 Campaign 字体/目录和两份 Forge 字体隔离重建
+  逐字节一致；292/312/394 字符覆盖与背景轨道节点对照通过。clang-format
+  19.1.5 的 46 文件、actionlint、修改文本 UTF-8/LF/末尾换行、Python 语法和
+  `git diff --check` 通过。
+
+早期为避开用户 EXE 锁建立 `build/polish-desktop` 副本，xmake 编译缓存带回了
+该副本的绝对头文件依赖，造成根工程后续修改未重编译。本包已关闭 Windows
+ccache 并完整重建两模式，以上最终成绩使用新产物，旧 polish 日志不作为最终
+证据。Android Release 也关闭缓存重建并复验，结果与常规构建一致。
+一次 Android 补验误配为 Windows、与图形检查争用 EXE，已改为显式 Android
+配置后完成；不把该失败算作 Android 运行失败。
+
+最终 Windows 日志 `build/polish-final-<mode>-*.log`；两款/Lab 图形在
+`build/polish-final-<mode>-<name>/`，Forge 在 `build/polish-final-<mode>-forge/`。
+SDK `build/polish-final-sdk-<mode>.log`，Android 最终无缓存日志
+`build/polish-final-android-no-cache-*.log`，帮助页最后补验 `build/polish-help-*`，
+Forge 独立 `build/polish-final-forge-sdk-release.log`，资源复验 `build/polish-assets/`。
+根配置 Windows x64 Release、examples/tests 开启、GUI 子系统，ccache=n。
+
+### 未运行、限制与下一步
+
+未安装/运行 Android 真机/模拟器，未运行 Linux/macOS、新远端 CI、人工完整
+通关/手柄/音频试听、多 DPI/多显示器矩阵或长稳。正常客户区截图不替代 DPI
+矩阵验收。超采样的显存/帧时间、Android 安全区/GPU 恢复以及拖动/按钮实际
+手感仍须设备测试；这次增加的是指针工具与按钮绘制，不是通用拖放对象系统。
+
+本包提交主题：`Polish campaign menus, marble art and mobile controls`。用户可运行
+`bin/marble_temple.exe`、`bin/garden_guard.exe` 与 `bin/forge_runner/forge_runner.exe`
+体验菜单/全屏/拖放；手动安装同签名新 APK 验收按钮大小、下拉跳跃与拖种植。
+
+## 上一工作包：祖玛与植物大战僵尸玩法示例（已实现并本地验证）
 
 基线 `196c6d0`，开始时工作区干净。用户要求增加两个完整游戏示例。
 提交主题：`Add Marble Temple and Garden Guard campaign examples`。

@@ -7,8 +7,13 @@ bool Inside(Vector2 point, Rectangle bounds) {
 }
 } // namespace
 Rectangle TouchControls::Bounds(Rectangle reference) const {
-    return layout.Place(reference,
-                        {reference.x > 640 ? 1.0f : 0.0f, reference.y > 360 ? 1.0f : 0.0f});
+    float scale = std::clamp(sizeScale, 1.0f, 1.4f);
+    auto r = reference;
+    r.x = reference.x > 640 ? 1280 - (1280 - reference.x) * scale : reference.x * scale;
+    r.y = reference.y > 360 ? 720 - (720 - reference.y) * scale : reference.y;
+    r.width *= scale;
+    r.height *= scale;
+    return layout.Place(r, {reference.x > 640 ? 1.0f : 0.0f, reference.y > 360 ? 1.0f : 0.0f});
 }
 void TouchControls::Reset(const RayGame::InputFrame& frame) {
     tracker.Reset(frame);
@@ -69,7 +74,7 @@ void TouchControls::Update(const RayGame::InputFrame& frame,
             } else if (Inside(point.position, Bounds(DashButton))) {
                 free->role = Role::Dash;
                 pendingDash = true;
-            } else if (Inside(point.position, Bounds(Down))) {
+            } else if (showDown && Inside(point.position, Bounds(Down))) {
                 free->role = Role::Down;
             } else if (Inside(point.position, Bounds(PauseButton))) {
                 free->role = Role::Pause;
@@ -92,6 +97,9 @@ void TouchControls::Update(const RayGame::InputFrame& frame,
                 held.move -= 1;
             if (Inside(contact.position, Bounds(Right)))
                 held.move += 1;
+            // Pull the movement finger down, then tap jump to drop through a ledge.
+            if (contact.position.y - contact.start.y > 48)
+                held.down = true;
         }
         if (contact.role == Role::Jump)
             held.jumpHeld = true;

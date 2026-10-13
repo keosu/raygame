@@ -3,7 +3,7 @@
 #include "../common/CampaignGame.h"
 
 namespace Garden {
-using RayGame::UI;
+using Campaign::UI;
 inline constexpr Color Leaf{90, 163, 66, 255};
 inline void DrawPlant(Vector2 p, Kind kind, float time = 0, bool small = false) {
     float bounce = small ? 0 : std::sin(time * 3 + p.x) * 2;
@@ -124,6 +124,46 @@ public:
     int heardShot = 0, heardHit = 0, heardPlant = 0;
     std::string feedback;
     float feedbackTime = 0;
+    int dragSeed = -1;
+    bool dragActive = false;
+    Vector2 dragPoint{};
+    void PointerBegin(int action, Vector2 p) override {
+        if (screen != Campaign::Screen::Play)
+            return;
+        if (action >= 40 && action <= 46) {
+            dragSeed = action - 40;
+            dragPoint = p;
+        }
+    }
+    void PointerMove(Vector2 p) override {
+        if (dragSeed < 0)
+            return;
+        dragPoint = p;
+        dragActive = pointer.dragging;
+    }
+    bool PointerEnd(int, Vector2 p, bool dragged) override {
+        if (dragSeed < 0)
+            return false;
+        int seed = dragSeed;
+        PointerCancel();
+        if (!dragged)
+            return false;
+        int row = static_cast<int>(std::floor((p.y - Top) / CellH));
+        int col = static_cast<int>(std::floor((p.x - Left) / CellW));
+        if (row < 0 || row >= Rows || col < 0 || col >= Columns)
+            return true;
+        model.selected = seed;
+        bool placed = seed == 6 ? model.Shovel(row, col) : model.PlantSeed(row, col, seed);
+        if (!placed) {
+            feedback = "Need sun, an empty tile and a ready seed packet.";
+            feedbackTime = 2;
+        }
+        return true;
+    }
+    void PointerCancel() override {
+        dragSeed = -1;
+        dragActive = false;
+    }
     explicit Game(std::filesystem::path directory)
         : Campaign::Game(
               "garden_guard", "GARDEN GUARD", "Grow a defence. Protect the little house.",
@@ -184,13 +224,13 @@ public:
         }
     }
     void DrawHUD() override {
-        using RayGame::UI;
+        using Campaign::UI;
         DrawRectangleRounded({28, 20, 1224, 62}, 0.15f, 8, {39, 65, 43, 245});
         UI::Title(47, 29, "GARDEN GUARD", 34, Campaign::Cream);
-        UI::Label(331, 31, TextFormat("%d / 3  %s", level + 1, levelNames[level].c_str()), 22,
+        UI::Label(331, 31, TextFormat("%d / 3  %s", level + 1, Tr(levelNames[level]).c_str()), 22,
                   Campaign::Cream);
         UI::Label(331, 57,
-                  TextFormat("WAVE %d / 3   DEFEATED  %d / %d",
+                  TextFormat((Tr("WAVE") + " %d / 3   " + Tr("DEFEATED") + "  %d / %d").c_str(),
                              model.elapsed < 60   ? 1
                              : model.elapsed < 98 ? 2
                                                   : 3,
@@ -201,23 +241,20 @@ public:
         DrawCircleV({74, 140}, 18, {247, 199, 72, 255});
         UI::Title(102, 120, std::to_string(model.sun), 36, Campaign::Cream);
         UI::Label(57, 164, "SUN TO SPEND", 15, Campaign::Cream);
-        UI::Label(
-            240, 651,
-            feedbackTime > 0
-                ? feedback
-                : "Choose a seed, then click an empty tile. Click glowing suns to collect them.",
-            19, {224, 228, 190, 255});
+        if (feedbackTime > 0 && !feedback.empty())
+            UI::LabelCentered(640, 685, feedback, 16, {224, 228, 190, 255});
     }
     void OnRender() override {
         Campaign::Game::OnRender();
         if (screen != Campaign::Screen::Play)
             return;
         auto o = Campaign::Origin();
-        BeginMode2D({{}, o, 0, 1});
+        rlPushMatrix();
+        rlTranslatef(o.x, o.y, 0);
         for (int i = 0; i < 6; ++i) {
             Rectangle r{240.0f + i * 144, 100, 134, 86};
             if (model.selected == i)
-                DrawRectangleRoundedLines(r, 0.18f, 8, {255, 217, 102, 255});
+                DrawRectangleRoundedLinesEx(r, 0.18f, 24, 2, {255, 217, 102, 255});
             DrawPlant({r.x + 33, r.y + 47}, static_cast<Kind>(i), 0, true);
             UI::Label(r.x + 61, r.y + 17, TextFormat("%d  / %d", i + 1, Costs[i]), 18,
                       Campaign::Cream);
@@ -235,21 +272,42 @@ public:
         }
         if (model.selected == 6)
             DrawRectangleLinesEx({1120, 100, 124, 86}, 3, {255, 217, 102, 255});
-        int row = static_cast<int>((aim.y - Top) / CellH),
-            col = static_cast<int>((aim.x - Left) / CellW);
-        if (aim.y >= Top && aim.x >= Left && row < Rows && col < Columns)
-            DrawRectangleLinesEx({Left + col * CellW, Top + row * CellH, CellW, CellH}, 3,
-                                 {248, 228, 137, 220});
+        auto point = dragActive ? dragPoint : aim;
+        int row = static_cast<int>(std::floor((point.y - Top) / CellH)),
+            col = static_cast<int>(std::floor((point.x - Left) / CellW));
+        if (row >= 0 && col >= 0 && row < Rows && col < Columns) {
+            int seed = dragActive ? dragSeed : model.selected;
+            bool valid = seed == 6 ? model.PlantAt(row, col) >= 0
+                                   : model.PlantAt(row, col) < 0 && model.cooldown[seed] <= 0 &&
+                                         model.sun >= Costs[seed];
+            Rectangle cell{Left + col * CellW, Top + row * CellH, CellW, CellH};
+            Color glow = valid ? Color{215, 246, 142, 220} : Color{246, 116, 94, 220};
+            DrawRectangleRec(cell, Fade(glow, 0.14f));
+            DrawRectangleLinesEx(cell, 3, glow);
+            if (dragActive && seed < 6) {
+                DrawPlant(Center(row, col), static_cast<Kind>(seed));
+                DrawRectangleRec(cell, Fade(glow, 0.1f));
+            }
+        }
+        if (dragActive) {
+            Vector2 ghost{point.x, point.y - (pointer.IsTouch() ? 60 : 18)};
+            DrawCircleV({ghost.x, ghost.y + 12}, 42, {20, 41, 28, 110});
+            if (dragSeed < 6)
+                DrawPlant(ghost, static_cast<Kind>(dragSeed));
+            else
+                RayGame::ButtonPainter::Icon(RayGame::ButtonIcon::Drop, ghost, 44, Campaign::Cream);
+        }
         if (model.elapsed < 22)
-            UI::TitleCentered(
-                715, 300, TextFormat("PLANT YOUR DEFENCE  /  %.0fs", std::ceil(22 - model.elapsed)),
-                28, {249, 234, 178, 255});
+            UI::TitleCentered(715, 300,
+                              Tr("PLANT YOUR DEFENCE") +
+                                  TextFormat("  /  %.0fs", std::ceil(22 - model.elapsed)),
+                              28, {249, 234, 178, 255});
         if (model.waveFlash > 0 && model.spawned > 0)
             UI::LabelCentered(715, 198, "VISITORS APPROACH!", 20, {255, 219, 119, 255});
-        EndMode2D();
+        rlPopMatrix();
     }
     void DrawHelp() override {
-        using RayGame::UI;
+        using Campaign::UI;
         const char* lines[] = {"Collect glowing sun tokens to pay for plants.",
                                "Select a seed packet (1 - 6), then click an empty tile.",
                                "Sunflowers produce sun. Peashooters attack their own row.",
@@ -263,7 +321,8 @@ public:
     }
     void DrawWorld() {
         auto o = Campaign::Origin();
-        BeginMode2D({{}, o, 0, 1});
+        rlPushMatrix();
+        rlTranslatef(o.x, o.y, 0);
         Color sky[] = {{122, 169, 150, 255}, {128, 150, 172, 255}, {180, 139, 116, 255}};
         DrawRectangleRounded({28, 90, 1224, 590}, 0.05f, 10, sky[model.stage]);
         for (int i = 0; i < 10; ++i) {
@@ -336,7 +395,7 @@ public:
             DrawCircleLines(static_cast<int>(b.position.x), static_cast<int>(b.position.y),
                             155 * b.age / 0.6f, {249, 203, 87, 255});
         }
-        EndMode2D();
+        rlPopMatrix();
     }
     int Smoke();
 };

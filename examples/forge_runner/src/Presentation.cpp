@@ -39,6 +39,8 @@ std::string Presentation::Localize(const std::string& value) const {
             key = "TOUCH JUMP / HOLD FOR HEIGHT";
         if (value == "SHIFT TO DASH")
             key = "TOUCH DASH";
+        if (value == "HOLD DOWN + JUMP TO DROP THROUGH")
+            key = "PULL MOVE DOWN + TAP JUMP TO DROP";
     }
     return catalog.Translate(key, settings.language);
 }
