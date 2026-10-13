@@ -51,15 +51,16 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 - 独立副本中 `verify-sdk.lua` 及 `--graphics` 通过；`build-forge.ps1 -Mode release
   -Verify -SkipGraphics` 通过；clang-format 19.1.5 的 22 文件检查通过（新测试头纳入范围）。
 - 外部塔防项目以子模块编译通过。
+- 已推送 `e196a10`；远端 CI run 38418657798 全部通过：Windows/Linux Debug/Release、
+  C++ formatting、Android ARM64 APKs（Linux 构建与 Android 打包由 CI 验证，本地未跑）。
 
 日志：`build/ext/`（本仓库作为子模块时须用 `xmake -P .`，否则 xmake 会选中父工程；
 `verify-sdk.lua` 内部未传 `-P`，因此在独立副本 `%TEMP%/raygame-sdkcheck` 中运行）。
 
 ### 未运行与下一步
 
-未运行 Linux/macOS、远端 CI、Android 构建与设备、Forge 图形 smoke（`-SkipGraphics`）、
-人工试玩与音频试听。退出接触按碰撞体地址顺序派发是既有行为（两世界间顺序不同），
-本包未改。下一步：推送后检查 CI；可考虑渲染组件注册/可见性裁剪、粒子曲线与
+未运行 macOS、Android 设备、Forge 图形 smoke（`-SkipGraphics`）、人工试玩与音频试听。退出接触按碰撞体地址顺序派发是既有行为（两世界间顺序不同），
+本包未改。下一步：可考虑渲染组件注册/可见性裁剪、粒子曲线与
 局部空间、UI 控件状态与输入路由（审查文档第 5、6 节）。
 
 ## 上一工作包：Windows 第二关 CRLF 加载错误（已修复并验证）
