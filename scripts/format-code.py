@@ -24,6 +24,10 @@ DEFAULT_PATHS = (
     "src/SpeechAndroid.cpp",
     "tests/speech.h",
     "tests/tts_smoke.cpp",
+    "examples/marble_temple",
+    "examples/garden_guard",
+    "examples/common/CampaignGame.h",
+    "tests/campaigns.cpp",
 )
 
 

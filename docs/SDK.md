@@ -123,7 +123,7 @@ xmake build -a -j 1 -y
 ```
 
 桌面引擎库按平台/架构/模式输出到 `build/lib/<平台>/<架构>/<模式>`，防止
-Debug/Release 库相互覆盖。五小示例（含 Engine Lab）及 tests/smoke 的可执行文件仍共用 `bin`，
+Debug/Release 库相互覆盖。七个示例（含 Engine Lab、Marble Temple 和 Garden Guard）及 tests/smoke 的可执行文件仍共用 `bin`，
 根工程 FORGE 与其逻辑测试位于 `bin/forge_runner`；
 构建规则在每个可执行文件旁保存 `.raygame-config` 配置标记，切换模式后强制
 重新链接，避免模式独立的缓存误判共享 EXE。相同配置的无改动构建仍复用产物。

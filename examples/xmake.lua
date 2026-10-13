@@ -10,7 +10,7 @@ option("example_console")
     set_description("Enable the Windows console and raylib logs for examples")
 option_end()
 
-local example_names = {"space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "engine_lab"}
+local example_names = {"space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "engine_lab", "marble_temple", "garden_guard"}
 local examples_root = os.scriptdir()
 
 -- Each game owns its assets; only the small examples share fonts.
@@ -45,8 +45,8 @@ if not is_plat("android") and (has_config("build_examples") or has_config("build
             set_default(false)
             on_build(function ()
                 copy_assets(path.join(examples_root, name, "assets"), path.join(os.projectdir(), "bin/assets", name), os, io)
-                if name == "engine_lab" then
-                    os.cp(path.join(examples_root, name, "README.md"), path.join(os.projectdir(), "bin/engine_lab-README.md"))
+                if name == "engine_lab" or name == "marble_temple" or name == "garden_guard" then
+                    os.cp(path.join(examples_root, name, "README.md"), path.join(os.projectdir(), "bin", name .. "-README.md"))
                 end
             end)
         target_end()

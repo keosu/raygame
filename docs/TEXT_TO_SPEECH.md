@@ -38,7 +38,7 @@ Android 继续使用 NativeActivity。`platform/android/java/org/raygame/SpeechB
 暂停停止、销毁释放，旧请求回调以编号过滤。默认系统 TTS 服务是否需要联网由其声音决定。
 应用不下载语音包，不需要录音权限。缺失服务或语言数据时显示可读错误。
 
-六个 APK 已统一接入 `raygame.android_tts`：在 xmake **3.1.1** 的 NativeActivity
+八个 APK 已统一接入 `raygame.android_tts`：在 xmake **3.1.1** 的 NativeActivity
 打包后，用 JDK 17 javac 编译桥接、D8 生成 classes.dex，再进行 16 KiB ZIP 对齐和签名。
 不需要 Gradle。该规则依赖 xmake 3.1.1 的 `packing/res_only.apk` 中间产物；升级 xmake
 需重新验证打包顺序与增量重建。构建脚本检查 dex 内桥接类以及 manifest 的 hasCode 和

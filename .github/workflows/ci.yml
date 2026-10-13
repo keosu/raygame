@@ -74,6 +74,11 @@ jobs:
       - name: Run FORGE tests
         run: xmake run forge_tests
 
+      - name: Build and run campaign game tests
+        run: |
+          xmake build -y campaign_tests
+          xmake run campaign_tests
+
       - name: Verify installed SDK from an independent project
         run: xmake lua scripts/verify-sdk.lua
 
@@ -111,6 +116,10 @@ jobs:
             bin/bullet_hell.exe
             bin/engine_lab.exe
             bin/engine_lab-README.md
+            bin/marble_temple.exe
+            bin/marble_temple-README.md
+            bin/garden_guard.exe
+            bin/garden_guard-README.md
             bin/*.dll
             bin/assets/
             bin/forge_runner/forge_runner.exe
@@ -147,7 +156,7 @@ jobs:
         with:
           xmake-version: ${{ env.XMAKE_VERSION }}
 
-      - name: Build and verify six APKs including FORGE and Engine Lab
+      - name: Build and verify eight APKs including campaign games
         run: |
           ./scripts/build-android.ps1 -Mode release -SdkRoot $env:ANDROID_HOME `
             -NdkRoot "$env:ANDROID_HOME/ndk/28.2.13676358" -JavaHome $env:JAVA_HOME

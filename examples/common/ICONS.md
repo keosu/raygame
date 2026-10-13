@@ -1,8 +1,9 @@
 # Example game icons
 
-The five `examples/<game>/artwork/icon.svg` files are original geometric artwork (including Engine Lab's connected circle, square and triangle): a cyan ship,
+The seven `examples/<game>/artwork/icon.svg` files are original geometric artwork (including Engine Lab's connected circle, square and triangle): a cyan ship,
 mint/blue/gold bouncing balls, neon bricks and a paddle, and a pink radial bullet core.
-They share a dark rounded tile while keeping distinct silhouettes at small sizes.
+Marble Temple adds a frog and marble chain; Garden Guard adds a pea plant.
+They share a rounded tile while keeping distinct silhouettes at small sizes.
 
 Generated assets are committed, so normal xmake and CI builds need no image tools:
 

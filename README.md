@@ -384,7 +384,7 @@ save.Save("save.txt");
 
 ## Android APK (experimental)
 
-All six examples, including FORGE and Engine Lab, can be packaged as ARM64 NativeActivity APKs with xmake and raylib.
+All eight examples, including FORGE, Engine Lab and the two campaign games, can be packaged as ARM64 NativeActivity APKs with xmake and raylib.
 The current build targets Android 8.0+ (API 26), target SDK 35, and includes bundled
 fonts, touch controls, pause/exit UI and application-private saves/logs.
 
@@ -407,6 +407,14 @@ and platform limits](docs/ANDROID.md) (Chinese) for prerequisites and commands.
 | `neon_breakout` | Layered neon rendering, tweens, timers, trigger callbacks, camera shake, HUD, save |
 | `bullet_hell` | Boss fight with briefing, practice mode, automatic fire, pooled bullets and parent-child turrets |
 | `engine_lab` | Six interactive pages: components, physics, sprites, particles/events/pools, tilemaps, system TTS and saves |
+| `marble_temple` | Three-stage Zuma-style campaign: curved marble chains, insertion, match-3, chain reactions, blast shots and saved progress |
+| `garden_guard` | Three-stage Plants-vs-Zombies-style campaign: sun economy, six plants, five lanes, enemy waves, mowers and saved progress |
+
+[Marble Temple](examples/marble_temple/README.md) and [Garden Guard](examples/garden_guard/README.md)
+are complete small campaigns with original artwork and sounds, menus, instructions, unlocks,
+win/loss/retry flows, touch input and auto-pause on focus loss. Use `xmake run marble_temple`
+or `xmake run garden_guard`. The shared shell is `examples/common/CampaignGame.h`; each
+game has an independently testable model and a Scene/Component renderer.
 
 [Engine Lab](examples/engine_lab/README.md) demonstrates the APIs with live objects and controls.
 Run `xmake run engine_lab`; use its Services page for Windows/Android speech, sound and saves.
@@ -473,7 +481,7 @@ balls to keep the physics playground responsive.
 The root `xmake.lua` defines the engine and shared dependencies, then includes
 `examples/xmake.lua` and `tests/xmake.lua` for their targets. Run xmake from the
 repository root. Each example owns its assets, artwork and Android/Windows packaging
-resources under `examples/<name>/`; the five small examples share fonts in
+resources under `examples/<name>/`; the seven examples share fonts in
 `examples/common/assets/fonts`. The engine's Android raylib recipe is in
 `xmake/packages/raylib.lua`. Desktop assets are copied to `bin/assets/fonts` and
 `bin/assets/<name>/`; each APK contains only common fonts and its own assets.
@@ -481,7 +489,7 @@ Android packages remain in `bin/android/<arch>/<mode>`. See the
 [example directory guide](examples/README.md) for ownership and build entries.
 
 ```bash
-xmake            # build the library and all six desktop examples, including FORGE
+xmake            # build the library and all eight desktop examples, including FORGE
 xmake run neon_breakout
 xmake run bullet_hell
 xmake run forge_runner
@@ -508,7 +516,7 @@ with `--build_examples=n --build_tests=n`. Install with
 headers and library through the supplied SDK integration script. See
 [SDK setup and verification](docs/SDK.md).
 
-All six desktop examples build as Windows GUI applications by default: launching an EXE
+All eight desktop examples build as Windows GUI applications by default: launching an EXE
 does not open a console, and raylib trace output is disabled. To enable the console
 and logs for debugging the four small examples, run `xmake f --example_console=y` and rebuild. Use
 `xmake f --example_console=n` to return to quiet launches. The `tests` and `smoke`
@@ -567,10 +575,10 @@ tilemaps, tween callback mutation, timers, pooling, events and saves.
 an independent consumer with no engine source/example paths. It checks fixed-step
 physics, input, storage, and configuration mismatch diagnostics; `--graphics` also
 checks a native window and texture cleanup. Desktop CI runs the headless consumer.
-GitHub Actions builds all six desktop examples and runs the engine and FORGE logic
+GitHub Actions builds all eight desktop examples and runs the engine, FORGE and campaign game logic
 suites in Debug and Release on Linux and Windows; Windows explicitly selects MSVC
 and also verifies FORGE's standalone SDK build. A separate Windows job builds and verifies
-the six ARM64 Android Release APKs with JDK 17, SDK 35 and NDK r28c. All jobs use
+the eight ARM64 Android Release APKs with JDK 17, SDK 35 and NDK r28c. All jobs use
 xmake 3.1.1 (`.github/workflows/ci.yml`). CI runs on pushes/PRs to `main` and supports
 manual **Actions → CI → Run workflow** runs.
 
@@ -578,11 +586,11 @@ Successful runs provide downloadable artifacts for 14 days:
 
 | Artifact | Contents |
 | --- | --- |
-| `raygame-windows-x64-release` | Five small-example Release EXEs (including Engine Lab), shared `assets/`, and complete FORGE in `forge_runner/` |
-| `raygame-windows-x64-debug` | The same six examples and assets in Debug mode |
+| `raygame-windows-x64-release` | Seven Release EXEs (including Engine Lab, Marble Temple and Garden Guard), shared `assets/`, and complete FORGE in `forge_runner/` |
+| `raygame-windows-x64-debug` | The same eight examples and assets in Debug mode |
 | `raygame-forge-windows-x64-<mode>` | FORGE EXE, its own `assets/`, README and third-party notices |
 | `raygame-forge-linux-x86_64-<mode>` | FORGE Linux executable, `assets/`, README and third-party notices |
-| `raygame-android-arm64-release` | Six APKs including FORGE and Engine Lab, and `verification.json` with SHA-256 hashes |
+| `raygame-android-arm64-release` | Eight APKs including the campaign games, and `verification.json` with SHA-256 hashes |
 
 Open a CI run and download from **Artifacts**. Keep `assets/` next to the extracted
 Windows EXEs. The separate FORGE artifacts put the executable and assets at the

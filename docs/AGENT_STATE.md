@@ -11,7 +11,7 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：引擎能力补齐（来自塔防游戏实践，已实现并本地验证）
+## 远程并行工作包：引擎能力补齐（来自塔防游戏实践，已实现并本地验证）
 
 基线 `0fc15f8`，开始时工作区干净。用户在外部项目（以子模块使用本仓库的奥特曼
 塔防游戏）中发现框架高层组件不足，要求直接在引擎修复并推送。本包只加能力与
@@ -63,7 +63,79 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 本包未改。下一步：可考虑渲染组件注册/可见性裁剪、粒子曲线与
 局部空间、UI 控件状态与输入路由（审查文档第 5、6 节）。
 
-## 最近工作包：Windows/Android TTS 与 Engine Lab（已实现并本地验证）
+## 最近工作包：祖玛与植物大战僵尸玩法示例（已实现并本地验证）
+
+基线 `196c6d0`，开始时工作区干净。用户要求增加两个完整游戏示例。
+提交主题：`Add Marble Temple and Garden Guard campaign examples`。
+继续沿用 Android 只构建 APK、不安装或启动设备的约定。
+
+- `examples/marble_temple` / 彩球神庙：三条不同曲线轨道、有限球链、瞄准发射、
+  沿轨道切线插球、同色三连、闭合缺口连锁、当前/下一颗交换、每九发范围爆破。
+  三关分别 45/57/69 颗供给球，速度和配色不同；清空胜利、到达终点失败。
+  彩球有不同符号辅助辨识，投射物使用扫掠碰撞。
+- `examples/garden_guard` / 花园守卫：五行九列，阳光拾取/生产、成本/种子冷却，
+  向日葵/豌豆射手/坚果墙/冰花/樱桃炸弹/双发射手六种植物和铲子，普通/装甲/
+  快速敌人。同排射击、减速、啃食、范围爆炸，每行一次割草机救场；三关各三波，
+  分别 24/33/42 个敌人，清空全部波次胜利，耗尽救场后再次突破失败。
+- 两款共用 `examples/common/CampaignGame.h`：菜单/说明/锁定选关、暂停/重试、
+  逐关结算/最终胜利、自动保存解锁/最高分/音效开关。鼠标和捕获式触屏操作，
+  失焦取消手势并暂停，Back/P 暂停、R 重试、F11 全屏。真实 Scene/Component
+  驱动固定步规则与绘制；游戏模型独立于窗口。等比 Expand 画布居中固定玩法区域。
+- 角色、场景、图标为原创代码绘制/SVG，短音效由标准库 Python 合成；共用字体
+  保留许可。没有使用原游戏素材。Windows GUI 子系统、原生标题栏主题、文件日志
+  和用户数据目录沿用引擎；smoke 必须显式指定隔离数据目录。
+- 默认构建/Android/CI 扩至八个示例，Windows 产物包括新游戏 README，图标工具
+  支持七个共用字体示例；增加 `campaign_tests`，格式范围扩至 40 个 C++ 文件。
+  README、Android、SDK、TTS 和图标说明同步更新。本包未修改引擎实现。
+
+### 通过的检查
+
+- Windows/MSVC x64 Debug/Release 八示例构建，两模式各 **359 项引擎逻辑**、
+  **127 项 Forge 逻辑**、**37 项新 campaign 逻辑**通过，零失败。原四示例 graphics
+  smoke、Forge、Engine Lab 及两个新游戏图形/输入 smoke 两模式均 **0 failures**。
+  最后菜单/输入调整后两款均重建并重跑两模式 smoke；最终根工程 Release 全构建通过。
+- 新逻辑检查经普通发射/交换、阳光收集/种植命令实际完成六关，无瞬间胜利夹具：
+  Marble 约 42.4/40.5/65.4 秒，Garden 约 121.3/128.2/136.2 秒。另覆盖插球顺序、
+  缺口连锁、有限供给/不能提前胜利、扫掠碰撞、冷却、边界/成本、同排伤害/减速、
+  炸弹自毁/范围、产阳光、阻挡/啃食、双发、割草机/第二次突破及结束后输入拒绝。
+  自动通关不代表人工难度或手感验收。
+- 新 smoke 覆盖菜单/说明/锁定、触屏发射/换色/种植/收集/铲子、暂停、失焦取消、
+  多指捕获不重复发射，以及夹具触发的胜败/下一关/重试/解锁流程；这些夹具不充当
+  完整玩法通关证据。新实例重启恢复进度和音效开关通过，四种窗口比例截图已查看。
+- 八个 ARM64 Release APK 和两个新游戏 Debug APK 的 v2/v3 签名、16 KiB ZIP/ELF
+  对齐、原生入口、静态运行库、图标/完整资源 hash、Java TTS 桥接及 manifest 校验
+  通过。最终新 Release 包：Marble **1,353,661 B**、Garden **1,292,220 B**；Debug
+  分别 **4,159,421 B**、**4,102,076 B**。保留签名密钥；无改动八包增量重建 hash
+  一致，最终 `build/android/verification-release.json` 含八包，RuntimeTested=false。
+- 桌面 SDK 独立消费 Release（含隐藏窗口图形、搬迁/配置不匹配拒绝）通过；
+  本包未改 SDK API，Debug 独立消费成绩属于上一包，未重跑。八个 Windows Release
+  EXE 图标/八尺寸通过，新 EXE 的 GUI 子系统和 Release 配置标记通过。
+- clang-format 19.1.5 的 40 文件、actionlint 1.7.7、Python/PowerShell 语法、
+  修改文本 UTF-8/LF/末尾换行与 `git diff --check` 通过。
+
+日志 `build/campaign-{debug,release}-{build,tests,forge_tests,campaign_tests,smoke}.log`；
+新游戏/实验室图形 `build/campaign-smoke-{debug,release}-<name>/`，Forge 图形
+`build/campaign-forge-smoke-{debug,release}/`，截图概览 `build/campaign-overview.png`。
+最终新游戏构建 `build/campaign-final-<mode>-<name>.log`，全构建
+`build/campaign-final-release-build.log`；Android 最终日志
+`build/campaign-android-final-release.log`、`build/campaign-android-debug-<name>.log`；
+SDK `build/campaign-sdk-release.log`。最终根配置 Windows/MSVC x64 Release，
+examples/tests 开启，example_console=n。
+
+### 未运行、限制与下一步
+
+未安装/运行 Android 真机或模拟器，未运行 Linux/macOS、新远端 CI、人工完整
+通关/试听/难度调优或长稳。Android Debug 本包仅重建两个新游戏；设备触感、
+后台/锁屏、系统安全区与 GPU 恢复仍待验收。两款 UI 目前为英文，中文 README
+介绍操作；交付的是各三关的小型玩法复刻，不包含商业原作的全部内容。
+M0 的硬件、多 DPI/多显示器、干净机器与发行许可/稳定签名验收仍未完成。
+
+下一步：`xmake run marble_temple` / `xmake run garden_guard` 人工体验完整三关，
+重点检查彩球插入方向/连锁/速度，以及阳光经济/种子冷却/敌人波次难度。
+Android APK 在 `bin/android/arm64-v8a/release/`，由用户手动安装验收触屏、
+后台返回、音效和存档；推送后再检查本提交的远端 CI，不把历史成绩当成新验证。
+
+## 上一工作包：Windows/Android TTS 与 Engine Lab（已实现并本地验证）
 
 基线 `0fc15f8`，开始时工作区干净。用户要求添加 Windows/Android 系统 TTS，
 并增加一个展示引擎各类对象的 example；继续沿用 Android 不安装/启动设备的约定。

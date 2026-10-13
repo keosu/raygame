@@ -12,8 +12,8 @@ from resvg_py import svg_to_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "examples"
-GAMES = ("space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "engine_lab")
-BACKGROUNDS = ("#0b1a30", "#0b252d", "#1b1a32", "#221432", "#111e2a")
+GAMES = ("space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "engine_lab", "marble_temple", "garden_guard")
+BACKGROUNDS = ("#0b1a30", "#0b252d", "#1b1a32", "#221432", "#111e2a", "#23412d", "#639145")
 ET.register_namespace("", "http://www.w3.org/2000/svg")
 
 

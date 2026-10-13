@@ -1,6 +1,6 @@
 # Android APK 构建与手动验证
 
-当前提供六个 **实验性 Android APK**（含 FORGE 和 Engine Lab）：Android 8.0 / API 26 起、ARM64
+当前提供八个 **实验性 Android APK**（含 FORGE、Engine Lab 和两款完整小游戏）：Android 8.0 / API 26 起、ARM64
 (`arm64-v8a`)、OpenGL ES 2.0，target SDK 35。已实际交叉编译并检查 APK，
 尚未在真机或模拟器运行；用户负责本轮安装验证。
 
@@ -16,6 +16,11 @@ Release 原生代码使用本地调试密钥签名，适合侧载测试。它不
 | `bullet_hell.apk` | 竖屏，可反向竖屏 | 开场说明后选择练习/正式挑战；自动射击，拖动移动，第二根手指按住 FOCUS 减速 |
 | `forge_runner.apk` | 横屏，可反向横屏 | 左侧箭头移动；右侧跳跃/冲刺，可多指同时操作；下箭头 + 跳跃穿过单向平台 |
 | `engine_lab.apk` | 横屏，可反向横屏 | 左侧切页、底部操作；Services 试听中英文 TTS；Back 退出 |
+| `marble_temple.apk` | 横屏，可反向横屏 | 拖动瞄准、抬手发射；SWAP 换球；Back 暂停/返回 |
+| `garden_guard.apk` | 横屏，可反向横屏 | 选择种子卡，点击草坪种植；点击阳光收集；铲子移除植物 |
+
+两款新游戏有三关、说明/选关菜单、胜负结算/重试、自动保存进度；共用等比居中场地，
+失焦自动暂停。具体机制见各自 README；APK 构建验证不代替 Android 设备试玩。
 
 四个小示例都有右下角 PAUSE、暂停页 RESUME/EXIT；系统返回键切换暂停。
 保留外接键盘的原有操作。弹幕游戏有三秒准备时间，正式挑战三次护盾机会；
@@ -45,7 +50,7 @@ Android 8+ 自适应图标和 Android 13+ 主题单色图层。原始 SVG、生�
 
 包名分别是 `org.raygame.spaceshooter`、`org.raygame.bouncingballs`、
 `org.raygame.neonbreakout`、`org.raygame.bullethell`、`org.raygame.forge`、
-`org.raygame.enginelab`，六个包可同时安装。
+`org.raygame.enginelab`、`org.raygame.marbletemple`、`org.raygame.gardenguard`，八个包可同时安装。
 Android 首次侧载时按系统提示允许相应文件管理器安装应用。后续更新保留同一
 调试密钥，才能直接覆盖安装并保留数据；不要删除 `build/android/debug.keystore`。
 密钥、工具链与 APK 均不提交到 Git。
@@ -61,7 +66,7 @@ NDK r28c (`28.2.13676358`)。不需要 Gradle、Java 游戏 Activity 或 Android
 sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
 ```
 
-在仓库根目录运行，默认构建全部六个示例：
+在仓库根目录运行，默认构建全部八个示例：
 
 ```powershell
 pwsh -NoProfile -File scripts/build-android.ps1
@@ -101,7 +106,7 @@ C++ 运行库以及各自资源/共用字体和许可的 SHA-256；缺失、多�
 `.github/workflows/ci.yml` 的 Android 任务在 Windows 2022 runner 上调用同一
 脚本，固定 xmake 3.1.1、JDK 17、SDK 35/build-tools 35.0.0 和 NDK r28c。
 推送到 `main`、面向 `main` 的 PR，或在 Actions → CI → Run workflow 手动触发
-后，成功运行的 Artifacts 中提供 `raygame-android-arm64-release`，含六个 APK
+后，成功运行的 Artifacts 中提供 `raygame-android-arm64-release`，含八个 APK
 及 `verification.json`，保留 14 天。同一工作流还构建并上传 Windows x64
 Debug/Release EXE 和字体资源，Linux 保留 Debug/Release 构建与逻辑测试。
 
@@ -148,7 +153,7 @@ xmake build -j 4 -y
 
 ## 指定自己的签名 key
 
-目前直接 xmake 支持 `--android_keystore=/绝对路径/自己的.keystore`，但六个
+目前直接 xmake 支持 `--android_keystore=/绝对路径/自己的.keystore`，但八个
 游戏的打包规则都把密码固定为 `android`；未提供自定义密码、alias 或独立
 key password 的配置项。Windows 包装脚本也没有 `-Keystore` 参数，始终使用
 仓库下的本地调试 key。
@@ -201,7 +206,7 @@ Windows PowerShell（当前终端需配置 `JAVA_HOME` / `ANDROID_HOME`）：
   和 AssetManager 读取，支持压缩资源与大小上限。普通 `ReadText/WriteAtomic`
   仍用于应用私有存档，不把存档查询混入 APK 资源。
 - Android 输入帧保存最多 8 个触点 ID/位置；`Input::GetTouchPosition` 按当前
-  Display 画布换算。Android 由原生 Surface 决定实际窗口尺寸，六个示例都使用
+  Display 画布换算。Android 由原生 Surface 决定实际窗口尺寸，八个示例都使用
   Expand 等比适配；Forge 和 Bullet Hell 复用 TouchTracker 跟踪触点 ID 和取消。
   CanvasLayout 支持内容矩形，但尚未自动查询 WindowInsets。桌面专用标题栏/窗口大小
   API 不会在 Android 正常游戏流程中调用。
