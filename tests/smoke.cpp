@@ -40,6 +40,8 @@ public:
 
     void OnInit() override {
         TestResources();
+        TestRenderingExtensions();
+        TestAudioVoices();
         Expect(NativeWindowThemeMatchesSystem(GetWindowHandle()), "native title bar follows the system theme");
         SetCanvasSize(800, 600);
         LoadScene(CreateRef<shooter::SpaceShooterScene>());
@@ -173,6 +175,92 @@ public:
         retainedShader = ResourceManager::LoadShaderResource("shader-handle-test", "", shaderPath.string());
         Expect(!shader && retainedShader && shader != retainedShader, "shader unload invalidates retained references");
         fs::remove(imagePath); fs::remove(shaderPath); fs::remove(root);
+    }
+
+    static Color Pixel(RenderTexture2D target, int x, int y) {
+        Image image = LoadImageFromTexture(target.texture);
+        ImageFlipVertical(&image);
+        Color color = GetImageColor(image, x, y);
+        UnloadImage(image);
+        return color;
+    }
+
+    void TestRenderingExtensions() {
+        // Translucent drawing lowers a render target's alpha; presenting it must not
+        // reveal what lies underneath (the window margin color for the game canvas).
+        auto source = LoadRenderTexture(8, 8), dest = LoadRenderTexture(8, 8);
+        BeginTextureMode(source); ClearBackground({200, 0, 0, 255}); DrawRectangle(0, 0, 8, 8, {0, 0, 0, 128}); EndTextureMode();
+        Expect(Pixel(source, 4, 4).a < 255, "translucent drawing lowers render target alpha (test precondition)");
+        BeginTextureMode(dest); ClearBackground({0, 0, 255, 255}); Display::PresentOpaque(source.texture, {0, 0, 8, 8}); EndTextureMode();
+        Color presented = Pixel(dest, 4, 4);
+        Expect(presented.b == 0 && presented.r > 90 && presented.r < 110, "opaque presentation ignores canvas alpha");
+        UnloadRenderTexture(source); UnloadRenderTexture(dest);
+
+        // An offscreen pass in the middle of a frame resumes the canvas and its projection.
+        auto baked = LoadRenderTexture(16, 16);
+        Display::Begin();
+        ClearBackground(BLACK);
+        {
+            Display::OffscreenScope scope(baked);
+            Expect(!Display::InFrame(), "offscreen scope suspends the canvas");
+            ClearBackground({0, 255, 0, 255});
+        }
+        Expect(Display::InFrame(), "offscreen scope resumes the canvas");
+        DrawRectangle(10, 10, 20, 20, WHITE);
+        Display::End();
+        Expect(Pixel(baked, 8, 8).g == 255 && Pixel(baked, 8, 8).r == 0, "offscreen scope draws into its target");
+        Image canvas = LoadImageFromTexture(Display::GetCanvasTexture());
+        ImageFlipVertical(&canvas);
+        float qx = canvas.width / Display::GetWidth(), qy = canvas.height / Display::GetHeight();
+        Color inside = GetImageColor(canvas, (int)(20 * qx), (int)(20 * qy));
+        Color outside = GetImageColor(canvas, (int)(40 * qx), (int)(20 * qy));
+        Expect(inside.r == 255 && inside.g == 255 && outside.r == 0 && outside.g == 0,
+            "canvas drawing after an offscreen pass keeps logical coordinates");
+        UnloadImage(canvas); UnloadRenderTexture(baked);
+
+        // Textured additive particles accumulate light on top of the background.
+        auto object = CreateRef<GameObject>();
+        object->transform->position = {16, 16};
+        auto emitter = object->AddComponent<ParticleEmitter>();
+        emitter->emitting = false;
+        emitter->startVelocityMin = emitter->startVelocityMax = {0, 0};
+        emitter->startSizeMin = emitter->startSizeMax = 6;
+        emitter->startColor = emitter->endColor = {80, 0, 0, 255};
+        emitter->texture = ResourceManager::CreateColorTexture("particle-test", 4, 4, WHITE);
+        emitter->blend = ParticleBlend::Additive;
+        object->Start();
+        emitter->Burst(2);
+        auto target = LoadRenderTexture(32, 32);
+        BeginTextureMode(target); ClearBackground({40, 0, 0, 255}); emitter->Render(); EndTextureMode();
+        Color lit = Pixel(target, 16, 16), dark = Pixel(target, 2, 2);
+        Expect(lit.r >= 195 && lit.r <= 205 && dark.r == 40, "textured additive particles add their color");
+        UnloadRenderTexture(target);
+        ResourceManager::UnloadTextureNamed("particle-test");
+    }
+
+    void TestAudioVoices() {
+        if (!IsAudioDeviceReady()) { std::printf("NOTE: no audio device; voice pool checks skipped\n"); return; }
+        Wave wave{};
+        wave.frameCount = 22050; wave.sampleRate = 22050; wave.sampleSize = 16; wave.channels = 1;
+        auto* samples = (short*)MemAlloc(wave.frameCount * sizeof(short));
+        for (unsigned i = 0; i < wave.frameCount; ++i) samples[i] = (short)(std::sin(i * 0.1) * 3000);
+        wave.data = samples;
+        auto path = (std::filesystem::temp_directory_path() / "raygame-voice-test.wav").string();
+        Expect(ExportWave(wave, path.c_str()), "prepare voice test sound");
+        UnloadWave(wave);
+        AudioManager::LoadSound("voice-test", path, 3);
+        Expect(AudioManager::GetVoiceCount("voice-test") == 3, "sound aliases provide extra voices");
+        AudioManager::SetChannelVolume(AudioChannel::Sfx, 0);
+        for (int i = 0; i < 4; ++i) AudioManager::PlaySound("voice-test");
+        Expect(AudioManager::GetPlayingVoices("voice-test") == 3, "repeated plays overlap on separate voices");
+        AudioManager::SetSoundCooldown("voice-test", 10);
+        Expect(!AudioManager::PlaySound("voice-test"), "a cooldown throttles rapid repeats");
+        AudioManager::SetSoundCooldown("voice-test", 0);
+        Expect(AudioManager::PlaySound("voice-test"), "clearing the cooldown allows playback again");
+        AudioManager::StopSound("voice-test");
+        AudioManager::SetChannelVolume(AudioChannel::Sfx, 1);
+        Expect(AudioManager::GetPlayingVoices("voice-test") == 0, "stopping a sound stops all of its voices");
+        std::remove(path.c_str());
     }
 
     void Capture(const char* name) {

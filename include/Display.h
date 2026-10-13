@@ -91,6 +91,64 @@ public:
             }
         }
         if (!canvas.id) throw std::runtime_error("Cannot create a game canvas");
+        BeginCanvasMode();
+    }
+
+    static void End() {
+        inFrame = false;
+        EndTextureMode();
+        BeginDrawing();
+        ClearBackground({4, 7, 16, 255});
+        PresentOpaque(canvas.texture, viewport.bounds);
+        EndDrawing();
+    }
+
+    // True between Begin and End, i.e. while scene and UI rendering target the canvas.
+    static bool InFrame() { return inFrame; }
+
+    // Copies a render-texture color attachment without blending. Translucent drawing
+    // lowers a canvas's alpha; presenting with blending would mix in whatever lies below.
+    static void PresentOpaque(Texture2D texture, Rectangle dest) {
+        rlDrawRenderBatchActive();
+        rlDisableColorBlend();
+        DrawTexturePro(texture, {0, 0, (float)texture.width, -(float)texture.height}, dest, {0, 0}, 0, WHITE);
+        rlDrawRenderBatchActive();
+        rlEnableColorBlend();
+    }
+
+    // Redirects drawing into another render target, e.g. to bake a texture during Render.
+    // raylib cannot nest texture modes, so the canvas is suspended and its projection
+    // restored afterwards. Matrices pushed before the scope are not carried into it.
+    class OffscreenScope {
+    public:
+        explicit OffscreenScope(RenderTexture2D target) : resume(inFrame) {
+            if (resume) {
+                inFrame = false;
+                EndTextureMode();
+            }
+            BeginTextureMode(target);
+        }
+        ~OffscreenScope() {
+            EndTextureMode();
+            if (resume) BeginCanvasMode();
+        }
+        OffscreenScope(const OffscreenScope&) = delete;
+        OffscreenScope& operator=(const OffscreenScope&) = delete;
+
+    private:
+        bool resume;
+    };
+
+    static void Shutdown() {
+        if (canvas.id) UnloadRenderTexture(canvas);
+        canvas = {};
+        viewport = {};
+        failedWidth = failedHeight = 0;
+        inFrame = false;
+    }
+
+private:
+    static void BeginCanvasMode() {
         BeginTextureMode(canvas);
         // Scale the projection so nested scene cameras keep working in game units.
         rlMatrixMode(RL_PROJECTION);
@@ -98,25 +156,10 @@ public:
         rlOrtho(0, GetWidth(), GetHeight(), 0, RL_CULL_DISTANCE_NEAR, RL_CULL_DISTANCE_FAR);
         rlMatrixMode(RL_MODELVIEW);
         rlLoadIdentity();
+        inFrame = true;
     }
 
-    static void End() {
-        EndTextureMode();
-        BeginDrawing();
-        ClearBackground({4, 7, 16, 255});
-        DrawTexturePro(canvas.texture, {0, 0, (float)canvas.texture.width, -(float)canvas.texture.height},
-                       viewport.bounds, {0, 0}, 0, WHITE);
-        EndDrawing();
-    }
-
-    static void Shutdown() {
-        if (canvas.id) UnloadRenderTexture(canvas);
-        canvas = {};
-        viewport = {};
-        failedWidth = failedHeight = 0;
-    }
-
-private:
+    static inline bool inFrame = false;
     static inline int canvasWidth = 1, canvasHeight = 1;
     static inline CanvasScaleMode scaleMode = CanvasScaleMode::Fit;
     static inline int failedWidth = 0, failedHeight = 0;

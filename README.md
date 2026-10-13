@@ -37,7 +37,8 @@ paths, touch ID tracking, adaptive UI anchors, lifecycle boundaries and C++ form
 - **Colliders**: axis-aligned Box and Circle, auto-registered with the physics world
 - **All pair types** collide: Box-Box, Circle-Circle, Box-Circle
 - **Collision & trigger callbacks**: `OnCollisionEnter/Stay/Exit`, `OnTriggerEnter/Stay/Exit`
-- **Collision layers & masks**
+- **Collision layers & masks**, sweep-and-prune broad phase
+- **Queries**: circle/box overlap, swept segment casts and raycasts with layer masks
 - **Impulse-based resolution** with contact normals, penetration correction and static/dynamic handling
 
 ### Gameplay systems
@@ -45,7 +46,7 @@ paths, touch ID tracking, adaptive UI anchors, lifecycle boundaries and C++ form
 - **Event bus**: string-keyed pub/sub with automatic owner cancellation for scenes and components
 - **Object pool**: generic free-list pool (`ObjectPool<T>`)
 - **Timers**: `DestroyAfter`, repeating/one-shot `TimerComponent`
-- **Particle system**: point/circle/box/cone emitters, burst & continuous
+- **Particle system**: point/circle/box/cone emitters, burst & continuous, color/size over life, drag, textures, additive blending
 - **Tilemap**: grid tiles, tileset rendering, per-tile solidity queries
 
 ### Input, Audio, UI, Save
@@ -321,6 +322,57 @@ borrowed pointer; do not cache it or copied native IDs across reload/unload.
 Checked `operator->`/`operator*` throw on invalid handles. Upload, replacement,
 unload and handle reads must run on the graphics thread while the owning window
 is alive. Asynchronous loading and full asset dependency tracking are pending.
+
+### Rendering, particles and depth sorting
+
+The canvas is presented without blending, so translucent overlays no longer darken
+toward the window margin color. `Display::PresentOpaque(texture, dest)` applies the
+same rule to your own render targets. To bake a texture while a frame is being drawn,
+use a scope; it suspends the canvas and restores its logical projection afterwards:
+
+```cpp
+{ Display::OffscreenScope bake(target); ClearBackground(BLANK); DrawStuff(); }
+```
+
+Set `ySort = true` on any component for top-down/2.5D depth: within the same layer and
+`renderOrder`, objects lower on screen draw later. Override `RenderDepth()` for a custom key.
+
+`ParticleEmitter` interpolates `startColor` → `endColor` (including alpha) over each
+lifetime and adds `endSizeScale`, `drag`, an optional `texture` (with visible rotation)
+and `blend = ParticleBlend::Additive` for glows and sparks. Existing emitters that only
+set `startColor` now fade toward the default white end color; set
+`endColor = Fade(startColor, 0)` to keep a pure alpha fade, as the examples do.
+
+### Physics queries and broad phase
+
+`PhysicsWorld` answers gameplay queries without dispatching callbacks:
+`OverlapCircle`, `OverlapBox`, `SegmentCast` (optionally swept by a radius, hits sorted
+nearest first) and `Raycast`, each with a layer mask and a trigger filter. Worlds with
+48 or more colliders prune pairs with a sweep along x before the narrow test
+(`SetBroadphaseThreshold` changes the cutoff). Pairs keep registration order, so
+callback order is unchanged; a pair that only overlaps after another contact was
+resolved earlier in the same step is reported on the next step.
+
+```cpp
+for (Collider* c : world.OverlapCircle(tower, range, 1u << kEnemyLayer)) { /* in range */ }
+auto line = world.SegmentCast(origin, end, 8.0f); // piercing beam, nearest first
+```
+
+### Time scale, pointer capture, audio and international text
+
+- `GameEngine::SetTimeScale(2)` fast-forwards simulation without changing the fixed
+  step; the catch-up budget grows with the scale. `0` freezes simulation while UI and
+  unscaled time keep running. Components can read `GameTime::GetTimeScale()`.
+- `UI::IsMouseOverUI()` reports whether the pointer was over a panel, button or
+  progress bar in the last rendered frame, so world clicks under the HUD can be ignored.
+  Call `UI::Capture(rect)` for custom widgets.
+- `AudioManager::LoadSound(name, path, voices)` lets rapid repeats overlap,
+  `SetSoundCooldown` throttles spam, and `SetChannelVolume(AudioChannel::Sfx/Music, v)`
+  scales each group for settings menus. `PlaySound` returns whether it played.
+- `ResourceManager::CodepointsFromText(text)` gathers the glyphs a UTF-8 string needs
+  for `LoadFontResource(..., codepoints)`; `SetFontOptions(name, {true, TEXTURE_FILTER_TRILINEAR})`
+  adds mipmaps for large CJK atlases drawn small. `scripts/subset-font.py` shrinks a
+  font to the characters used by your sources and assets.
 
 ### Save
 ```cpp

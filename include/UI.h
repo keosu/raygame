@@ -19,6 +19,16 @@ public:
     static void ResetFonts() { font = nullptr; headingFont = nullptr; }
     static void ResetInteraction() { hasPress = false; }
 
+    // Pointer capture lets gameplay ignore clicks aimed at the UI. Panels, buttons and
+    // progress bars register themselves; call Capture for custom widgets. GameEngine
+    // brackets each Render with BeginFrame/EndFrame, so Update sees the last frame.
+    static void BeginFrame() { overThisFrame = false; }
+    static void EndFrame() { overLastFrame = overThisFrame; }
+    static void Capture(Rectangle rect) {
+        if (Input::IsMouseInCanvas() && CheckCollisionPointRec(Input::GetMousePosition(), rect)) overThisFrame = true;
+    }
+    static bool IsMouseOverUI() { return overLastFrame || overThisFrame; }
+
     static void Title(float x, float y, const std::string& text, int size = 36, Color color = RAYWHITE) {
         DrawTextCustom(text, x, y, size, color, true);
     }
@@ -44,12 +54,14 @@ public:
 
     static void Panel(Rectangle rect, Color color = {0,0,0,0}) {
         Color c = (color.a == 0 && color.r == 0 && color.g == 0 && color.b == 0) ? panelColor : color;
+        Capture(rect);
         DrawRectangleRounded(rect, 0.12f, 8, c);
         DrawRectangleRoundedLines(rect, 0.12f, 8, {66, 86, 119, 100});
     }
 
     static void ProgressBar(Rectangle rect, float value01, Color fill = {0,0,0,0}) {
         Color f = (fill.a == 0 && fill.r == 0 && fill.g == 0 && fill.b == 0) ? accentColor : fill;
+        Capture(rect);
         DrawRectangleRounded(rect, 0.4f, 6, Fade(DARKGRAY, 0.6f));
         Rectangle inner = rect;
         inner.width = rect.width * Clamp(value01, 0.0f, 1.0f);
@@ -67,6 +79,7 @@ public:
             hasPress = true;
         }
         bool hover = acceptsInput && Input::IsMouseInCanvas() && CheckCollisionPointRec(m, rect);
+        Capture(rect);
         Color bg = hover ? Fade(accentColor, 0.4f) : Fade(accentColor, 0.15f);
         DrawRectangleRounded(rect, 0.25f, 8, bg);
         DrawRectangleRoundedLines(rect, 0.25f, 8, Fade(accentColor, hover ? 1.0f : 0.4f));
@@ -82,6 +95,7 @@ public:
 private:
     static inline Vector2 pressPosition = {0, 0};
     static inline bool hasPress = false;
+    static inline bool overThisFrame = false, overLastFrame = false;
     static float MeasureWidth(const std::string& text, int size, bool heading = false) {
         auto selected = heading && headingFont ? headingFont : font;
         if (selected && selected->texture.id != 0)

@@ -85,21 +85,24 @@ public:
             ~CameraScope() { if (value) value->End(); }
         } cameraScope{cam ? camera.get() : nullptr};
 
-        // Build a flat, layer-sorted draw list across all objects.
+        // Build a flat, layer-sorted draw list across all objects. Keys are read once so
+        // the comparator stays consistent even if a component computes them.
         drawList.clear();
         for (auto& obj : gameObjects) {
             if (!obj || !obj->active || obj->IsDestroyed()) continue;
             obj->Start();
             for (auto& comp : obj->GetAllComponents()) {
-                if (comp && comp->IsEnabled() && comp->HasStarted()) drawList.push_back(comp);
+                if (comp && comp->IsEnabled() && comp->HasStarted())
+                    drawList.push_back({comp->RenderLayer(), comp->renderOrder, comp->RenderDepth(), comp});
             }
         }
-        std::stable_sort(drawList.begin(), drawList.end(),
-            [](const Ref<Component>& a, const Ref<Component>& b) {
-                if (a->RenderLayer() != b->RenderLayer()) return a->RenderLayer() < b->RenderLayer();
-                return a->renderOrder < b->renderOrder;
-            });
-        for (const auto& comp : drawList) {
+        std::stable_sort(drawList.begin(), drawList.end(), [](const DrawItem& a, const DrawItem& b) {
+            if (a.layer != b.layer) return a.layer < b.layer;
+            if (a.order != b.order) return a.order < b.order;
+            return a.depth < b.depth;
+        });
+        for (const auto& item : drawList) {
+            const auto& comp = item.component;
             auto* obj = comp->GetGameObject();
             if (obj && obj->active && !obj->IsDestroyed() && comp->IsEnabled()) {
                 ScopeActivation scope(comp->GetCallbackScope());
@@ -257,7 +260,12 @@ private:
     CallbackScope callbacks;
     ScopeToken parentScope;
     std::vector<Ref<GameObject>> pendingAdd;
-    std::vector<Ref<Component>> drawList;
+    struct DrawItem {
+        int layer, order;
+        float depth;
+        Ref<Component> component;
+    };
+    std::vector<DrawItem> drawList;
     std::weak_ptr<Camera2DComponent> activeCamera;
     bool updating = false;
     bool clearing = false;

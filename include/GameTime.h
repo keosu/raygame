@@ -44,6 +44,9 @@ public:
         if (std::isfinite(dt) && dt > 0) fixedDeltaTime = dt;
     }
     static void Reset() { deltaTime = 0; time = 0; frameCount = 0; unscaledDeltaTime = 0; unscaledTime = 0; }
+    // Mirrors GameEngine::SetTimeScale for components that adapt effects to fast-forward.
+    static float GetTimeScale() { return timeScale; }
+    static void SetTimeScale(float scale) { if (std::isfinite(scale)) timeScale = Clamp(scale, 0.0f, 8.0f); }
     static float GetTime() { return inFixedStep ? (float)fixedTime : time; }
     static int GetFrameCount() { return frameCount; }
     static float FPS() { return GetFPS(); }
@@ -55,6 +58,7 @@ private:
     static inline float unscaledDeltaTime = 0.0f;
     static inline double unscaledTime = 0.0;
     static inline float fixedDeltaTime = 1.0f / 60.0f;
+    static inline float timeScale = 1.0f;
     static inline float time = 0.0f;
     static inline int frameCount = 0;
 };

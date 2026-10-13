@@ -220,6 +220,7 @@ public:
         particles->startSizeMin = 1;
         particles->startSizeMax = 2;
         particles->startColor = shape->color;
+        particles->endColor = Fade(shape->color, 0);
     }
 };
 

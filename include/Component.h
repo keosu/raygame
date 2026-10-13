@@ -34,6 +34,9 @@ public:
 
     // Determines draw order; lower draws first. Renderers override.
     virtual int RenderLayer() const { return renderOrder; }
+    // Final sort key within equal layer and renderOrder. With ySort, objects lower on
+    // screen draw later (top-down/2.5D depth); otherwise registration order is kept.
+    virtual float RenderDepth() const;
 
     bool IsEnabled() const { return enabled; }
     void SetEnabled(bool value) {
@@ -51,6 +54,7 @@ public:
     GameObject* GetGameObject() const { return gameObject; }
 
     int renderOrder = 0;
+    bool ySort = false;
 
 protected:
     friend class GameObject;

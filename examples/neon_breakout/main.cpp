@@ -107,6 +107,7 @@ static void SpawnBurst(Scene* scene, Vector2 pos, Color color) {
     p->lifetimeMin = 0.25f; p->lifetimeMax = 0.6f;
     p->startSizeMin = 2; p->startSizeMax = 5;
     p->startColor = color;
+    p->endColor = Fade(color, 0);
     p->loop = false; p->emitting = false;
     p->Burst(24);
     fx->AddComponent<DestroyAfter>(0.7f);

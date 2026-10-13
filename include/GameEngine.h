@@ -191,6 +191,16 @@ public:
     }
     const FrameTiming& GetFrameTiming() const { return timing; }
 
+    // Scales simulated time (0 freezes it, 2 runs twice as fast), clamped to [0, 8].
+    // The fixed interval is unchanged: the per-frame catch-up budget of eight steps
+    // grows with the scale, and unscaled time, pause and UI keep running normally.
+    void SetTimeScale(float scale) {
+        if (!std::isfinite(scale)) return;
+        timeScale = Clamp(scale, 0.0f, 8.0f);
+        GameTime::SetTimeScale(timeScale);
+    }
+    float GetTimeScale() const { return timeScale; }
+
     int GetScreenWidth() const { return initialized ? (int)std::lround(Display::GetWidth()) : screenWidth; }
     int GetScreenHeight() const { return initialized ? (int)std::lround(Display::GetHeight()) : screenHeight; }
     void SetCanvasScaleMode(CanvasScaleMode mode) {
@@ -233,6 +243,8 @@ private:
     bool shuttingDown = false;
     CanvasScaleMode canvasScaleMode = CanvasScaleMode::Fit;
     Vector2 lastCanvasSize = {0, 0};
+    float timeScale = 1;
+    int MaxFixedSteps() const { return 8 * std::max(1, (int)std::ceil(timeScale)); }
     double fixedAccumulator = 0.0;
     FrameTiming timing;
     bool ticking = false;
@@ -305,8 +317,9 @@ private:
     void Render() {
         ScopeActivation scope(GetCallbackScope());
         Display::Begin();
+        UI::BeginFrame();
         struct FrameScope {
-            ~FrameScope() { UI::inputEnabled = true; Display::End(); }
+            ~FrameScope() { UI::inputEnabled = true; UI::EndFrame(); Display::End(); }
         } frame;
         ClearBackground(clearColor);
         UI::inputEnabled = !paused;

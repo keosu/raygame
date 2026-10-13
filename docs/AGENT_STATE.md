@@ -1,6 +1,6 @@
 # Agent 工作状态
 
-更新时间：2026-10-11。
+更新时间：2026-10-13。
 
 ## 目标与约束
 
@@ -11,7 +11,58 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：Windows 第二关 CRLF 加载错误（已修复并验证）
+## 最近工作包：引擎能力补齐（来自塔防游戏实践，已实现并本地验证）
+
+基线 `0fc15f8`，开始时工作区干净。用户在外部项目（以子模块使用本仓库的奥特曼
+塔防游戏）中发现框架高层组件不足，要求直接在引擎修复并推送。本包只加能力与
+修正契约，保留现有生命周期、回调顺序与示例外观。
+
+- `Display`：画布改为关闭混合贴到窗口（`PresentOpaque`），半透明绘制降低画布
+  alpha 后不再混入窗口底色而变暗。新增 `OffscreenScope`，在 Render 中途烘焙
+  纹理时挂起画布并恢复逻辑投影；`InFrame()` 查询状态。scope 不继承之前压栈的矩阵。
+- 渲染排序：`Component::ySort` / 虚函数 `RenderDepth()`，同 layer、renderOrder 内按
+  渲染 y 升序（2.5D 遮挡）；排序键每帧只读取一次，NaN 视为 0。
+- `ParticleEmitter`：`startColor`→`endColor` 含 alpha 插值（修复 endColor 未生效、
+  初始 alpha 被覆盖），新增 `endSizeScale`、`drag`、可选 `texture`（可见旋转）、
+  `ParticleBlend::Additive`；`maxParticles` 在 Start 时预留并始终遵守，`GetParticles()`。
+  三个使用粒子的示例（Space Shooter 两处）显式设置透明 `endColor`，保持原纯 alpha 淡出。
+- `PhysicsWorld`：≥48 个碰撞体时按 x 扫描粗筛（`SetBroadphaseThreshold`），候选对
+  按注册序处理，Enter/Stay 顺序不变；同一步中因先前解算才重叠的对下一步报告。
+  新增 `OverlapCircle/OverlapBox/SegmentCast(带半径扫掠，近到远)/Raycast`，带层掩码
+  与触发器过滤，不派发回调、不产生接触。非有限包围盒不参与裁剪，与全部候选配对。
+- `GameEngine::SetTimeScale`（0–8，`GameTime::GetTimeScale` 同步）：固定步长不变，
+  每帧追赶上限 8×ceil(scale) 步；droppedSeconds 现以模拟秒计。
+- `UI::IsMouseOverUI/Capture/BeginFrame/EndFrame`：Panel、Button、ProgressBar 自动登记，
+  引擎在每帧 Render 前后调用，Update 读到上一帧结果。
+- `AudioManager`：`LoadSound(name, path, voices)` 用 raylib 别名实现多声部、
+  `SetSoundCooldown` 节流、`SetChannelVolume(Sfx/Music)`、`StopSound`、
+  `GetVoiceCount/GetPlayingVoices`；`PlaySound` 返回是否播放。单声部行为不变。
+- `ResourceManager::CodepointsFromText`（UTF-8 校验，拒绝过长/代理/控制字符）与
+  `SetFontOptions`（mipmap/过滤，重载后保持，卸载时清除）；通用
+  `scripts/subset-font.py`。README 新增三节 API 说明，审查文档更新粒子条目。
+
+### 通过的检查
+
+- Windows/MSVC x64 Debug/Release 全目标构建；各 **391 项引擎逻辑**（原 335 + 新
+  `tests/engine_extensions.h` 56 项）、**127 项 Forge 逻辑**通过，零失败。
+- 原四示例图形 smoke 两模式 **0 failures**，新增 GPU 检查：半透明画布不透明呈现、
+  OffscreenScope 写入目标并恢复画布坐标、贴图叠加粒子像素值、音频三声部重叠/
+  冷却/停止（本机有音频设备，已实际运行）。
+- 独立副本中 `verify-sdk.lua` 及 `--graphics` 通过；`build-forge.ps1 -Mode release
+  -Verify -SkipGraphics` 通过；clang-format 19.1.5 的 22 文件检查通过（新测试头纳入范围）。
+- 外部塔防项目以子模块编译通过。
+
+日志：`build/ext/`（本仓库作为子模块时须用 `xmake -P .`，否则 xmake 会选中父工程；
+`verify-sdk.lua` 内部未传 `-P`，因此在独立副本 `%TEMP%/raygame-sdkcheck` 中运行）。
+
+### 未运行与下一步
+
+未运行 Linux/macOS、远端 CI、Android 构建与设备、Forge 图形 smoke（`-SkipGraphics`）、
+人工试玩与音频试听。退出接触按碰撞体地址顺序派发是既有行为（两世界间顺序不同），
+本包未改。下一步：推送后检查 CI；可考虑渲染组件注册/可见性裁剪、粒子曲线与
+局部空间、UI 控件状态与输入路由（审查文档第 5、6 节）。
+
+## 上一工作包：Windows 第二关 CRLF 加载错误（已修复并验证）
 
 基线 `28c3e78`，开始时工作区干净。用户反馈 Windows 第二关启动报错，尚未
 提供具体报错原文。本机标准 LF 资源正常；在隔离游戏副本中只将第二关转换为

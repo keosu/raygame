@@ -330,6 +330,7 @@ public:
         particles->startSizeMin = 2;
         particles->startSizeMax = 4;
         particles->startColor = {100, 200, 255, 255};
+        particles->endColor = {100, 200, 255, 0};
         
         // Create camera
         auto cameraObj = CreateGameObject("Camera");
@@ -492,6 +493,7 @@ public:
         particles->startSizeMin = 3;
         particles->startSizeMax = 8;
         particles->startColor = {255, 150, 0, 255};
+        particles->endColor = {255, 150, 0, 0};
         particles->emitting = false;
         particles->loop = false;
         

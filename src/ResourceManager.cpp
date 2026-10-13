@@ -53,6 +53,13 @@ template<class T> void Clear(Cache<T>& cache) {
     for (auto& entry : cache) Invalidate(entry.second);
     cache.clear();
 }
+std::unordered_map<std::string, FontOptions> fontOptions;
+void ApplyFontOptions(const Slot<Font>& slot) {
+    auto it = fontOptions.find(slot->name);
+    if (it == fontOptions.end() || slot->state != ResourceState::Ready || !slot->value.texture.id) return;
+    if (it->second.mipmaps && slot->value.texture.mipmaps <= 1) GenTextureMipmaps(&slot->value.texture);
+    if (it->second.filter >= 0) SetTextureFilter(slot->value.texture, it->second.filter);
+}
 Texture2D Upload(Image image) {
     if (!image.data) return {};
     auto texture = LoadTextureFromImage(image);
@@ -60,12 +67,42 @@ Texture2D Upload(Image image) {
     return texture;
 }
 }
-void ResourceManager::Shutdown() { Clear(textures); Clear(fonts); Clear(shaders); }
+void ResourceManager::Shutdown() { Clear(textures); Clear(fonts); Clear(shaders); fontOptions.clear(); }
+std::vector<int> ResourceManager::CodepointsFromText(const std::string& text, bool includeAscii) {
+    std::vector<int> points;
+    if (includeAscii) for (int c = 32; c < 127; ++c) points.push_back(c);
+    size_t i = 0;
+    while (i < text.size()) {
+        auto byte = (unsigned char)text[i];
+        int length = byte < 0x80 ? 1 : (byte >> 5) == 0x6 ? 2 : (byte >> 4) == 0xe ? 3 : (byte >> 3) == 0x1e ? 4 : 0;
+        if (length == 0 || i + length > text.size()) { ++i; continue; }
+        int code = length == 1 ? byte : byte & (0x7f >> length);
+        bool valid = true;
+        for (int k = 1; k < length; ++k) {
+            auto next = (unsigned char)text[i + k];
+            if ((next & 0xc0) != 0x80) { valid = false; break; }
+            code = (code << 6) | (next & 0x3f);
+        }
+        static const int minimum[] = {0, 0, 0x80, 0x800, 0x10000};
+        if (!valid) { ++i; continue; }
+        i += length;
+        if (code < minimum[length] || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff)) continue;
+        if (code < 32 || (code >= 127 && code < 160)) continue;
+        points.push_back(code);
+    }
+    std::sort(points.begin(), points.end());
+    points.erase(std::unique(points.begin(), points.end()), points.end());
+    return points;
+}
+void ResourceManager::SetFontOptions(const std::string& name, const FontOptions& options) {
+    fontOptions[name] = options;
+    if (auto slot = Find(fonts, name)) ApplyFontOptions(slot);
+}
 TextureHandle ResourceManager::GetTexture(const std::string& name) { return TextureHandle(Find(textures, name)); }
 FontHandle ResourceManager::GetFont(const std::string& name) { return FontHandle(Find(fonts, name)); }
 ShaderHandle ResourceManager::GetShader(const std::string& name) { return ShaderHandle(Find(shaders, name)); }
 void ResourceManager::UnloadTextureNamed(const std::string& name) { Unload(textures, name); }
-void ResourceManager::UnloadFontNamed(const std::string& name) { Unload(fonts, name); }
+void ResourceManager::UnloadFontNamed(const std::string& name) { Unload(fonts, name); fontOptions.erase(name); }
 void ResourceManager::UnloadShaderNamed(const std::string& name) { Unload(shaders, name); }
 TextureHandle ResourceManager::LoadTexture(const std::string& name, const std::string& path) {
     if (!GetTexture(name)) ReloadTexture(name, path);
@@ -126,7 +163,9 @@ bool ResourceManager::ReloadFont(const std::string& name, const std::string& pat
     Font value = IsWindowReady() && size > 0 && validCodes
         ? LoadFontEx(path.c_str(), size, codes.empty() ? nullptr : codes.data(), (int)codes.size()) : Font{};
     bool valid = value.texture.id && value.texture.id != GetFontDefault().texture.id;
-    return Store(slot, value, valid, path);
+    bool stored = Store(slot, value, valid, path);
+    if (stored) ApplyFontOptions(slot);
+    return stored;
 }
 ShaderHandle ResourceManager::LoadShaderResource(const std::string& name, const std::string& vs, const std::string& fs) {
     if (!GetShader(name)) ReloadShader(name, vs, fs);

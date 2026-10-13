@@ -15,6 +15,7 @@ DEFAULT_PATHS = (
     "include/CanvasLayout.h",
     "include/TouchTracker.h",
     "tests/touch_layout.h",
+    "tests/engine_extensions.h",
 )
 
 

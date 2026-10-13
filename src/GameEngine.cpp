@@ -19,11 +19,15 @@ void GameEngine::Tick(float dt) {
     try {
         ApplyPendingScene();
         float realDelta = std::isfinite(dt) ? std::max(0.0f, dt) : 0.0f;
-        float simulationDelta = paused ? 0 : std::min(realDelta, fixedDelta * 8);
+        // Fast-forward keeps the fixed interval and runs proportionally more steps.
+        int maxSteps = MaxFixedSteps();
+        float scaledDelta = realDelta * timeScale;
+        float simulationDelta = paused ? 0 : std::min(scaledDelta, fixedDelta * maxSteps);
         timing.fixedSteps = 0;
-        timing.droppedSeconds = paused ? 0 : (double)realDelta - simulationDelta;
+        timing.droppedSeconds = paused ? 0 : (double)scaledDelta - simulationDelta;
         timing.totalDroppedSeconds += timing.droppedSeconds;
         GameTime::Advance(realDelta, simulationDelta);
+        GameTime::SetTimeScale(timeScale);
         OnUnscaledUpdate();
         if (paused) { Input::DiscardPending(); return; }
         GameTime::SetFixedDeltaTime(fixedDelta);
@@ -35,7 +39,7 @@ void GameEngine::Tick(float dt) {
         }
         if (paused) return;
         fixedAccumulator += GameTime::DeltaTime();
-        while (fixedAccumulator + fixedDelta * 1e-5 >= fixedDelta && timing.fixedSteps < 8) {
+        while (fixedAccumulator + fixedDelta * 1e-5 >= fixedDelta && timing.fixedSteps < maxSteps) {
             fixedAccumulator = std::max(0.0, fixedAccumulator - fixedDelta);
             ++timing.fixedSteps;
             timing.fixedTime += fixedDelta;
