@@ -590,7 +590,9 @@ campaign 逻辑，以及原四示例/Forge/Lab/两款 campaign 图形均通过�
 37 campaign 逻辑、全部示例图形/输入 smoke、原生静音 TTS、独立 SDK 图形消费
 通过；Forge 独立 Release 构建/逻辑/图标通过。八 ARM64 Release APK 关闭缓存
 完整重建后签名/16 KiB 对齐/资源/Java 桥接校验通过。格式与 actionlint 通过。
-具体日志和边界见 AGENT_STATE；合并后新远端 CI 尚待推送触发。
+具体日志和边界见 AGENT_STATE。代码 `1ba4c61` 已普通推送；新 CI
+[run 38421676802](https://github.com/keosu/raygame/actions/runs/38421676802)
+的 Windows/Linux Debug/Release、格式、Android ARM64 八 APK 六项全部通过。
 
 粗筛对同一步解算才形成的重叠下一步报告，SegmentCast 的盒体半径扩张为方角
 保守近似；未测性能收益，UI 尚无完整模态/焦点系统。未运行本地 Linux/macOS、

@@ -11,7 +11,7 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：远程引擎扩展 rebase 与审查（本地验证通过，准备推送）
+## 最近工作包：远程引擎扩展 rebase 与审查（已验证并推送）
 
 用户要求 pull --rebase、解决冲突并评价远程提交，随后授权验证通过后推送。
 开始时工作区干净，main 为 `3d6600a`，本地三个提交在 `0fc15f8` 上。
@@ -52,6 +52,11 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
   GUI 子系统、ccache=n。
 - 原远程功能提交 `e196a10` 的 CI run 38418657798 与文档提交 `5531c8e` 的
   run 38419374411 均成功，已通过 GitHub CLI 查询；这是原提交证据，与合并后检查分开。
+- 本包代码提交 `1ba4c61` 已普通推送 origin/main，未 force push；新 CI
+  [run 38421676802](https://github.com/keosu/raygame/actions/runs/38421676802)
+  六个 job 全部成功：Windows/Linux Debug/Release、C++ formatting、Android ARM64
+  八 APK。本地 main 与远程同步、工作区干净，原提交备份分支保留。
+  本次补记只更新状态/评审文档，不改变上述已验证的程序代码。
 
 ### 未运行、限制与下一步
 
@@ -62,9 +67,9 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 
 未在本地运行 Linux/macOS、本包新 Android Debug、设备/模拟器、人工音频试听、
 性能基准、多 DPI 矩阵或长稳。Android 继续只构建校验、不安装启动。
-下一步：提交本包 `Fix UI capture and custom depth after rebasing engine extensions`，
-普通推送 origin/main 并检查新 CI；不要 force push。后续按设备反馈和实际测量
-推进，不把构建/逻辑通过表述为全部平台、设备或性能验收。
+提交主题 `Fix UI capture and custom depth after rebasing engine extensions`。
+后续按 Android 设备反馈和实际性能测量推进，不把构建/逻辑通过表述为全部平台、
+设备或性能验收。原备份 `backup/before-rebase-20261013-3d6600a` 留给用户按需处理。
 
 ## 远程并行工作包：引擎能力补齐（来自塔防游戏实践，已实现并本地验证）
 
