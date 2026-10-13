@@ -39,10 +39,11 @@ try {
             -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=RayGame Debug,O=RayGame,C=US'
         if ($LASTEXITCODE -ne 0) { throw 'Cannot generate the local debug signing key' }
     }
-    & xmake f -p android -a arm64-v8a -m $Mode --toolchain=ndk "--ndk=$NdkRoot" "--android_sdk=$SdkRoot" `
+    # -P pins this checkout even when it is a submodule inside another xmake project.
+    & xmake f -P $projectRoot -p android -a arm64-v8a -m $Mode --toolchain=ndk "--ndk=$NdkRoot" "--android_sdk=$SdkRoot" `
         --ndk_sdkver=26 "--build_toolver=$($tools.BuildToolsVersion)" --runtimes=c++_static --build_examples=y --build_tests=n "--android_keystore=$keystore" -o build/android -y
     if ($LASTEXITCODE -ne 0) { throw 'Android configure failed' }
-    $buildArgs = @('build', '-j', $Jobs, '-y')
+    $buildArgs = @('build', '-P', $projectRoot, '-j', $Jobs, '-y')
     if ($Game -ne 'all') { $buildArgs += $Game }
     & xmake @buildArgs
     if ($LASTEXITCODE -ne 0) { throw 'Android build failed' }

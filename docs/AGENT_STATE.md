@@ -11,7 +11,34 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：特效层、弹道组件、拖尾粒子与主题按钮（已实现并本地验证）
+## 最近工作包：作为子模块嵌入与外部项目 Android 打包（已实现并本地验证）
+
+基线 `0279a78`。外部塔防项目为支持 Android 改为 `includes` 本仓库 `xmake.lua`，
+暴露三处只在“raygame 不是根工程”时出现的问题，本包修复：
+
+- `xmake.lua`：检测是否为根工程；被包含时不调用 set_project/set_version，
+  `build_examples`/`build_tests` 默认关闭（根工程仍默认开启，CI 不受影响）。
+- `xmake/rules/android-tts.lua`：Java 桥接源码与依赖文件按规则文件位置解析，
+  不再用 `os.projectdir()`（外部项目中会指向错误目录）。
+- `scripts/build-android.ps1`、`scripts/verify-sdk.lua`：所有 xmake 调用加 `-P` 固定
+  本仓库。此前在子模块目录运行会选中父工程：Android 构建把 APK 写进父工程 bin
+  后找不到产物；SDK 检查的 install 找不到 raygame 构建。
+- `docs/ANDROID.md` 新增“外部项目以子模块使用 raygame 并打包 APK”。
+
+### 通过的检查
+
+- 根工程桌面 Release 配置列出全部示例/测试目标，全构建通过，453 引擎逻辑通过。
+- 在子模块目录内直接运行（此前失败的场景）：`build-android.ps1 -Game engine_lab`
+  成功并通过脚本全部 APK 检查（含 TTS 桥接）；`verify-sdk.lua` 通过。
+- 外部塔防项目：桌面构建只含 raygame + 游戏两个目标；Android ARM64 Release APK
+  构建、签名、16 KiB 对齐、ELF 入口、静态运行库、TTS dex、资源 SHA-256 检查通过。
+
+### 未运行与下一步
+
+未运行 `tests/android_tools.ps1`（未改发现逻辑）、Linux/macOS、Debug Android、
+任何 Android 设备/模拟器（本机无设备与模拟器）。下一步：推送后检查 CI。
+
+## 上一工作包：特效层、弹道组件、拖尾粒子与主题按钮（已实现并本地验证）
 
 基线 `3681079`，开始时工作区干净；提交前 rebase 到并行会话的 `54a4cf0`（仅 Android
 工具/CI/文档，与本包代码无重叠，状态文档冲突保留双方条目）。上一包迁移后塔防游戏仍需自写的部分是弹道、

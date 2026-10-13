@@ -22,10 +22,18 @@ function main(graphics)
         os.cp(path.join(root, "tests/sdk_consumer", name), consumer)
     end
 
+    -- Pin each project explicitly: this checkout may sit inside another xmake project
+    -- (e.g. as a git submodule), which xmake would otherwise select from the parent.
+    local function pinned(args, directory)
+        local out = {args[1], "-P", directory}
+        for i = 2, #args do table.insert(out, args[i]) end
+        return out
+    end
+
     local function run(name, args, directory)
         print("SDK check: %s", name)
         local logfile = path.join(logs, name .. ".log")
-        local status = os.execv(os.programfile(), args, {
+        local status = os.execv(os.programfile(), pinned(args, directory), {
             curdir = directory, stdout = logfile, stderr = logfile, try = true
         })
         assert(status == 0, "SDK check failed: " .. name .. "; see " .. logfile)
@@ -63,7 +71,7 @@ function main(graphics)
         metadata[field] = wrong
         io.save(sdkfile, metadata)
         local output = path.join(logs, "reject-" .. field .. ".log")
-        local status = os.execv(os.programfile(), args, {
+        local status = os.execv(os.programfile(), pinned(args, consumer), {
             curdir = consumer, stdout = output, stderr = output, try = true
         })
         metadata[field] = original

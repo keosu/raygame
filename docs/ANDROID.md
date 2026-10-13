@@ -171,6 +171,32 @@ xmake build -j 4 -y
 目前只在 Windows 主机实际构建了 ARM64 Release 及 FORGE Debug APK，
 其他主机/ABI 尚未验证。
 
+## 外部项目以子模块使用 raygame 并打包 APK
+
+游戏仓库可把 raygame 放在 `third_party/raygame`（git 子模块），在自己的 `xmake.lua`
+中 `includes("third_party/raygame/xmake.lua")`。此时 raygame 只提供 `raygame` 目标
+及其平台设置（Android 版 raylib 配方、native_app_glue、`-fPIC`、TTS 规则），沿用外部
+项目名，示例与测试默认关闭（`--build_examples/--build_tests` 仍可显式打开）。
+游戏目标在 Android 上设为 `shared`，并添加：
+
+```lua
+add_rules("android.native_app", {android_sdk_version = "35", android_manifest = "android/AndroidManifest.xml",
+          android_res = "android/res", android_assets = "assets", native_app_glue = false,
+          keystore = path.absolute(get_config("android_keystore") or "build/android/debug.keystore", os.projectdir()),
+          keystore_pass = "android", package_name = "org.example.game"})
+add_rules("raygame.android_tts")
+add_shflags("-Wl,-u,ANativeActivity_onCreate", "-Wl,-u,__wrap_android_main", "-Wl,--wrap=android_main",
+            "-Wl,-z,max-page-size=16384", "-Wl,--no-undefined", {force = true})
+```
+
+manifest 需与示例一样声明 `android:hasCode="true"` 和 TTS_SERVICE `<queries>`，
+`android.app.lib_name` 等于目标名。`raygame.android_tts` 从规则文件所在位置定位
+Java 桥接源码，不依赖外部项目目录。工具发现可直接 dot-source
+`scripts/android-tools.ps1` 的 `Resolve-AndroidTools`。
+
+raygame 自带的 `build-android.ps1` 与 `verify-sdk.lua` 用 `-P` 固定 raygame 自身工程；
+在子模块目录内手动运行 xmake 时也要加 `-P .`，否则会选中外部工程。
+
 ## 指定自己的签名 key
 
 目前直接 xmake 支持 `--android_keystore=/绝对路径/自己的.keystore`，但八个

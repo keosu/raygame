@@ -1,4 +1,8 @@
 -- Extend xmake 3.1.1 NativeActivity packaging with the engine-owned Java bridge.
+-- Paths are relative to this file so projects that include raygame (e.g. as a
+-- submodule) package the same bridge.
+local rule_file = path.join(os.scriptdir(), "android-tts.lua")
+local bridge_source = path.join(os.scriptdir(), "../../platform/android/java/org/raygame/SpeechBridge.java")
 rule("raygame.android_tts")
     add_deps("android.native_app")
     add_orders("android.native_app", "raygame.android_tts")
@@ -6,7 +10,7 @@ rule("raygame.android_tts")
         import("core.project.depend")
         import("lib.detect.find_tool")
         local conf = target:extraconf("rules", "android.native_app")
-        local source = path.join(os.projectdir(), "platform/android/java/org/raygame/SpeechBridge.java")
+        local source = path.normalize(bridge_source)
         local sdk = target:toolchain("ndk"):config("android_sdk")
         local version = target:toolchain("ndk"):config("build_toolver")
         local sdktools = path.join(sdk, "build-tools", version)
@@ -42,7 +46,7 @@ rule("raygame.android_tts")
                 "--out", path.absolute(output), path.join(stage, "aligned.apk")})
             cprint("${color.build.target}packaged Android TTS bridge: %s", target:name())
         end, {dependfile = target:dependfile(output .. ".tts"),
-              files = {base, source, androidjar, keystore, path.join(os.projectdir(), "xmake/rules/android-tts.lua")},
+              files = {base, source, androidjar, keystore, rule_file},
               values = {version, conf.android_sdk_version}, changed = not os.isfile(output)})
     end)
 rule_end()
