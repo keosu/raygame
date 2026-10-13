@@ -11,7 +11,41 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：远程引擎扩展 rebase 与审查（已验证并推送）
+## 最近工作包：塔防游戏迁移暴露的粒子/纹理缺口（已实现并本地验证）
+
+基线 `f81e588`。本检出在本包进行中被并行会话 `pull --rebase` 快进（`5531c8e` →
+`1ba4c61`）；本包改动只含自身 hunk，提交前已 stash/rebase 到 `f81e588`。
+用户要求外部塔防项目改用上一包的新接口并评估能否大幅简化开发；迁移中发现
+三处阻碍用框架组件替换自写实现的缺口，本包只补这三处。
+
+- `Particle` 保存发射时的 `fromColor/toColor`：此前每帧按发射器当前颜色重算，
+  改发射器颜色会给已存活粒子整体换色，单个发射器无法复用于不同颜色的命中/爆炸。
+  示例与 Lab 都只在初始化时设色，外观不变。
+- `ParticleEmitter::radialVelocity/speedMin/speedMax/spreadAngle`：沿物体旋转方向
+  的张角内随机方向、按速率范围发射；原矩形速度范围会产生方形爆炸轮廓。默认关闭。
+- `ResourceManager::CreateTextureFromImage(name, image, mipmaps)`：程序生成图像
+  （柔光、烘焙头像）成为受管 TextureHandle，可选 mipmap + 三线性；同名复用，
+  无效图像得到 Failed 句柄。此前只能生成纯色/硬边圆。
+- README 粒子节补充；更正“远程并行工作包”中的检查计数（见该节）。
+
+### 通过的检查
+
+- Windows/MSVC x64 Debug/Release 全目标构建；各 **437 引擎逻辑**（新增 3 项：
+  多色复用、径向方向、径向速率范围）、**130 Forge**、**37 campaign** 逻辑零失败。
+- `smoke` 两模式 0 failures（新增 CreateTextureFromImage mipmap 与无效图像检查），
+  `tts_smoke` 两模式 0 failures；Engine Lab、Marble Temple、Garden Guard、Forge
+  `--smoke --data <隔离目录>` 两模式退出码 0（Debug/Release 各自重建后运行，
+  两模式共用 `bin/`，须先重建对应模式）。
+- 独立副本 `verify-sdk.lua --graphics` 通过；clang-format 19.1.5 默认 47 文件通过。
+- 外部塔防项目迁移后编译、`--balance` 机器人、`--capture` 截图巡览正常。
+
+日志：`build/ext/`（`*2-*`、`*3-*`、`smoke-{debug,release}-<name>/`）。
+
+### 未运行与下一步
+
+未运行 Linux/macOS、Android 构建与设备、人工试玩与音频试听。下一步：推送后检查 CI。
+
+## 上一工作包：远程引擎扩展 rebase 与审查（已验证并推送）
 
 用户要求 pull --rebase、解决冲突并评价远程提交，随后授权验证通过后推送。
 开始时工作区干净，main 为 `3d6600a`，本地三个提交在 `0fc15f8` 上。
@@ -103,8 +137,9 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 
 ### 通过的检查
 
-- Windows/MSVC x64 Debug/Release 全目标构建；各 **391 项引擎逻辑**（原 335 + 新
-  `tests/engine_extensions.h` 56 项）、**127 项 Forge 逻辑**通过，零失败。
+- Windows/MSVC x64 Debug/Release 全目标构建；引擎逻辑与 **127 项 Forge 逻辑**通过，零失败。
+  （更正：当时记录的“391 项（原 335 + 新 56 项）”计数有误；该提交在本机实测为
+  **434 项**，其中 `tests/engine_extensions.h` 为 63 项，与 rebase 包记录一致。）
 - 原四示例图形 smoke 两模式 **0 failures**，新增 GPU 检查：半透明画布不透明呈现、
   OffscreenScope 写入目标并恢复画布坐标、贴图叠加粒子像素值、音频三声部重叠/
   冷却/停止（本机有音频设备，已实际运行）。

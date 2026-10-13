@@ -31,6 +31,10 @@ public:
     static void UnloadTextureNamed(const std::string& name);
     static TextureHandle CreateColorTexture(const std::string& name, int width, int height, Color color);
     static TextureHandle CreateCircleTexture(const std::string& name, int radius, Color color);
+    // Uploads a procedurally generated image (the caller keeps ownership of `image`).
+    // Reuses a ready entry of the same name. With mipmaps, trilinear filtering keeps
+    // the texture smooth when drawn much smaller, e.g. soft glows or baked portraits.
+    static TextureHandle CreateTextureFromImage(const std::string& name, const Image& image, bool mipmaps = false);
 
     static FontHandle LoadFontResource(const std::string& name, const std::string& filepath, int size = 32);
     static bool ReloadFont(const std::string& name, const std::string& filepath, int size = 32);

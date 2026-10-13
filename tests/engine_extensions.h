@@ -98,6 +98,37 @@ static void Particles() {
     emitter->maxParticles = 0;
     emitter->Burst(5);
     CHECK(emitter->GetParticleCount() == 0);
+
+    // One emitter can burst several colors: particles keep the colors they were born with.
+    emitter->maxParticles = 10;
+    emitter->drag = 0;
+    emitter->startColor = emitter->endColor = {255, 0, 0, 255};
+    emitter->Burst(1);
+    emitter->startColor = emitter->endColor = {0, 0, 255, 255};
+    emitter->Burst(1);
+    GameTime::Advance(0.1f, 0.1f);
+    emitter->Update();
+    CHECK(emitter->GetParticles()[0].color.r == 255 && emitter->GetParticles()[1].color.b == 255);
+
+    // Radial bursts aim along the object's rotation within the spread.
+    emitter->Clear();
+    emitter->radialVelocity = true;
+    emitter->speedMin = emitter->speedMax = 80;
+    emitter->spreadAngle = 0;
+    object->transform->rotation = 90;
+    emitter->Burst(1);
+    Vector2 v = emitter->GetParticles()[0].velocity;
+    CHECK(Approx(v.x, 0, 0.01f) && Approx(v.y, 80, 0.01f));
+    emitter->Clear();
+    emitter->speedMin = 20;
+    emitter->spreadAngle = 360;
+    emitter->Burst(10);
+    bool inRange = true;
+    for (const auto& p : emitter->GetParticles()) {
+        float speed = std::sqrt(p.velocity.x * p.velocity.x + p.velocity.y * p.velocity.y);
+        inRange &= speed >= 19.99f && speed <= 80.01f;
+    }
+    CHECK(inRange);
     GameTime::Reset();
 }
 

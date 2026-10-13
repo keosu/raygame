@@ -226,7 +226,15 @@ public:
         emitter->startVelocityMin = emitter->startVelocityMax = {0, 0};
         emitter->startSizeMin = emitter->startSizeMax = 6;
         emitter->startColor = emitter->endColor = {80, 0, 0, 255};
-        emitter->texture = ResourceManager::CreateColorTexture("particle-test", 4, 4, WHITE);
+        Image white = GenImageColor(16, 16, WHITE);
+        emitter->texture = ResourceManager::CreateTextureFromImage("particle-test", white, true);
+        UnloadImage(white);
+        Expect(emitter->texture && emitter->texture->width == 16 && emitter->texture->mipmaps > 1,
+            "procedural images upload as managed textures with mipmaps");
+        Image invalid{};
+        Expect(!ResourceManager::CreateTextureFromImage("invalid-image-test", invalid)
+            && ResourceManager::GetTexture("invalid-image-test").State() == ResourceState::Failed,
+            "an invalid image yields a failed handle");
         emitter->blend = ParticleBlend::Additive;
         object->Start();
         emitter->Burst(2);

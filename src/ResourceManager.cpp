@@ -141,6 +141,22 @@ TextureHandle ResourceManager::CreateCircleTexture(const std::string& name, int 
     Store(slot, value, value.id != 0, "generated circle texture");
     return TextureHandle(slot);
 }
+TextureHandle ResourceManager::CreateTextureFromImage(const std::string& name, const Image& image, bool mipmaps) {
+    if (auto cached = GetTexture(name)) return cached;
+    auto slot = Ensure(textures, name);
+    Texture2D value{};
+    if (IsWindowReady() && IsImageValid(image)) {
+        value = LoadTextureFromImage(image);
+        if (value.id && mipmaps) {
+            GenTextureMipmaps(&value);
+            SetTextureFilter(value, value.mipmaps > 1 ? TEXTURE_FILTER_TRILINEAR : TEXTURE_FILTER_BILINEAR);
+        } else if (value.id) {
+            SetTextureFilter(value, TEXTURE_FILTER_BILINEAR);
+        }
+    }
+    Store(slot, value, value.id != 0, "generated image texture");
+    return TextureHandle(slot);
+}
 FontHandle ResourceManager::LoadFontResource(const std::string& name, const std::string& path, int size) {
     if (!GetFont(name)) ReloadFont(name, path, size);
     return GetFont(name);

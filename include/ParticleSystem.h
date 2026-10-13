@@ -12,7 +12,9 @@ struct Particle {
     Vector2 position;
     Vector2 velocity;
     Vector2 acceleration;
-    Color color;     // current color, interpolated from the emitter's start/end colors
+    Color color;     // current color, interpolated between the two colors below
+    Color fromColor; // emitter colors captured at emission, so later emitter edits only
+    Color toColor;   // affect new particles (one emitter can burst many colors)
     float lifetime;
     float age;
     float size;      // current radius in pixels
@@ -79,6 +81,11 @@ public:
     Vector2 startVelocityMin = {-50, -50};
     Vector2 startVelocityMax = {50, -100};
     Vector2 acceleration = {0, 100};  // Gravity
+    // Radial bursts: speed in [speedMin, speedMax] along a random direction within
+    // spreadAngle degrees centered on the object's rotation. Replaces the box range above.
+    bool radialVelocity = false;
+    float speedMin = 50.0f, speedMax = 100.0f;
+    float spreadAngle = 360.0f;
     float drag = 0.0f;                // fraction of velocity lost per second
 
     float lifetimeMin = 1.0f;
@@ -163,7 +170,14 @@ public:
 
         Particle p;
         p.position = GetEmissionPosition();
-        p.velocity = Random(startVelocityMin, startVelocityMax);
+        if (radialVelocity) {
+            float base = gameObject->transform->GetWorldRotation();
+            float angle = (base + Random(-spreadAngle / 2, spreadAngle / 2)) * DEG2RAD;
+            float speed = Random(speedMin, speedMax);
+            p.velocity = {std::cos(angle) * speed, std::sin(angle) * speed};
+        } else {
+            p.velocity = Random(startVelocityMin, startVelocityMax);
+        }
         p.acceleration = acceleration;
         p.lifetime = Random(lifetimeMin, lifetimeMax);
         p.age = 0;
@@ -171,6 +185,8 @@ public:
         p.rotation = Random(0.0f, 360.0f);
         p.rotationSpeed = Random(rotationSpeedMin, rotationSpeedMax);
         p.active = true;
+        p.fromColor = startColor;
+        p.toColor = endColor;
         Apply(p);
 
         particles.push_back(p);
@@ -204,8 +220,8 @@ private:
         auto channel = [t](unsigned char a, unsigned char b) {
             return (unsigned char)std::lround(a + (b - a) * t);
         };
-        p.color = {channel(startColor.r, endColor.r), channel(startColor.g, endColor.g),
-                   channel(startColor.b, endColor.b), channel(startColor.a, endColor.a)};
+        p.color = {channel(p.fromColor.r, p.toColor.r), channel(p.fromColor.g, p.toColor.g),
+                   channel(p.fromColor.b, p.toColor.b), channel(p.fromColor.a, p.toColor.a)};
         p.size = p.startSize * Lerp(1.0f, endSizeScale, t);
     }
 

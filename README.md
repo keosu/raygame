@@ -343,6 +343,12 @@ lifetime and adds `endSizeScale`, `drag`, an optional `texture` (with visible ro
 and `blend = ParticleBlend::Additive` for glows and sparks. Existing emitters that only
 set `startColor` now fade toward the default white end color; set
 `endColor = Fade(startColor, 0)` to keep a pure alpha fade, as the examples do.
+Each particle keeps the colors it was emitted with, so one emitter can serve many
+effects: move its object, set colors and ranges, then `Burst`. With
+`radialVelocity = true`, bursts use `speedMin..speedMax` along directions within
+`spreadAngle` degrees of the object's rotation instead of the rectangular velocity range.
+`ResourceManager::CreateTextureFromImage(name, image, mipmaps)` turns a procedural
+image (a soft glow, a baked portrait) into a managed texture handle for particles and sprites.
 
 ### Physics queries and broad phase
 
