@@ -11,7 +11,48 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：塔防游戏迁移暴露的粒子/纹理缺口（已实现并本地验证）
+## 最近工作包：Android 构建工具自动发现（本地验证通过）
+
+用户反馈其他机器 Android 脚本报错，指出假定了 NDK 版本。原脚本默认只查找
+`ndk/28.2.13676358`，Build Tools 也只用 `35.0.0`；虽然支持 `-NdkRoot`，
+未设置环境变量的其他版本无法自动发现。用户尚未提供另一机器报错与安装版本，
+本包修复已确认的固定目录依赖，不把它当作已复现用户的全部报错。
+
+- 新 `scripts/android-tools.ps1` 独立负责发现：显式 NDK → 有效环境变量 → 所选
+  SDK 下最新完整稳定版 `ndk/*` → `ndk-bundle`，从 source.properties 读版本并
+  数字排序；跳过预览与未完整安装。显式坏路径报告缺失文件，不静默回退。
+- Build Tools 自动选最新完整稳定版 >=35.0.0，新增 `-BuildToolsVersion` 可固定，
+  35 是 16 KiB ZIP 对齐工具下限，SDK platform 35/target 35 仍为项目要求。
+  JDK 支持 PATH 中 javac 的安装根；脚本打印最终路径/版本，校验报告记录两版本。
+- CI 仍固定 r28c/Build Tools35，增加自动发现测试；文档区分可发现版本与实际
+  构建兼容性。测试以 build/ 临时目录模拟布局，无下载/编译/设备操作。
+- 开始基线 `f81e588`、工作区干净。验证期间远程新增 `3681079`，已安全 stash
+  本包改动、pull --rebase 快进后恢复，合并后的 Android 与 Windows Release 已重验。
+
+### 本轮已通过
+
+18 项自动发现检查：只有 r27/Build Tools36、多版本数字排序、预览/不完整目录、
+显式覆盖、两个 NDK 环境变量/失效提示、外部路径/空格路径、ndk-bundle、缺 SDK/
+Build Tools 与旧版本错误提示。本机默认发现后八 Release APK 构建/签名/对齐/
+资源/TTS 桥接校验通过。第二套真实 SDK 自动选 Build Tools36，Engine Lab 重新
+编译/打包/完整校验通过；调用者 JAVA_HOME/PATH/XMAKE_CONFIGDIR 与 Windows
+配置 hash 保持，坏 NDK 路径失败也保持环境。PowerShell 语法/actionlint/diff 检查通过。
+合并 `3681079` 后八 APK 重建/完整校验通过，Windows/MSVC Release 八示例构建
+与 437 项引擎逻辑零失败；根桌面配置仍为 Release/MSVC/ccache=n。
+
+### 未运行与下一步
+
+测试日志 `build/android-tools-*`，最终 APK 验证日志
+`build/android-tools-merged-all-release.log`、报告 `build/android/verification-release.json`
+含八包；Build Tools36 Lab 日志 `build/android-tools-sdk36-lab.log`，模拟测试
+`build/android-tools-final-tests.log`。只有 NDK r28c 在本机真实安装，r27/r29 的发现
+使用模拟目录，未声称其原生编译通过；真实 Build Tools35/36 已分别验证。
+未安装/运行 Android 设备、未下载其他 NDK，新 CI 尚待推送；工具版本兼容性以
+构建/16 KiB 校验为准，脚本不自动安装。桌面 Debug/图形检查本包暂未重跑。
+下一步：提交 `Discover installed Android NDK and Build Tools versions`，沿用用户此前
+验证通过后推送的授权普通推送、检查 CI；另一机器可直接运行脚本重试。
+
+## 上一工作包：塔防游戏迁移暴露的粒子/纹理缺口（已实现并本地验证）
 
 基线 `f81e588`。本检出在本包进行中被并行会话 `pull --rebase` 快进（`5531c8e` →
 `1ba4c61`）；本包改动只含自身 hunk，提交前已 stash/rebase 到 `f81e588`。

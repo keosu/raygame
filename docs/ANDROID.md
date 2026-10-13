@@ -57,8 +57,10 @@ Android 首次侧载时按系统提示允许相应文件管理器安装应用。
 
 ## Windows / PowerShell 一键构建
 
-依赖：xmake 3.1.1、JDK 17+、Android SDK platform 35、build-tools 35.0.0、
-NDK r28c (`28.2.13676358`)。不需要 Gradle、Java 游戏 Activity 或 Android Studio 项目。
+依赖：PowerShell 7+、xmake 3.1.1、JDK 17+、Android SDK platform 35、
+完整的 Windows NDK 和稳定版 Build Tools 35.0.0 或更新版本（需支持 16 KiB ZIP 对齐）。
+本地脚本不要求 NDK 的固定版本号；r28c (`28.2.13676358`) 是本机与 CI 已验证的版本。
+不需要 Gradle、Java 游戏 Activity 或 Android Studio 项目。
 引擎统一编译/打包 TTS Java 桥接，游戏通过 C++ 调用；详见 [TTS](TEXT_TO_SPEECH.md)。
 也可用 Android Studio/命令行 SDK Manager 安装所需组件：
 
@@ -75,14 +77,24 @@ pwsh -NoProfile -File scripts/build-android.ps1 -Game neon_breakout
 pwsh -NoProfile -File scripts/build-android.ps1 -Game forge_runner
 ```
 
-脚本查找 `ANDROID_HOME` / `ANDROID_SDK_ROOT`、`ANDROID_NDK_HOME` /
-`ANDROID_NDK_ROOT`、`JAVA_HOME`，以及已知的本机工具缓存。可显式指定：
+SDK 优先使用 `-SdkRoot`，然后查找 `ANDROID_HOME` / `ANDROID_SDK_ROOT`、
+Android Studio 默认目录和已知工具缓存；SDK 必须包含 `platforms/android-35/android.jar`。
+NDK 按以下顺序选择：`-NdkRoot` → 有效的 `ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`
+→ 所选 SDK 的 `ndk/*` 中版本最高的完整稳定版 → 旧式 `ndk-bundle`。
+版本来自 `source.properties`，按数字排序；自动发现跳过预览版与未完整安装的目录。
+显式路径无效会报告缺少的文件，不会偷偷切换到另一套工具。
+
+Build Tools 默认选所选 SDK 中版本最高的完整稳定版（至少 35.0.0），可用
+`-BuildToolsVersion` 固定版本。JDK 查找 `-JavaHome`、`JAVA_HOME`、PATH 中的
+`javac.exe` 和已知缓存。脚本启动时打印最终工具路径和版本，便于排查其他机器。
+例如，机器只有 r27 和 Build Tools 36 时，无需安装 r28c 或 35.0.0 即可发现它们：
 
 ```powershell
 pwsh -NoProfile -File scripts/build-android.ps1 `
     -SdkRoot 'C:/Android/Sdk' `
-    -NdkRoot 'C:/Android/Sdk/ndk/28.2.13676358' `
-    -JavaHome 'C:/Java/jdk-17'
+    -NdkRoot 'C:/Android/Sdk/ndk/27.2.12479018' `
+    -JavaHome 'C:/Java/jdk-17' `
+    -BuildToolsVersion '36.0.0'
 ```
 
 默认 ARM64、Release、4 个编译任务；`-Mode debug` 可构建含调试信息的版本。
@@ -100,6 +112,14 @@ C++ 运行库以及各自资源/共用字体和许可的 SHA-256；缺失、多�
 运行资源会使检查失败。SHA-256 等结果存入
 `build/android/verification-release.json`（Debug 对应 `verification-debug.json`）。
 构建检查也覆盖 APK 中的普通、自适应和主题图标资源。
+报告同时记录所用 NDK 与 Build Tools 版本。自动发现可适配不同安装目录，
+但每个工具版本的实际兼容性仍以构建与校验结果为准；脚本不会自动下载工具。
+
+仅检查不同 SDK 布局的选择逻辑（临时目录，无真实编译/签名）：
+
+```powershell
+pwsh -NoProfile -File tests/android_tools.ps1
+```
 
 ## GitHub Actions 构建与下载
 
@@ -117,8 +137,8 @@ CI 检查构建/签名/打包，不安装或启动 Android 应用。
 
 ## 直接使用 xmake（Linux/macOS 也可参考）
 
-安装与 Windows 相同版本的 SDK/NDK/JDK，在仓库根目录执行。下面使用
-Linux/macOS 的 sh/bash/zsh 语法，把工具路径换成自己的安装目录：
+安装所需 SDK/NDK/JDK，在仓库根目录执行。下面是使用已验证工具版本的示例，
+采用 Linux/macOS 的 sh/bash/zsh 语法，把 NDK 和 Build Tools 路径换成自己的安装目录：
 
 ```sh
 export ANDROID_HOME="/path/to/Android/Sdk"

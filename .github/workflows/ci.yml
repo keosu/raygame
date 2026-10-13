@@ -158,8 +158,9 @@ jobs:
 
       - name: Build and verify eight APKs including campaign games
         run: |
+          ./tests/android_tools.ps1
           ./scripts/build-android.ps1 -Mode release -SdkRoot $env:ANDROID_HOME `
-            -NdkRoot "$env:ANDROID_HOME/ndk/28.2.13676358" -JavaHome $env:JAVA_HOME
+            -NdkRoot "$env:ANDROID_HOME/ndk/28.2.13676358" -JavaHome $env:JAVA_HOME -BuildToolsVersion '35.0.0'
           Copy-Item -LiteralPath build/android/verification-release.json `
             -Destination bin/android/arm64-v8a/release/verification.json
 

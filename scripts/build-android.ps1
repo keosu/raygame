@@ -5,39 +5,23 @@ param(
     [string]$SdkRoot,
     [string]$NdkRoot,
     [string]$JavaHome,
-    [ValidateRange(1, 32)][int]$Jobs = 4
+    [ValidateRange(1, 32)][int]$Jobs = 4,
+    [string]$BuildToolsVersion
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 
-function Find-ToolRoot($Explicit, $Candidates, $RequiredFile, $Description) {
-    if ($Explicit) { $Candidates = @($Explicit) }
-    foreach ($candidate in $Candidates) {
-        if ($candidate -and (Test-Path -LiteralPath (Join-Path $candidate $RequiredFile))) {
-            return (Resolve-Path -LiteralPath $candidate).Path
-        }
-    }
-    throw "$Description not found. See docs/ANDROID.md or provide its path explicitly."
-}
-
-$SdkRoot = Find-ToolRoot $SdkRoot @(
-    $env:ANDROID_HOME, $env:ANDROID_SDK_ROOT,
-    "$env:LOCALAPPDATA/Android/Sdk", "$env:LOCALAPPDATA/raygame/android-sdk",
-    "$env:USERPROFILE/.cache/balanceball-tools/android-sdk"
-) 'platforms/android-35/android.jar' 'Android SDK 35'
-$NdkRoot = Find-ToolRoot $NdkRoot @(
-    $env:ANDROID_NDK_HOME, $env:ANDROID_NDK_ROOT,
-    "$SdkRoot/ndk/28.2.13676358", "$env:LOCALAPPDATA/raygame/android-sdk/ndk/28.2.13676358"
-) 'toolchains/llvm/prebuilt/windows-x86_64/bin/clang.exe' 'Android NDK (r28c recommended)'
-$JavaHome = Find-ToolRoot $JavaHome @(
-    $env:JAVA_HOME, "$env:USERPROFILE/.cache/balanceball-tools/jdk/jdk-17.0.18+8",
-    "$env:LOCALAPPDATA/raygame/android-jdk17"
-) 'bin/keytool.exe' 'JDK 17+'
-$buildTools = Join-Path $SdkRoot 'build-tools/35.0.0'
-foreach ($tool in @('aapt.exe', 'apksigner.bat', 'zipalign.exe')) {
-    if (-not (Test-Path -LiteralPath (Join-Path $buildTools $tool))) { throw "Missing Android build tool: $tool" }
-}
+. (Join-Path $PSScriptRoot 'android-tools.ps1')
+$tools = Resolve-AndroidTools -SdkRoot $SdkRoot -NdkRoot $NdkRoot -JavaHome $JavaHome -BuildToolsVersion $BuildToolsVersion
+$SdkRoot = $tools.SdkRoot
+$NdkRoot = $tools.NdkRoot
+$JavaHome = $tools.JavaHome
+$buildTools = $tools.BuildToolsRoot
+Write-Output "Android SDK: $SdkRoot"
+Write-Output "Android NDK: $($tools.NdkVersion) ($NdkRoot)"
+Write-Output "Android Build Tools: $($tools.BuildToolsVersion) ($buildTools)"
+Write-Output "JDK: $JavaHome"
 
 $savedJava = $env:JAVA_HOME
 $savedPath = $env:PATH
@@ -56,7 +40,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Cannot generate the local debug signing key' }
     }
     & xmake f -p android -a arm64-v8a -m $Mode --toolchain=ndk "--ndk=$NdkRoot" "--android_sdk=$SdkRoot" `
-        --ndk_sdkver=26 --build_toolver=35.0.0 --runtimes=c++_static --build_examples=y --build_tests=n "--android_keystore=$keystore" -o build/android -y
+        --ndk_sdkver=26 "--build_toolver=$($tools.BuildToolsVersion)" --runtimes=c++_static --build_examples=y --build_tests=n "--android_keystore=$keystore" -o build/android -y
     if ($LASTEXITCODE -ne 0) { throw 'Android configure failed' }
     $buildArgs = @('build', '-j', $Jobs, '-y')
     if ($Game -ne 'all') { $buildArgs += $Game }
@@ -152,6 +136,7 @@ try {
             ABI = 'arm64-v8a'; MinSdk = 26; TargetSdk = 35; Signing = 'debug'; RuntimeTested = $false
             Assets = @($expectedAssets.Keys | Sort-Object); AssetContentsVerified = $true
             SpeechBridgeVerified = $true
+            NdkVersion = $tools.NdkVersion; BuildToolsVersion = $tools.BuildToolsVersion
         }
     }
     $results | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath "build/android/verification-$Mode.json" -Encoding utf8
