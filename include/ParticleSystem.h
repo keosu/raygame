@@ -105,6 +105,10 @@ public:
     // Optional sprite scaled to the particle diameter; circles are drawn without one.
     TextureHandle texture;
     ParticleBlend blend = ParticleBlend::Alpha;
+    // Streaks: face the direction of travel and lengthen by speed x stretch seconds.
+    // Without a texture a streak is drawn as a line size pixels thick.
+    bool alignToVelocity = false;
+    float stretch = 0;
 
     void Start() override {
         emissionTimer = 0;
@@ -139,7 +143,10 @@ public:
 
         for (auto& p : particles) {
             p.Update(dt, drag);
-            if (p.active) Apply(p);
+            if (!p.active) continue;
+            Apply(p);
+            if (alignToVelocity && (p.velocity.x != 0 || p.velocity.y != 0))
+                p.rotation = std::atan2(p.velocity.y, p.velocity.x) * RAD2DEG;
         }
 
         particles.erase(
@@ -154,10 +161,16 @@ public:
         if (blend == ParticleBlend::Additive) BeginBlendMode(BLEND_ADDITIVE);
         for (const auto& p : particles) {
             if (!p.active) continue;
+            float speed = std::sqrt(p.velocity.x * p.velocity.x + p.velocity.y * p.velocity.y);
+            float trail = stretch > 0 ? speed * stretch : 0;
             if (sprite) {
                 Rectangle source{0, 0, (float)sprite->width, (float)sprite->height};
-                Rectangle dest{p.position.x, p.position.y, p.size * 2, p.size * 2};
-                DrawTexturePro(*sprite, source, dest, {p.size, p.size}, p.rotation, p.color);
+                float length = p.size * 2 + trail;
+                Rectangle dest{p.position.x, p.position.y, length, p.size * 2};
+                DrawTexturePro(*sprite, source, dest, {length / 2, p.size}, p.rotation, p.color);
+            } else if (trail > 0) {
+                Vector2 tail{p.position.x - p.velocity.x * stretch, p.position.y - p.velocity.y * stretch};
+                DrawLineEx(tail, p.position, p.size, p.color);
             } else {
                 DrawCircleV(p.position, p.size, p.color);
             }
@@ -182,7 +195,7 @@ public:
         p.lifetime = Random(lifetimeMin, lifetimeMax);
         p.age = 0;
         p.startSize = Random(startSizeMin, startSizeMax);
-        p.rotation = Random(0.0f, 360.0f);
+        p.rotation = alignToVelocity ? std::atan2(p.velocity.y, p.velocity.x) * RAD2DEG : Random(0.0f, 360.0f);
         p.rotationSpeed = Random(rotationSpeedMin, rotationSpeedMax);
         p.active = true;
         p.fromColor = startColor;

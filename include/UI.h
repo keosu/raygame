@@ -10,6 +10,7 @@ namespace RayGame {
 // Immediate-mode UI helpers. Call per-frame during a Scene's Render (screen space).
 class RAYGAME_API UI {
 public:
+    enum class Align { Left, Center, Right };
     static FontHandle font; // optional custom font
     static inline FontHandle headingFont = nullptr;
     static inline FontHandle unicodeFont = nullptr, unicodeHeadingFont = nullptr;
@@ -87,6 +88,44 @@ public:
         Label(cx - w / 2, y, text, size, color);
     }
 
+    // Fill, border and corner roundness (0..1, as in DrawRectangleRounded) for themed HUDs.
+    static void Panel(Rectangle rect, Color fill, Color border, float roundness = 0.12f) {
+        Capture(rect);
+        DrawRectangleRounded(rect, roundness, 10, fill);
+        if (border.a > 0)
+            DrawRectangleRoundedLines(rect, roundness, 10, border);
+    }
+
+    // Text at a float size with alignment and an optional outline (`outline` pixels).
+    // Uses the same font selection as Label/Title, including the Unicode fonts.
+    static void Text(float x, float y, const std::string& text, float size, Color color,
+                     Align align = Align::Left, bool heading = false, float outline = 0,
+                     Color outlineColor = {0, 0, 0, 255}) {
+        auto selected = Pick(text, heading);
+        bool unicode = HasUnicode(text) && unicodeFont;
+        float drawSize = unicode ? size * unicodeScale : size;
+        if (unicode)
+            y -= size * 0.18f;
+        float width = selected ? MeasureTextEx(*selected, text.c_str(), drawSize, 0.5f).x
+                               : (float)MeasureText(text.c_str(), (int)size);
+        if (align == Align::Center)
+            x -= width / 2;
+        else if (align == Align::Right)
+            x -= width;
+        auto draw = [&](float px, float py, Color c) {
+            if (selected)
+                DrawTextEx(*selected, text.c_str(), {px, py}, drawSize, 0.5f, c);
+            else
+                DrawText(text.c_str(), (int)px, (int)py, (int)size, c);
+        };
+        if (outline > 0)
+            for (int i = 0; i < 8; ++i) {
+                float a = i * PI / 4;
+                draw(x + std::cos(a) * outline, y + std::sin(a) * outline, outlineColor);
+            }
+        draw(x, y, color);
+    }
+
     static void Panel(Rectangle rect, Color color = {0, 0, 0, 0}) {
         Color c =
             (color.a == 0 && color.r == 0 && color.g == 0 && color.b == 0) ? panelColor : color;
@@ -107,8 +146,14 @@ public:
 
     // Returns true on click (mouse released inside while pressed inside).
     static bool Button(Rectangle rect, const std::string& label, int size = 20) {
+        return Button(rect, label, ButtonStyle{panelColor, accentColor, textColor}, size);
+    }
+
+    // Themed button; a disabled button still draws and captures the pointer but never clicks.
+    static bool Button(Rectangle rect, const std::string& label, const ButtonStyle& style,
+                       int size = 20, bool enabled = true) {
         Vector2 m = Input::GetMousePosition();
-        bool acceptsInput = inputEnabled && Input::GetFrame().focused;
+        bool acceptsInput = enabled && inputEnabled && Input::GetFrame().focused;
         // A disabled background widget must not cancel a foreground menu's press.
         if (!Input::GetFrame().focused)
             hasPress = false;
@@ -118,12 +163,12 @@ public:
         }
         bool hover = acceptsInput && Input::IsMouseInCanvas() && CheckCollisionPointRec(m, rect);
         Capture(rect);
-        ButtonPainter::Draw(rect,
-                            {hover, hasPress && hover && Input::GetMouseButton(MOUSE_BUTTON_LEFT)},
-                            {panelColor, accentColor, textColor});
+        bool down = hasPress && hover && Input::GetMouseButton(MOUSE_BUTTON_LEFT);
+        ButtonPainter::Draw(rect, {hover, down, false, !enabled}, style);
         float w = MeasureWidth(label, size);
-        DrawTextCustom(label, rect.x + (rect.width - w) / 2, rect.y + (rect.height - size) / 2,
-                       size, textColor);
+        DrawTextCustom(label, rect.x + (rect.width - w) / 2,
+                       rect.y + (rect.height - size) / 2 + (down ? 2.0f : 0.0f), size,
+                       enabled ? style.ink : Fade(style.ink, 0.45f));
         bool clicked = hasPress && hover && CheckCollisionPointRec(pressPosition, rect) &&
                        Input::GetMouseButtonUp(MOUSE_BUTTON_LEFT);
         if (clicked)
@@ -161,6 +206,12 @@ private:
             DrawTextEx(*selected, text.c_str(), {x, y}, drawSize, 0.5f, color);
         else
             DrawText(text.c_str(), (int)x, (int)y, size, color);
+    }
+    static const Font* Pick(const std::string& text, bool heading) {
+        bool unicode = HasUnicode(text) && unicodeFont;
+        auto selected = unicode ? (heading && unicodeHeadingFont ? unicodeHeadingFont : unicodeFont)
+                                : (heading && headingFont ? headingFont : font);
+        return selected && selected->texture.id != 0 ? selected.Get() : nullptr;
     }
     static bool HasUnicode(const std::string& text) {
         return std::any_of(text.begin(), text.end(), [](unsigned char c) { return c >= 128; });

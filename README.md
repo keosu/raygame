@@ -349,6 +349,32 @@ effects: move its object, set colors and ranges, then `Burst`. With
 `spreadAngle` degrees of the object's rotation instead of the rectangular velocity range.
 `ResourceManager::CreateTextureFromImage(name, image, mipmaps)` turns a procedural
 image (a soft glow, a baked portrait) into a managed texture handle for particles and sprites.
+`alignToVelocity` with `stretch` turns particles into streaks that face their direction
+of travel (a textured quad, or a line without a texture).
+
+### Effects, projectiles and themed UI
+
+`EffectLayer` collects short-lived combat feedback on one object: `Beam` (layered
+additive line), `Ring` (expanding shockwave) and `Text` (rising, outlined, fading).
+Effects age with simulated time, so pausing with `SetTimeScale(0)` freezes them.
+
+`Projectile` moves `Straight`, `Homing` (follows a GameObject, then its last position),
+`Boomerang` (out and back, hitting again on the return leg) or `Lob` (falls onto a
+point over `flightTime`). Hits are physics overlap queries with a layer mask; `pierce`
+hits each collider once per leg. Hooks: `onHit`, `onArrive`, `onStep` (each fixed
+step, for trails) and `onDraw`. The object destroys itself when the flight ends.
+
+```cpp
+auto shot = scene.CreateGameObject("shot")->AddComponent<Projectile>();
+shot->motion = ProjectileMotion::Boomerang;
+shot->target = aim; shot->hitRadius = 8; shot->pierce = true; shot->layerMask = 1u << kEnemyLayer;
+shot->onHit = [](Projectile&, Collider* c) { /* damage c->GetGameObject() */ };
+```
+
+`UI::Button(rect, label, ButtonStyle{base, accent, ink, roundness}, size, enabled)` draws
+themed buttons (disabled ones still capture the pointer but never click);
+`UI::Panel(rect, fill, border, roundness)` and `UI::Text(x, y, text, size, color, align,
+heading, outline, outlineColor)` cover themed panels and outlined, aligned text.
 
 ### Physics queries and broad phase
 

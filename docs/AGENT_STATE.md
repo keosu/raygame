@@ -11,7 +11,45 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：Android 构建工具自动发现（本地验证通过）
+## 最近工作包：特效层、弹道组件、拖尾粒子与主题按钮（已实现并本地验证）
+
+基线 `3681079`，开始时工作区干净；提交前 rebase 到并行会话的 `54a4cf0`（仅 Android
+工具/CI/文档，与本包代码无重叠，状态文档冲突保留双方条目）。上一包迁移后塔防游戏仍需自写的部分是弹道、
+光线/冲击环/飘字、拖尾火花与按钮样式；用户要求把这些贡献给框架。游戏不作为
+示例提交（用户决定，涉及第三方 IP）。
+
+- `include/Effects.h`：`EffectLayer` 组件，`Beam`/`Ring`/`Text`（参数结构体），
+  随模拟时间老化（暂停冻结），光线与冲击环叠加混合，飘字带出现弹跳与描边；
+  非有限坐标、空文本、非正寿命忽略；`RingRadius` 供玩法查询冲击波前沿。
+- `include/Projectile.h`：`Projectile` 组件，`Straight/Homing/Boomerang/Lob`；
+  命中用场景 PhysicsWorld 的 `OverlapCircle`（层掩码/触发器过滤），`pierce` 每程
+  每个碰撞体一次，回旋返程重置；钩子 `onHit/onArrive/onStep/onDraw`；到达、非穿透
+  命中或 `maxLife` 后自毁，`Finish()` 可由回调提前结束；渲染位置可插值。
+- `ParticleEmitter::alignToVelocity/stretch`：粒子朝向速度，贴图拉长为条带，无贴图
+  画线；默认关闭。
+- `UI`：`Button(rect, label, ButtonStyle, size, enabled)`（复用 ButtonPainter，禁用态
+  仍捕获指针但不点击，按下时文字下沉），`Panel(rect, fill, border, roundness)`，
+  `Text(x, y, text, size, color, align, heading, outline, outlineColor)`；原 `Button`
+  改为调用新重载，外观不变。`RayGame.h` 与 SDK 单头文件测试包含两个新头。
+- README 新增“Effects, projectiles and themed UI”一节。
+
+### 通过的检查
+
+- Windows/MSVC x64 Debug/Release 全目标构建；各 **453 引擎逻辑**（新增 16 项：特效
+  老化/无效输入/冲击半径、四种弹道/穿透/回旋两程/追踪移动目标/抛物到达/寿命/
+  onStep、拖尾朝向随速度转向）、**130 Forge**、**37 campaign** 零失败。
+- `smoke` 两模式 0 failures（新增：禁用主题按钮不点击且绘制禁用底色、UI::Text 描边），
+  `tts_smoke` 两模式 0；Engine Lab、Marble Temple、Garden Guard、Forge `--smoke` 两模式
+  退出码 0（各模式先重建）。clang-format 47 文件通过；独立副本 `verify-sdk.lua --graphics`
+  通过（含新头文件单独包含）。
+- 外部塔防项目改用 EffectLayer/Projectile/拖尾/主题按钮后编译、平衡机器人、截图巡览正常。
+
+### 未运行与下一步
+
+未运行 Linux/macOS、Android 构建与设备、人工试玩。EffectLayer 文字依赖 UI 字体，
+未设置字体时退回 raylib 默认字体（不含中文）。下一步：推送后检查 CI。
+
+## 并行工作包：Android 构建工具自动发现（并行会话完成，已推送 54a4cf0）
 
 用户反馈其他机器 Android 脚本报错，指出假定了 NDK 版本。原脚本默认只查找
 `ndk/28.2.13676358`，Build Tools 也只用 `35.0.0`；虽然支持 `-NdkRoot`，
