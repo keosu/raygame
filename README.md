@@ -364,9 +364,9 @@ auto line = world.SegmentCast(origin, end, 8.0f); // piercing beam, nearest firs
 - `GameEngine::SetTimeScale(2)` fast-forwards simulation without changing the fixed
   step; the catch-up budget grows with the scale. `0` freezes simulation while UI and
   unscaled time keep running. Components can read `GameTime::GetTimeScale()`.
-- `UI::IsMouseOverUI()` reports whether the pointer was over a panel, button or
-  progress bar in the last rendered frame, so world clicks under the HUD can be ignored.
-  Call `UI::Capture(rect)` for custom widgets.
+- `UI::IsMouseOverUI()` tests the current pointer against panel, button and progress
+  bar regions from the last rendered frame, so moving onto the HUD and clicking in
+  the same update is captured. Call `UI::Capture(rect)` for custom widgets.
 - `AudioManager::LoadSound(name, path, voices)` lets rapid repeats overlap,
   `SetSoundCooldown` throttles spam, and `SetChannelVolume(AudioChannel::Sfx/Music, v)`
   scales each group for settings menus. `PlaySound` returns whether it played.

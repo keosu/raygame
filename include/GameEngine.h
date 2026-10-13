@@ -116,6 +116,7 @@ public:
         hasPendingScene = false;
         fixedAccumulator = 0;
         Input::Reset();
+        UI::ResetInteraction();
 
         TextToSpeech::Shutdown();
         TweenManager::Clear();

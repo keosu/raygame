@@ -179,6 +179,7 @@ public:
             emitter->emissionRate = 35;
             emitter->maxParticles = 240;
             emitter->startColor = Cyan;
+            emitter->endColor = Fade(Cyan, 0);
             emitter->startVelocityMin = {-55, -100};
             emitter->startVelocityMax = {55, -180};
             emitter->acceleration = {0, 80};

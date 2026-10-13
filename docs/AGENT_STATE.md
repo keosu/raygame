@@ -11,6 +11,61 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
+## 最近工作包：远程引擎扩展 rebase 与审查（本地验证通过，准备推送）
+
+用户要求 pull --rebase、解决冲突并评价远程提交，随后授权验证通过后推送。
+开始时工作区干净，main 为 `3d6600a`，本地三个提交在 `0fc15f8` 上。
+先创建 `backup/before-rebase-20261013-3d6600a`，pull 获取远程 `e196a10`
+（Add engine features found missing while building a tower defense game）。
+
+- rebase 已完成；推送前 fetch 又获取仅更新 CI 记录的 `5531c8e`，一并 rebase。
+  最终保留三个本地包：TTS/Lab `b8781f9`、campaign `45ed663`、画质/菜单/触控
+  `6abc0f4`。解决 Display、UI、GameEngine 主循环、测试入口、
+  格式脚本和本文档冲突；保留远程扩展与本地 TTS/超采样/Unicode/按钮功能。
+  `git range-diff` 已检查，远程与本地原有检查均保留。
+- 审查确认 UI 捕获缓存上一帧悬停 bool，移入/移出 HUD 后的第一帧会误判，
+  ResetInteraction/失焦也未清除它。改为保存控件区域并用当前输入查询，
+  暂停/切场景/Shutdown 清理。自定义 RenderDepth 返回非有限值此前未统一处理，
+  现由 Scene 构建排序键时统一视为零，仍只读取一次。
+- Lab 显式设置透明 Cyan endColor，保持原纯 alpha 淡出；Lab 图形测试改为
+  正常引擎 Render 路径，覆盖 UI BeginFrame/EndFrame；冲突代码格式已修整。
+- 新增七项行为回归；修复前 `429 passed / 5 failed`，修复后引擎 `434 passed / 0 failed`。
+
+### 本轮通过的检查
+
+- Windows/MSVC x64 Debug/Release 八示例完整重建（ccache=n）；各 **434 引擎**、
+  **130 Forge**、**37 campaign** 逻辑通过。原四示例 graphics smoke、Forge、
+  Lab、Marble、Garden 图形/输入 smoke 两模式零失败；原生静音 TTS 两模式零失败。
+  图形覆盖离屏恢复、不透明呈现、叠加粒子、真实三声部音效/冷却/停止、
+  菜单/语言/设置/多比例/拖种植/存档；已查看新的中文主菜单和拖种植截图。
+- SDK 两模式安装/搬迁/单头文件/逻辑/隐藏图形/配置拒绝通过；Forge 独立
+  Release 构建、130 逻辑与图标通过，其独立图形入口使用 `-SkipGraphics`。
+  根 Release EXE 图标与 Forge 图标通过。
+- 八 ARM64 Release APK 关闭缓存完整重建，签名/16 KiB ZIP 与 ELF 对齐/
+  入口/资源 hash/TTS dex 与 manifest 校验通过；沿用原密钥，未安装启动设备。
+  日志 `build/rebase-android-no-cache-{config,build,verify}.log`，报告
+  `build/android/verification-release.json`。首轮缓存构建仅作辅助，最终以上述为准。
+- clang-format 19.1.5 默认 47 文件、actionlint、UTF-8/LF、`git diff --check` 通过。
+  `5531c8e` 仅改变状态文档：第二次 rebase 后与验证时的实现树逐字节一致。
+  SDK 日志 `build/sdk-validation/windows/x64/{debug,release}`，本包其它日志和
+  图形产物 `build/rebase-*`；根配置 Windows/MSVC x64 Release、examples/tests 开启、
+  GUI 子系统、ccache=n。
+- 原远程功能提交 `e196a10` 的 CI run 38418657798 与文档提交 `5531c8e` 的
+  run 38419374411 均成功，已通过 GitHub CLI 查询；这是原提交证据，与合并后检查分开。
+
+### 未运行、限制与下一步
+
+审查未发现剩余阻塞问题；上述两处缺陷已修复并有失败到通过的证据。
+粗筛候选对保留注册序，但因之前解算才形成的重叠下一步报告；带半径 SegmentCast
+对盒体按方角扩张，是保守近似，会在角落提前命中。新 API 有用，但尚无性能基准，
+不承诺粗筛在密集碰撞场景的收益；UI 捕获也不替代完整焦点/模态/拖放系统。
+
+未在本地运行 Linux/macOS、本包新 Android Debug、设备/模拟器、人工音频试听、
+性能基准、多 DPI 矩阵或长稳。Android 继续只构建校验、不安装启动。
+下一步：提交本包 `Fix UI capture and custom depth after rebasing engine extensions`，
+普通推送 origin/main 并检查新 CI；不要 force push。后续按设备反馈和实际测量
+推进，不把构建/逻辑通过表述为全部平台、设备或性能验收。
+
 ## 远程并行工作包：引擎能力补齐（来自塔防游戏实践，已实现并本地验证）
 
 基线 `0fc15f8`，开始时工作区干净。用户在外部项目（以子模块使用本仓库的奥特曼
@@ -63,7 +118,7 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 本包未改。下一步：可考虑渲染组件注册/可见性裁剪、粒子曲线与
 局部空间、UI 控件状态与输入路由（审查文档第 5、6 节）。
 
-## 最近工作包：示例画质、菜单、拖拽与移动控制（已实现并本地验证）
+## 上一工作包：示例画质、菜单、拖拽与移动控制（已实现并本地验证）
 
 基线 `da09343`。用户要求两款 campaign 的适配/菜单/中英文/设置、彩球质感、
 花园拖种植，以及 Forge 放大触屏图标按钮。随后反馈启动 PAUSED、设置被上层

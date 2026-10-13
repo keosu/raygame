@@ -92,8 +92,11 @@ public:
             if (!obj || !obj->active || obj->IsDestroyed()) continue;
             obj->Start();
             for (auto& comp : obj->GetAllComponents()) {
-                if (comp && comp->IsEnabled() && comp->HasStarted())
-                    drawList.push_back({comp->RenderLayer(), comp->renderOrder, comp->RenderDepth(), comp});
+                if (comp && comp->IsEnabled() && comp->HasStarted()) {
+                    float depth = comp->RenderDepth();
+                    drawList.push_back({comp->RenderLayer(), comp->renderOrder,
+                                       std::isfinite(depth) ? depth : 0.0f, comp});
+                }
             }
         }
         std::stable_sort(drawList.begin(), drawList.end(), [](const DrawItem& a, const DrawItem& b) {

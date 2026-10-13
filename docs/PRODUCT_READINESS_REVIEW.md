@@ -573,3 +573,25 @@ campaign 逻辑，以及原四示例/Forge/Lab/两款 campaign 图形均通过�
 未运行 Android 设备、Linux/macOS、新远端 CI、多 DPI/多显示器矩阵、人工完整
 通关/音频/手柄或长稳。超采样性能、Android 安全区、拖动与触控按钮手感仍待
 真机验收；本包不替代 M0 硬件/稳定性和商业发行边界，也不是通用拖放对象系统。
+
+**28. 远程引擎扩展合并与审查**
+
+2026-10-13 将远程 `e196a10` 的离屏绘制/不透明呈现、按 y 排序、粒子颜色/
+尺寸/贴图/叠加、物理粗筛与查询、时间缩放、音效多声部/分组及字体采样能力
+与本地 TTS、八示例、Unicode UI、超采样和拖动按钮合并；后续 CI 记录提交
+`5531c8e` 同步纳入。原远程功能提交的 Windows/Linux 两模式和 Android CI 成功。
+
+审查复现 UI 缓存旧鼠标悬停导致移入 HUD 当帧点击穿透，以及自定义 RenderDepth
+返回 NaN 没有统一处理；现按当前指针查询上一帧控件区域，清理失焦/场景/Shutdown
+状态，并在 Scene 统一归一化非有限排序键。新增七项回归，修复前五项失败，
+修复后通过。Lab 保持原 Cyan 粒子淡出，图形检查采用正常引擎 Render 流程。
+
+合并后 Windows/MSVC x64 Debug/Release 八示例完整重建，各 434 引擎/130 Forge/
+37 campaign 逻辑、全部示例图形/输入 smoke、原生静音 TTS、独立 SDK 图形消费
+通过；Forge 独立 Release 构建/逻辑/图标通过。八 ARM64 Release APK 关闭缓存
+完整重建后签名/16 KiB 对齐/资源/Java 桥接校验通过。格式与 actionlint 通过。
+具体日志和边界见 AGENT_STATE；合并后新远端 CI 尚待推送触发。
+
+粗筛对同一步解算才形成的重叠下一步报告，SegmentCast 的盒体半径扩张为方角
+保守近似；未测性能收益，UI 尚无完整模态/焦点系统。未运行本地 Linux/macOS、
+新 Android Debug、真机、人工试听或长稳，不能将以上检查当作设备和发行验收。

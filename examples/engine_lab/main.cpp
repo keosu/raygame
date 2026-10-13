@@ -280,12 +280,7 @@ public:
         Display::Refresh();
         Input::SetFrame(input);
         Tick(1.0f / 60);
-        Display::Begin();
-        ClearBackground(clearColor);
-        if (GetCurrentScene())
-            GetCurrentScene()->Render();
-        OnRender();
-        Display::End();
+        Render();
     }
     void Click(Vector2 p, bool touch = false) {
         InputFrame input;

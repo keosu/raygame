@@ -28,17 +28,34 @@ public:
     }
     static void ResetInteraction() {
         hasPress = false;
+        regionsThisFrame.clear();
+        regionsLastFrame.clear();
     }
 
     // Pointer capture lets gameplay ignore clicks aimed at the UI. Panels, buttons and
     // progress bars register themselves; call Capture for custom widgets. GameEngine
-    // brackets each Render with BeginFrame/EndFrame, so Update sees the last frame.
-    static void BeginFrame() { overThisFrame = false; }
-    static void EndFrame() { overLastFrame = overThisFrame; }
-    static void Capture(Rectangle rect) {
-        if (Input::IsMouseInCanvas() && CheckCollisionPointRec(Input::GetMousePosition(), rect)) overThisFrame = true;
+    // brackets each Render with BeginFrame/EndFrame. Update tests the current pointer
+    // against the last rendered regions, so moving onto a widget captures immediately.
+    static void BeginFrame() {
+        regionsThisFrame.clear();
     }
-    static bool IsMouseOverUI() { return overLastFrame || overThisFrame; }
+    static void EndFrame() {
+        regionsLastFrame = regionsThisFrame;
+    }
+    static void Capture(Rectangle rect) {
+        regionsThisFrame.push_back(rect);
+    }
+    static bool IsMouseOverUI() {
+        if (!Input::GetFrame().focused || !Input::IsMouseInCanvas())
+            return false;
+        Vector2 pointer = Input::GetMousePosition();
+        auto contains = [pointer](const std::vector<Rectangle>& regions) {
+            return std::any_of(regions.begin(), regions.end(), [pointer](Rectangle rect) {
+                return CheckCollisionPointRec(pointer, rect);
+            });
+        };
+        return contains(regionsLastFrame) || contains(regionsThisFrame);
+    }
 
     static void Title(float x, float y, const std::string& text, int size = 36,
                       Color color = RAYWHITE) {
@@ -121,7 +138,7 @@ public:
 private:
     static inline Vector2 pressPosition = {0, 0};
     static inline bool hasPress = false;
-    static inline bool overThisFrame = false, overLastFrame = false;
+    static inline std::vector<Rectangle> regionsThisFrame, regionsLastFrame;
     static float MeasureWidth(const std::string& text, int size, bool heading = false) {
         bool unicode = HasUnicode(text) && unicodeFont;
         auto selected = unicode ? (heading && unicodeHeadingFont ? unicodeHeadingFont : unicodeFont)

@@ -7,6 +7,11 @@ namespace extension_tests {
 struct DrawRecorder : Component {
     std::vector<int>* log = nullptr;
     int id = 0;
+    bool customDepth = false;
+    float depth = 0;
+    float RenderDepth() const override {
+        return customDepth ? depth : Component::RenderDepth();
+    }
     void Render() override {
         log->push_back(id);
     }
@@ -43,6 +48,19 @@ static void DepthSorting() {
     log.clear();
     scene.Render();
     CHECK(log.size() == 5); // invalid positions sort as zero instead of corrupting the order
+    recorders[0]->customDepth = true;
+    recorders[0]->depth = NAN;
+    recorders[1]->customDepth = true;
+    recorders[1]->depth = -10;
+    recorders[2]->customDepth = true;
+    recorders[2]->depth = 10;
+    log.clear();
+    scene.Render();
+    CHECK((log == std::vector<int>{5, 2, 1, 3, 4})); // custom NaN keys also sort as zero
+    recorders[0]->depth = INFINITY;
+    log.clear();
+    scene.Render();
+    CHECK((log == std::vector<int>{5, 2, 1, 3, 4}));
 }
 
 static void Particles() {
@@ -270,6 +288,35 @@ static void PointerCapture() {
     UI::Capture({-10, -10, 20, 20});
     UI::EndFrame();
     CHECK(!UI::IsMouseOverUI()); // pointers outside the canvas never count
+
+    // Update uses the new input snapshot before UI is rendered again.
+    frame.mousePosition = {300, 300};
+    Input::SetFrame(frame);
+    UI::BeginFrame();
+    UI::Capture({50, 50, 100, 100});
+    UI::EndFrame();
+    frame.mousePosition = {100, 100};
+    Input::SetFrame(frame);
+    CHECK(UI::IsMouseOverUI()); // entering the HUD and clicking must not leak to gameplay
+    UI::BeginFrame();
+    UI::Capture({50, 50, 100, 100});
+    UI::EndFrame();
+    frame.mousePosition = {300, 300};
+    Input::SetFrame(frame);
+    CHECK(!UI::IsMouseOverUI()); // leaving the HUD releases capture immediately
+    frame.mousePosition = {100, 100};
+    Input::SetFrame(frame);
+    frame.focused = false;
+    Input::SetFrame(frame);
+    CHECK(!UI::IsMouseOverUI());
+    frame.focused = true;
+    Input::SetFrame(frame);
+    UI::BeginFrame();
+    UI::Capture({50, 50, 100, 100});
+    UI::EndFrame();
+    CHECK(UI::IsMouseOverUI());
+    UI::ResetInteraction();
+    CHECK(!UI::IsMouseOverUI()); // scene transitions must release old UI regions
     Input::Reset();
 }
 

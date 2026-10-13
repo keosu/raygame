@@ -128,7 +128,8 @@ public:
                                    "Cannot allocate game canvas; retaining the previous canvas");
             }
         }
-        if (!canvas.id) throw std::runtime_error("Cannot create a game canvas");
+        if (!canvas.id)
+            throw std::runtime_error("Cannot create a game canvas");
         BeginCanvasMode();
     }
 
@@ -142,14 +143,17 @@ public:
     }
 
     // True between Begin and End, i.e. while scene and UI rendering target the canvas.
-    static bool InFrame() { return inFrame; }
+    static bool InFrame() {
+        return inFrame;
+    }
 
     // Copies a render-texture color attachment without blending. Translucent drawing
     // lowers a canvas's alpha; presenting with blending would mix in whatever lies below.
     static void PresentOpaque(Texture2D texture, Rectangle dest) {
         rlDrawRenderBatchActive();
         rlDisableColorBlend();
-        DrawTexturePro(texture, {0, 0, (float)texture.width, -(float)texture.height}, dest, {0, 0}, 0, WHITE);
+        DrawTexturePro(texture, {0, 0, (float)texture.width, -(float)texture.height}, dest, {0, 0},
+                       0, WHITE);
         rlDrawRenderBatchActive();
         rlEnableColorBlend();
     }
@@ -168,7 +172,8 @@ public:
         }
         ~OffscreenScope() {
             EndTextureMode();
-            if (resume) BeginCanvasMode();
+            if (resume)
+                BeginCanvasMode();
         }
         OffscreenScope(const OffscreenScope&) = delete;
         OffscreenScope& operator=(const OffscreenScope&) = delete;
@@ -178,7 +183,8 @@ public:
     };
 
     static void Shutdown() {
-        if (canvas.id) UnloadRenderTexture(canvas);
+        if (canvas.id)
+            UnloadRenderTexture(canvas);
         canvas = {};
         viewport = {};
         failedWidth = failedHeight = 0;
