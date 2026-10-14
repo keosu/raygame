@@ -18,6 +18,8 @@ private:
     float pageTime = 0;
     int heroIndex = 0;
     int kaijuIndex = 0;
+    static constexpr int kLevelsPerPage = 3;
+    int levelPage = 0;
     RenderTexture2D sky{};
     std::vector<RenderTexture2D> previews;
     std::vector<MapData> maps;

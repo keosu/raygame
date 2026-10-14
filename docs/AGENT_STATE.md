@@ -242,25 +242,37 @@ build 约 **1,086.9 MiB**，包含当前两模式对象/链接符号、Android s
 ## 远端工作包：弹道命中记录的地址复用问题（已修复并本地验证）
 ## 分支工作包：Ultra Guard 示例（仅在 `example/ultra-guard` 分支，不合入 main）
 
-用户要求把外部塔防游戏作为示例放到独立分支，不推送 main。基线 main `d942764`。
-游戏为奥特曼同人（第三方版权/商标），README 顶部有非官方声明；公开仓库的分支
-同样公开可见，已向用户说明。是否合入 main 由用户另行决定。
+用户要求把外部塔防游戏作为示例放到独立分支，不推送 main。最初基线 main `d942764`；
+用户要求后已 rebase 到 main `095bbea`（只有本文件冲突，保留双方条目），并同步为外部
+仓库 `9cef57b` 的游戏版本。游戏为奥特曼同人（第三方版权/商标），README 顶部有非官方
+声明；公开仓库的分支同样公开可见，已向用户说明。是否合入 main 由用户另行决定。
 
-- `examples/ultra_guard/`：9 个 .cpp + 头文件（与外部仓库 `406ed56` 的游戏一致，仅改
+- `examples/ultra_guard/`：11 个 .cpp + 头文件（与外部仓库 `9cef57b` 的 src 一致，仅改
   资源目录为 `bin/assets/ultra_guard/`、数据目录 `raygame.ultra_guard`、日志控制台跟随
   `RAYGAME_QUIET_EXAMPLE`、Android 包名 `org.raygame.ultraguard`）；assets（字体子集与
-  OFL、合成音频）、android/、resources/windows/、tools/（字体/音频/图标脚本，路径改为
-  相对示例目录与本仓库 `scripts/subset-font.py`）、README。
+  OFL、WAV 音效与 OGG 音乐、`levels/` 关卡文件、`skins/neon` 示例皮肤）、android/、
+  resources/windows/、tools/（字体/音频/图标/示例皮肤脚本，路径改为相对示例目录、本仓库
+  `scripts/subset-font.py`、`bin/` 与 `build/`）、README（关卡与皮肤说明）。
+- 同步版本新增：文本关卡（`Levels.cpp`，`文件:行号` 报错、关卡页分页、星级按 id 存档）、
+  皮肤（`Skins.*`，调色板/头像/怪兽帧条/地图地面，标题页切换，`--export-skin` 模板、
+  `--skin`）、BGM 改 Ogg Vorbis、留边模糊填充（rebase 后 main 已有 `MarginStyle`，不再删除）。
+  外部仓库独有的 xmake Android 打包（`set_config("ndk_sdkver")`、APK 检查规则）未带入，
+  示例沿用本仓库 `examples/xmake.lua` 与 `scripts/build-android.ps1`。
 - `examples/xmake.lua`：示例名单加入 `ultra_guard`；源码改为 `<name>/*.cpp`（其余七个
   示例目录都只有 main.cpp，行为不变）；README 随资源复制。`scripts/build-android.ps1`
   的 -Game 选项与 all 列表加入 `ultra_guard`。`examples/README.md` 加一行。
 
 ### 通过的检查
 
-- Windows/MSVC x64 Release 全目标构建；453 引擎逻辑、原图形 smoke 0 failures。
-- 示例 `--balance` 9 局胜 8（与外部仓库一致），`--capture` 14 张截图正常，日志确认从
-  `bin/assets/ultra_guard/` 加载字体与音频。
-- `build-android.ps1 -Game ultra_guard` 通过全部 APK 检查（7,368,296 B）。
+同步版本（rebase 后，独立 worktree）：
+
+- Windows/MSVC x64 Release 全目标构建；454 引擎逻辑、图形 smoke 0 failures；
+  clang-format 47 文件与 `git diff --check` 通过。
+- 示例 `--balance` 报告与外部仓库逐字节一致（9 局胜 8）；`--capture` 经典与 `--skin neon`
+  各 15 张截图正常（含开头的皮肤切换往返）；`--export-skin` 输出 17 个文件；日志确认
+  从 `bin/assets/ultra_guard/` 读取 3 个关卡、neon 皮肤与 OGG 音乐。
+- 示例 `tools/make_font.py` 重新生成的字体与 charset 与外部仓库逐字节一致。
+- `build-android.ps1 -Game ultra_guard` 通过全部 APK 检查（4,100,925 B）。
 
 ### 未运行
 

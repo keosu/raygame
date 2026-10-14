@@ -3,6 +3,7 @@
 #include "Assets.h"
 #include "Draw.h"
 #include "Gui.h"
+#include "Skins.h"
 #include <rlgl.h>
 
 namespace UG {
@@ -103,6 +104,12 @@ void MenuScene::OnUnload() {
 void MenuScene::SetPage(MenuPage next) {
     page = next;
     pageTime = 0;
+    if (next == MenuPage::Levels) {
+        int newest = 0;
+        for (int i = 0; i < (int)Levels().size(); ++i)
+            if (Progress::Unlocked(i)) newest = i;
+        levelPage = newest / kLevelsPerPage;
+    }
 }
 
 void MenuScene::Update() {
@@ -125,6 +132,11 @@ void MenuScene::Update() {
     if (page == MenuPage::Heroes) {
         if (Input::GetKeyDown(KEY_DOWN) || Input::GetKeyDown(KEY_S)) heroIndex = (heroIndex + 1) % kHeroCount;
         if (Input::GetKeyDown(KEY_UP) || Input::GetKeyDown(KEY_W)) heroIndex = (heroIndex + kHeroCount - 1) % kHeroCount;
+    }
+    if (page == MenuPage::Levels) {
+        int pages = std::max(1, ((int)Levels().size() + kLevelsPerPage - 1) / kLevelsPerPage);
+        if (Input::GetKeyDown(KEY_RIGHT) || Input::GetKeyDown(KEY_D)) levelPage = std::min(levelPage + 1, pages - 1);
+        if (Input::GetKeyDown(KEY_LEFT) || Input::GetKeyDown(KEY_A)) levelPage = std::max(levelPage - 1, 0);
     }
     if (page == MenuPage::Kaiju) {
         if (Input::GetKeyDown(KEY_RIGHT) || Input::GetKeyDown(KEY_D)) kaijuIndex = (kaijuIndex + 1) % kEnemyCount;
@@ -240,6 +252,14 @@ void MenuScene::DrawTitle() {
     }
     Gui::NoteIcon({musicBtn.x + 28, musicBtn.y + 21}, 11, opt.music ? WHITE : Palette::muted, opt.music);
     if (Gui::Button({40, Hh - 64, 130, 44}, "退出游戏", Gui::Style::Dark, true, 17)) QuitGame();
+    const auto& skins = Skins::All();
+    if (skins.size() > 1 &&
+        Gui::Button({186, Hh - 64, 210, 44}, "皮肤：" + skins[Skins::Current()].name, Gui::Style::Dark, true, 17)) {
+        Skins::Select((Skins::Current() + 1) % (int)skins.size());
+        GoToMenu(MenuPage::Title); // rebuilds the baked map previews
+    }
+    if (!Skins::Errors().empty())
+        Gui::Text("皮肤文件有误：" + Skins::Errors()[0], 40, Hh - 86, 12, Palette::red);
 
     int stars = 0;
     for (int i = 0; i < (int)Levels().size(); ++i) stars += Progress::Stars(i);
@@ -252,10 +272,28 @@ void MenuScene::DrawLevels() {
     DrawBack();
     DrawPageTitle("选择关卡", "从东京湾到光之国，击退怪兽大军");
     const auto& levels = Levels();
-    for (int i = 0; i < (int)levels.size(); ++i) {
+    const auto& errors = LevelErrors();
+    if (!errors.empty()) {
+        Rectangle strip{50, levels.empty() ? 300.0f : 686.0f, W - 100, levels.empty() ? 120.0f : 28.0f};
+        Draw::RoundedPanel(strip, 8, {60, 12, 18, 230}, WithAlpha(Palette::red, 0.8f), 1.5f);
+        std::string message = "关卡文件有误：" + errors[0];
+        if (errors.size() > 1) message += TextFormat("（共 %d 条，详见日志）", (int)errors.size());
+        Gui::Text(message, W / 2, strip.y + strip.height / 2 - 8, 14, {255, 200, 200, 255}, Gui::Align::Center);
+    }
+    int pages = std::max(1, ((int)levels.size() + kLevelsPerPage - 1) / kLevelsPerPage);
+    levelPage = std::clamp(levelPage, 0, pages - 1);
+    if (pages > 1) {
+        Gui::Text(TextFormat("%d / %d", levelPage + 1, pages), W - 160, 104, 15, Palette::muted, Gui::Align::Center);
+        if (Gui::Button({W - 290, 28, 120, 44}, "上一页", Gui::Style::Dark, levelPage > 0, 18)) --levelPage;
+        if (Gui::Button({W - 150, 28, 120, 44}, "下一页", Gui::Style::Dark, levelPage + 1 < pages, 18)) ++levelPage;
+    }
+    int first = levelPage * kLevelsPerPage;
+    int shown = std::min(kLevelsPerPage, (int)levels.size() - first);
+    for (int i = first; i < first + shown; ++i) {
         const LevelDef& def = levels[i];
-        float appear = EaseOut((pageTime - i * 0.1f) / 0.45f);
-        Rectangle r{50 + i * 400.0f, 140 + (1 - appear) * 50, 380, 540};
+        int slot = i - first;
+        float appear = EaseOut((pageTime - slot * 0.1f) / 0.45f);
+        Rectangle r{W / 2 - (shown * 400.0f - 20) / 2 + slot * 400.0f, 140 + (1 - appear) * 50, 380, 540};
         bool unlocked = Progress::Unlocked(i);
         bool hover = unlocked && Gui::Hover(r);
         Color accent = def.theme == Theme::City ? Color{255, 160, 70, 255}

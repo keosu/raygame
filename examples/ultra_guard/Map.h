@@ -33,8 +33,9 @@ struct MapData {
     bool Buildable(int col, int row) const { return InGrid(col, row) && cells[row][col] == Cell::Open; }
 };
 
-// Static background in canvas coordinates, rendered at `scale` for supersampling.
-RenderTexture2D RenderMap(const MapData& map, float scale);
+// Static background in canvas coordinates, rendered at `scale` for supersampling. A skin's
+// maps/<level id or theme>.png replaces the ground; `builtinGroundOnly` exports the plain ground.
+RenderTexture2D RenderMap(const MapData& map, float scale, bool builtinGroundOnly = false);
 // Opaque copy: translucent decoration lowered the texture's alpha while baking.
 void DrawMapTexture(const RenderTexture2D& texture, Rectangle dest);
 // Animated elements above the static layer: portals, the base and ambience.
