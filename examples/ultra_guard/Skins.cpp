@@ -205,7 +205,10 @@ void Load(const std::string& folder) {
             state.skins.push_back(skin);
         }
     }
+    // With no saved choice, fall back to the photo skin so the real pictures are
+    // what players see first; "经典" (index 0) stays selectable and keeps the drawn art.
     std::string wanted = folder.empty() ? Progress::Options().skin : folder;
+    if (wanted.empty()) wanted = "real";
     int chosen = 0;
     for (int i = 1; i < (int)state.skins.size(); ++i)
         if (state.skins[i].folder == wanted) chosen = i;
