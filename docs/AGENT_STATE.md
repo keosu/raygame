@@ -11,7 +11,22 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：作为子模块嵌入与外部项目 Android 打包（已实现并本地验证）
+## 最近工作包：Fit 画布留边的填充方式（已实现并本地验证，`809343d`）
+
+基线 `d942764`。用户希望窗口比例不同时，四周留边不再是纯黑。`Display` 新增
+`MarginStyle::{Solid, BlurredCanvas}`、`SetMarginStyle(style, brightness)`、`SetMarginColor`；
+BlurredCanvas 把当前画布经三级 1/4 缩小的离屏纹理模糊后按画布比例铺满窗口并调暗，
+只在实际存在留边时计算。`PresentOpaque` 增加可选 tint；`PrepareMarginBlur` /
+`DrawMarginFill` 公开供自定义呈现与测试。默认仍为原来的深色纯色，现有游戏外观不变。
+README 渲染一节补充说明。
+
+通过：Windows/MSVC x64 Release 全构建、453 引擎逻辑、图形 smoke 0 failures（新增：模糊
+留边延续画布颜色并按亮度调暗、纯色留边使用指定颜色）；外部塔防游戏 1100×860 窗口的
+合成截图确认上下留边为模糊场景色。未运行：Debug、Linux/macOS、Android 设备上的
+实际效果与开销（每帧三个小纹理 pass）。Ultra Guard 示例只在 `example/ultra-guard`
+分支，其状态记录也在该分支。
+
+## 上一工作包：作为子模块嵌入与外部项目 Android 打包（已实现并本地验证）
 
 基线 `0279a78`。外部塔防项目为支持 Android 改为 `includes` 本仓库 `xmake.lua`，
 暴露三处只在“raygame 不是根工程”时出现的问题，本包修复：
