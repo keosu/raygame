@@ -335,6 +335,11 @@ use a scope; it suspends the canvas and restores its logical projection afterwar
 { Display::OffscreenScope bake(target); ClearBackground(BLANK); DrawStuff(); }
 ```
 
+With the default `Fit` scaling, windows of another aspect ratio show bars around the
+canvas. `Display::SetMarginStyle(Display::MarginStyle::BlurredCanvas, brightness)` fills
+them with a blurred, dimmed copy of the current frame (three small downsampling passes);
+`SetMarginColor` changes the solid color, which remains the default.
+
 Set `ySort = true` on any component for top-down/2.5D depth: within the same layer and
 `renderOrder`, objects lower on screen draw later. Override `RenderDepth()` for a custom key.
 

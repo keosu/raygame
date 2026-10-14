@@ -196,6 +196,21 @@ public:
         Expect(presented.b == 0 && presented.r > 90 && presented.r < 110, "opaque presentation ignores canvas alpha");
         UnloadRenderTexture(source); UnloadRenderTexture(dest);
 
+        // Margin fill: a blurred, dimmed copy of the frame continues its colors into the bars.
+        auto frameSource = LoadRenderTexture(64, 32), bars = LoadRenderTexture(64, 32);
+        BeginTextureMode(frameSource); ClearBackground({200, 0, 0, 255}); EndTextureMode();
+        Display::SetMarginStyle(Display::MarginStyle::BlurredCanvas, 0.5f);
+        Display::SetMarginColor({0, 0, 200, 255});
+        Display::PrepareMarginBlur(frameSource.texture);
+        BeginTextureMode(bars); ClearBackground(BLACK); Display::DrawMarginFill({0, 0, 64, 32}, {16, 0, 32, 32}); EndTextureMode();
+        Color blurred = Pixel(bars, 2, 16);
+        Expect(blurred.r > 85 && blurred.r < 115 && blurred.b < 10, "blurred margins continue the frame's colors, dimmed");
+        Display::SetMarginStyle(Display::MarginStyle::Solid);
+        BeginTextureMode(bars); ClearBackground(BLACK); Display::DrawMarginFill({0, 0, 64, 32}, {16, 0, 32, 32}); EndTextureMode();
+        Expect(Pixel(bars, 2, 16).b == 200 && Pixel(bars, 2, 16).r == 0, "solid margins use the margin color");
+        Display::SetMarginColor({4, 7, 16, 255});
+        UnloadRenderTexture(frameSource); UnloadRenderTexture(bars);
+
         // An offscreen pass in the middle of a frame resumes the canvas and its projection.
         auto baked = LoadRenderTexture(16, 16);
         Display::Begin();
