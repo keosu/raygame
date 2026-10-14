@@ -10,7 +10,8 @@ option("example_console")
     set_description("Enable the Windows console and raylib logs for examples")
 option_end()
 
-local example_names = {"space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "engine_lab", "marble_temple", "garden_guard"}
+local example_names = {"space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "engine_lab", "marble_temple", "garden_guard",
+                       "ultra_guard"}
 local examples_root = os.scriptdir()
 
 -- Each game owns its assets; only the small examples share fonts.
@@ -45,7 +46,7 @@ if not is_plat("android") and (has_config("build_examples") or has_config("build
             set_default(false)
             on_build(function ()
                 copy_assets(path.join(examples_root, name, "assets"), path.join(os.projectdir(), "bin/assets", name), os, io)
-                if name == "engine_lab" or name == "marble_temple" or name == "garden_guard" then
+                if name == "engine_lab" or name == "marble_temple" or name == "garden_guard" or name == "ultra_guard" then
                     os.cp(path.join(examples_root, name, "README.md"), path.join(os.projectdir(), "bin", name .. "-README.md"))
                 end
             end)
@@ -58,7 +59,7 @@ local function add_example(name)
         set_kind("binary")
         set_languages("c++17")
         set_basename(name)
-        add_files(name .. "/main.cpp")
+        add_files(name .. "/*.cpp") -- main.cpp, plus any sibling sources of larger examples
         add_deps("raygame")
         if is_plat("android") then
             local staged_assets = path.absolute(path.join(get_config("builddir"), "example-assets", name), os.projectdir())

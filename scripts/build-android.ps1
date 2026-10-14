@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('all', 'space_shooter', 'bouncing_balls', 'neon_breakout', 'bullet_hell', 'forge_runner', 'engine_lab', 'marble_temple', 'garden_guard')]
+    [ValidateSet('all', 'space_shooter', 'bouncing_balls', 'neon_breakout', 'bullet_hell', 'forge_runner', 'engine_lab', 'marble_temple', 'garden_guard', 'ultra_guard')]
     [string]$Game = 'all',
     [ValidateSet('debug', 'release')][string]$Mode = 'release',
     [string]$SdkRoot,
@@ -49,7 +49,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Android build failed' }
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
-    $names = if ($Game -eq 'all') { @('space_shooter','bouncing_balls','neon_breakout','bullet_hell','forge_runner','engine_lab','marble_temple','garden_guard') } else { @($Game) }
+    $names = if ($Game -eq 'all') { @('space_shooter','bouncing_balls','neon_breakout','bullet_hell','forge_runner','engine_lab','marble_temple','garden_guard','ultra_guard') } else { @($Game) }
     $readelf = Join-Path $NdkRoot 'toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-readelf.exe'
     $results = foreach ($name in $names) {
         $apk = Join-Path $projectRoot "bin/android/arm64-v8a/$Mode/$name.apk"
