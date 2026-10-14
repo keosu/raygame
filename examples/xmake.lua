@@ -14,7 +14,7 @@ local example_names = {"space_shooter", "bouncing_balls", "neon_breakout", "bull
 local examples_root = os.scriptdir()
 
 -- Each game owns its assets; only the small examples share fonts.
--- Keep historical desktop EXE paths and stage APK assets under the build directory.
+-- Keep published desktop EXE paths; all compiler outputs are under build/.
 -- Pass runtime APIs from the build hook; the declaration scope has restricted I/O.
 local function copy_assets(source, destination, os, io)
     local copied = {}
@@ -31,12 +31,17 @@ local function copy_assets(source, destination, os, io)
     return copied
 end
 
+local desktop_dir = path.absolute(path.join(get_config("builddir") or "build", "desktop",
+    get_config("plat") or os.host(), get_config("arch") or os.arch(), get_config("mode") or "release"), os.projectdir())
+
 if not is_plat("android") and (has_config("build_examples") or has_config("build_tests")) then
     target("example_assets")
         set_kind("phony")
         set_default(false)
         on_build(function (target)
-            copy_assets(path.join(examples_root, "common/assets"), path.join(os.projectdir(), "bin/assets"), os, io)
+            for _, dir in ipairs({desktop_dir, path.join(os.projectdir(), "bin")}) do
+                copy_assets(path.join(examples_root, "common/assets"), path.join(dir, "assets"), os, io)
+            end
         end)
     target_end()
     for _, name in ipairs(example_names) do
@@ -44,7 +49,9 @@ if not is_plat("android") and (has_config("build_examples") or has_config("build
             set_kind("phony")
             set_default(false)
             on_build(function ()
-                copy_assets(path.join(examples_root, name, "assets"), path.join(os.projectdir(), "bin/assets", name), os, io)
+                for _, dir in ipairs({desktop_dir, path.join(os.projectdir(), "bin")}) do
+                    copy_assets(path.join(examples_root, name, "assets"), path.join(dir, "assets", name), os, io)
+                end
                 if name == "engine_lab" or name == "marble_temple" or name == "garden_guard" then
                     os.cp(path.join(examples_root, name, "README.md"), path.join(os.projectdir(), "bin", name .. "-README.md"))
                 end
@@ -63,7 +70,7 @@ local function add_example(name)
         if is_plat("android") then
             local staged_assets = path.absolute(path.join(get_config("builddir"), "example-assets", name), os.projectdir())
             set_kind("shared")
-            set_targetdir("$(projectdir)/bin/android/$(arch)/$(mode)")
+            set_targetdir("$(builddir)/native/$(arch)/$(mode)")
             -- The Android rule resolves resource paths relative to this script.
             add_rules("android.native_app", {
                 android_sdk_version = "35",
@@ -92,7 +99,9 @@ local function add_example(name)
                         "-Wl,--no-undefined", {force = true})
         else
             add_deps("example_assets", name .. "_assets")
-            set_targetdir("$(projectdir)/bin")
+            set_targetdir("$(builddir)/desktop/$(plat)/$(arch)/$(mode)")
+            add_rules("raygame.publish")
+            set_values("raygame.publishdir", "$(projectdir)/bin")
             if is_plat("windows", "mingw") then
                 add_files(name .. "/resources/windows/" .. name .. ".rc")
                 add_includedirs(name .. "/resources/windows")

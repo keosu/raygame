@@ -6,7 +6,7 @@ Space / 鼠标右键 / SWAP 交换当前和下一颗彩球。三关依次解锁�
 
 ```powershell
 xmake run marble_temple
-pwsh -NoProfile -File scripts/build-android.ps1 -Game marble_temple
+xmake android --game=marble_temple
 ```
 
 Windows 输出 `bin/marble_temple.exe`，保留同级 assets；Android APK 在

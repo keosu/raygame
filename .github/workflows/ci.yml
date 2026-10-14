@@ -156,20 +156,27 @@ jobs:
         with:
           xmake-version: ${{ env.XMAKE_VERSION }}
 
+      - name: Check Android tool discovery
+        run: xmake lua tests/android_tools.lua
+
       - name: Build and verify eight APKs including campaign games
         run: |
-          ./tests/android_tools.ps1
-          ./scripts/build-android.ps1 -Mode release -SdkRoot $env:ANDROID_HOME `
-            -NdkRoot "$env:ANDROID_HOME/ndk/28.2.13676358" -JavaHome $env:JAVA_HOME -BuildToolsVersion '35.0.0'
+          xmake android --mode=release --sdk="$env:ANDROID_HOME" `
+            --ndk="$env:ANDROID_HOME/ndk/28.2.13676358" --jdk="$env:JAVA_HOME" --build-tools=35.0.0
+
+      - name: Stage Android download artifact
+        run: |
+          New-Item -ItemType Directory -Path build/android/artifact -Force | Out-Null
+          Copy-Item -Path bin/android/arm64-v8a/release/*.apk -Destination build/android/artifact
           Copy-Item -LiteralPath build/android/verification-release.json `
-            -Destination bin/android/arm64-v8a/release/verification.json
+            -Destination build/android/artifact/verification.json
 
       - name: Upload Android APKs and verification report
         uses: actions/upload-artifact@v4
         with:
           name: raygame-android-arm64-release
           path: |
-            bin/android/arm64-v8a/release/*.apk
-            bin/android/arm64-v8a/release/verification.json
+            build/android/artifact/*.apk
+            build/android/artifact/verification.json
           if-no-files-found: error
           retention-days: 14

@@ -55,76 +55,82 @@ Android 首次侧载时按系统提示允许相应文件管理器安装应用。
 调试密钥，才能直接覆盖安装并保留数据；不要删除 `build/android/debug.keystore`。
 密钥、工具链与 APK 均不提交到 Git。
 
-## Windows / PowerShell 一键构建
+## 用 xmake 构建
 
-依赖：PowerShell 7+、xmake 3.1.1、JDK 17+、Android SDK platform 35、
-完整的 Windows NDK 和稳定版 Build Tools 35.0.0 或更新版本（需支持 16 KiB ZIP 对齐）。
-本地脚本不要求 NDK 的固定版本号；r28c (`28.2.13676358`) 是本机与 CI 已验证的版本。
-不需要 Gradle、Java 游戏 Activity 或 Android Studio 项目。
-引擎统一编译/打包 TTS Java 桥接，游戏通过 C++ 调用；详见 [TTS](TEXT_TO_SPEECH.md)。
-也可用 Android Studio/命令行 SDK Manager 安装所需组件：
+仓库根目录运行（xmake 3.1.1，Windows/Linux/macOS 共用 Lua 入口）：
 
-```powershell
-sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.2.13676358'
+```sh
+xmake android
+xmake android --game=neon_breakout
+xmake android --game=forge_runner --mode=debug
+xmake android --verify-only
 ```
 
-在仓库根目录运行，默认构建全部八个示例：
+默认构建并校验八个 ARM64 Release APK，`--jobs=4` 控制并行编译数。
+`--rebuild` 强制重新编译；Android 任务关闭编译缓存，保留正常的依赖增量构建。
+只运行构建与静态校验，不安装或启动设备。
 
-```powershell
-pwsh -NoProfile -File scripts/build-android.ps1
-# 只生成一个游戏：
-pwsh -NoProfile -File scripts/build-android.ps1 -Game neon_breakout
-pwsh -NoProfile -File scripts/build-android.ps1 -Game forge_runner
+工具已安装时无需环境安装脚本。SDK 查找显式 `--sdk`、`ANDROID_HOME` /
+`ANDROID_SDK_ROOT` / `ANDROID_SDK_HOME`、项目内工具目录、Android Studio 默认目录
+及原有 RayGame 缓存。NDK 优先使用 `--ndk`，其次有效环境变量
+`ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`，再选 SDK 中版本最高的完整稳定版，
+最后兼容 `ndk-bundle`。Build Tools 同样选择完整稳定版，要求 >=35.0.0。
+版本按数字排序，自动发现跳过预览版和未完整安装；显式坏路径直接报错。
+JDK 支持 `--jdk`、`JAVA_HOME`、PATH 和本地工具目录，并检查 javac >=17。
+
+```sh
+xmake android --sdk="C:/Android/Sdk" --ndk="C:/Android/Sdk/ndk/27.2.12479018" --jdk="C:/Java/jdk-17" --build-tools=36.0.0
 ```
 
-SDK 优先使用 `-SdkRoot`，然后查找 `ANDROID_HOME` / `ANDROID_SDK_ROOT`、
-Android Studio 默认目录和已知工具缓存；SDK 必须包含 `platforms/android-35/android.jar`。
-NDK 按以下顺序选择：`-NdkRoot` → 有效的 `ANDROID_NDK_HOME` / `ANDROID_NDK_ROOT`
-→ 所选 SDK 的 `ndk/*` 中版本最高的完整稳定版 → 旧式 `ndk-bundle`。
-版本来自 `source.properties`，按数字排序；自动发现跳过预览版与未完整安装的目录。
-显式路径无效会报告缺少的文件，不会偷偷切换到另一套工具。
+任务只给子进程传递 JAVA_HOME/PATH/XMAKE_CONFIGDIR，配置保存在
+`build/android/config`，不改变 IDE 的桌面配置或终端环境。编译库位于
+`build/android/native/<arch>/<mode>` 和 `build/android/lib/`；Java、dex、
+未签名 APK 与 v4 签名辅助文件都留在 `build/android/`。`bin/android/<arch>/<mode>`
+只发布最终签名 APK。
 
-Build Tools 默认选所选 SDK 中版本最高的完整稳定版（至少 35.0.0），可用
-`-BuildToolsVersion` 固定版本。JDK 查找 `-JavaHome`、`JAVA_HOME`、PATH 中的
-`javac.exe` 和已知缓存。脚本启动时打印最终工具路径和版本，便于排查其他机器。
-例如，机器只有 r27 和 Build Tools 36 时，无需安装 r28c 或 35.0.0 即可发现它们：
+本地调试密钥在首次构建时生成到 `build/android/debug.keystore`，已有文件会复用。
+alias 为 `androiddebugkey`，密码为 `android`。清缓存时应保留该文件；删除并重建
+会改变签名，无法覆盖安装原来的 APK。它不是可重建的编译缓存。
 
-```powershell
-pwsh -NoProfile -File scripts/build-android.ps1 `
-    -SdkRoot 'C:/Android/Sdk' `
-    -NdkRoot 'C:/Android/Sdk/ndk/27.2.12479018' `
-    -JavaHome 'C:/Java/jdk-17' `
-    -BuildToolsVersion '36.0.0'
+每次校验直接检查 APK 内的原生库：签名、16 KiB ZIP/ELF 对齐、ARM64、SDK 26/35、
+NativeActivity 导出入口、静态 C++ 运行库、完整资源集合与 SHA-256、图标、TTS dex
+和 manifest。报告位于 `build/android/verification-<mode>.json`；开始时撤销旧报告，
+全部所选 APK 通过后才写入新报告，单游戏调用的报告只包含该游戏。
+
+工具发现回归检查不需要真实 SDK、下载或设备：
+
+```sh
+xmake lua tests/android_tools.lua
 ```
 
-默认 ARM64、Release、4 个编译任务；`-Mode debug` 可构建含调试信息的版本。
-脚本不会安装、启动设备或修改全局环境。它在 `build/android/config` 下使用
-独立的 `XMAKE_CONFIGDIR`，恢复调用者的 JAVA_HOME/PATH/config 环境，不改变
-普通 `xmake` 命令使用的桌面配置。
+## 从零安装工具
 
-此脚本目前使用 Windows 工具文件名，Linux/macOS 使用下文的直接 xmake 命令。
-签名密钥首次自动生成到 `build/android/debug.keystore`，alias 为
-`androiddebugkey`，store/key 密码均为 `android`，与用户
-`~/.android/debug.keystore` 分开。`build/` 被 Git 忽略，因此其他机器或新克隆
-没有这个文件；直接执行 xmake 也不会自动生成它。每个 APK 会检查签名、
-ZIP 对齐、ARM64 ELF 的 16 KiB LOAD 段对齐、NativeActivity 导出入口、静态
-C++ 运行库以及各自资源/共用字体和许可的 SHA-256；缺失、多余或内容不一致的
-运行资源会使检查失败。SHA-256 等结果存入
-`build/android/verification-release.json`（Debug 对应 `verification-debug.json`）。
-构建检查也覆盖 APK 中的普通、自适应和主题图标资源。
-报告同时记录所用 NDK 与 Build Tools 版本。自动发现可适配不同安装目录，
-但每个工具版本的实际兼容性仍以构建与校验结果为准；脚本不会自动下载工具。
-
-仅检查不同 SDK 布局的选择逻辑（临时目录，无真实编译/签名）：
-
-```powershell
-pwsh -NoProfile -File tests/android_tools.ps1
+```sh
+xmake android-setup
+xmake android
 ```
+
+安装器由 xmake 执行 Lua。默认把 SDK 放在 `build/android/tools/sdk`；优先复用已有
+JDK，没有时下载带固定 SHA-256 的 Microsoft OpenJDK 21.0.10。Google command-line
+tools 19.0 使用官方仓库固定校验和，下载和解压暂存在 `build/android/setup-downloads`，
+成功安装后移除下载包与解压副本。SDK Manager 安装缺少的 platform 35、Build Tools
+35.0.0 和 NDK r28c；已完整安装的其它兼容版本会复用。Android 许可证默认由
+sdkmanager 交互询问；明确接受时可用 `xmake android-setup --accept-licenses`。
+
+也可为已有 SDK 补齐缺少的组件：
+
+```sh
+xmake android-setup --sdk="C:/Android/Sdk" --jdk="C:/Java/jdk-17"
+```
+
+安装器记录工具路径到 `build/android/setup.lua`，后续 `xmake android` 可直接发现。
+不改全局环境。Windows x64、Linux x86_64、macOS x86_64/ARM64 有下载配置，
+本轮真实构建验证范围仍以文末和 AGENT_STATE 为准；其他主机未做本地验收。
 
 ## GitHub Actions 构建与下载
 
 `.github/workflows/ci.yml` 的 Android 任务在 Windows 2022 runner 上调用同一
-脚本，固定 xmake 3.1.1、JDK 17、SDK 35/build-tools 35.0.0 和 NDK r28c。
+`xmake android`，固定 xmake 3.1.1、JDK 17、SDK 35/build-tools 35.0.0 和 NDK r28c。
 推送到 `main`、面向 `main` 的 PR，或在 Actions → CI → Run workflow 手动触发
 后，成功运行的 Artifacts 中提供 `raygame-android-arm64-release`，含八个 APK
 及 `verification.json`，保留 14 天。同一工作流还构建并上传 Windows x64
@@ -135,7 +141,7 @@ CI 每次生成独立的临时调试密钥，不上传密钥，也不需要配�
 会清除应用数据。需要持续覆盖安装时，继续使用保留同一调试密钥的本地构建。
 CI 检查构建/签名/打包，不安装或启动 Android 应用。
 
-## 直接使用 xmake（Linux/macOS 也可参考）
+## 手动配置底层 xmake 目标（可选）
 
 安装所需 SDK/NDK/JDK，在仓库根目录执行。下面是使用已验证工具版本的示例，
 采用 Linux/macOS 的 sh/bash/zsh 语法，把 NDK 和 Build Tools 路径换成自己的安装目录：
@@ -167,15 +173,15 @@ xmake build -j 4 -y
 输出仍为 `bin/android/arm64-v8a/release/*.apk`。只切换 `-m debug` 时，输出在
 同级 `debug/` 目录。已有标准 `~/.android/debug.keystore` 时，可以跳过生成，
 并把配置中的路径换成 `--android_keystore="$HOME/.android/debug.keystore"`。
-这些直接命令会切换当前目录的 xmake 配置；Windows 推荐使用前面的隔离脚本。
-目前只在 Windows 主机实际构建了 ARM64 Release 及 FORGE Debug APK，
+这些直接命令会切换当前目录的 xmake 配置；推荐使用前面的 `xmake android` 隔离任务。
+目前只在 Windows 主机实际验证过这些入口，
 其他主机/ABI 尚未验证。
 
 ## 指定自己的签名 key
 
 目前直接 xmake 支持 `--android_keystore=/绝对路径/自己的.keystore`，但八个
 游戏的打包规则都把密码固定为 `android`；未提供自定义密码、alias 或独立
-key password 的配置项。Windows 包装脚本也没有 `-Keystore` 参数，始终使用
+key password 的配置项。`xmake android` 任务也没有 keystore 参数，始终使用
 仓库下的本地调试 key。
 
 使用自定义密码或多 alias 的 keystore 时，先按上文正常构建，再使用 SDK 的
@@ -206,7 +212,7 @@ Windows PowerShell（当前终端需配置 `JAVA_HOME` / `ANDROID_HOME`）：
 ```
 
 `apksigner` 替换 APK 原来的调试签名，保留资源、原生库及已有 ZIP 对齐；安装
-`forge_runner-signed.apk`。其他游戏替换文件名即可。原始 APK 和构建脚本的
+`forge_runner-signed.apk`。其他游戏替换文件名即可。原始 APK 和构建任务的
 `verification-*.json` 仍对应调试签名产物，自有 key 的输出用上述 `verify` 检查。
 后续版本用同一私钥签名才可覆盖安装；要延续另一台机器的安装签名，需要复用
 那台机器的原 key，创建同名文件或相同 alias 不会生成相同私钥。

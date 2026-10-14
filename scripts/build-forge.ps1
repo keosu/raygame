@@ -8,6 +8,8 @@ $projectRoot=Split-Path -Parent $PSScriptRoot
 $gameRoot=Join-Path $projectRoot 'examples/forge_runner'
 $workRoot=Join-Path $projectRoot "build/forge/$Mode"
 $sdkRoot=Join-Path $workRoot 'sdk'
+$gameBuild=Join-Path $workRoot 'game-build'
+$gameBin=Join-Path $gameBuild "windows/x64/$Mode"
 $savedConfig=$env:XMAKE_CONFIGDIR
 New-Item -ItemType Directory -Path $workRoot -Force | Out-Null
 function Invoke-Xmake([string[]]$Arguments,[string]$Log) {
@@ -30,16 +32,16 @@ try {
     $env:XMAKE_CONFIGDIR=Join-Path $workRoot 'game-config'
     Push-Location $gameRoot
     try {
-        Invoke-Xmake @('f','-P',$gameRoot,'-p','windows','-a','x64','--toolchain=msvc','-m',$Mode,"--raygame_sdk=$sdkRoot",'-y') 'game-config.log'
+        Invoke-Xmake @('f','-P',$gameRoot,'-p','windows','-a','x64','--toolchain=msvc','-m',$Mode,"--raygame_sdk=$sdkRoot",'-o',$gameBuild,'-y') 'game-config.log'
         Invoke-Xmake @('build','-P',$gameRoot,'-j','1','-y') 'game-build.log'
         if($Verify) {
-            & (Join-Path $PSScriptRoot 'verify-windows-icons.ps1') -BinaryDirectory (Join-Path $gameRoot "build/windows/x64/$Mode") `
+            & (Join-Path $PSScriptRoot 'verify-windows-icons.ps1') -BinaryDirectory $gameBin `
                 -Games @('forge_runner') -IconDirectory (Join-Path $gameRoot 'resources') -IconNames @('forge')
             Invoke-Xmake @('build','-P',$gameRoot,'-j','1','-y','forge_tests') 'tests-build.log'
             Invoke-Xmake @('run','-P',$gameRoot,'forge_tests',(Join-Path $gameRoot 'assets'),(Join-Path $workRoot 'test-data')) 'tests.log'
             Get-Content -LiteralPath (Join-Path $workRoot 'tests.log') -Tail 1
             if(-not $SkipGraphics) {
-                $exe=Join-Path $gameRoot "build/windows/x64/$Mode/forge_runner.exe"
+                $exe=Join-Path $gameBin 'forge_runner.exe'
                 $data=Join-Path $workRoot 'smoke-data'
                 $arguments=@('--smoke','--data',('"'+$data+'"'))
                 $process=Start-Process -FilePath $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru
@@ -53,7 +55,7 @@ try {
             } else { Write-Output 'FORGE graphics smoke: not run (-SkipGraphics)' }
         }
     } finally { Pop-Location }
-    Write-Output "FORGE executable: $gameRoot/build/windows/x64/$Mode/forge_runner.exe"
+    Write-Output "FORGE executable: $gameBin/forge_runner.exe"
 } finally {
     $env:XMAKE_CONFIGDIR=$savedConfig
 }

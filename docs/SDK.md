@@ -105,7 +105,7 @@ xmake lua scripts/verify-sdk.lua
 xmake lua scripts/verify-sdk.lua --graphics
 ```
 
-脚本将 SDK 安装到新临时目录，再搬到含空格的新路径；将独立消费项目复制到
+脚本将 SDK 安装到 `build/sdk-validation/` 下的新临时目录，再搬到含空格的新路径；将独立消费项目复制到
 另一子目录，编译并检查头文件、物理/固定 tick、输入、TTS 参数拒绝和存档。不引用引擎源码
 或示例资源。脚本还验证模式、架构及 Windows C 运行库不匹配会被明确拒绝。
 `--graphics` 额外创建真实隐藏窗口、程序生成纹理并绘制四帧，检查退出清理，
@@ -123,11 +123,11 @@ xmake build -a -j 1 -y
 ```
 
 桌面引擎库按平台/架构/模式输出到 `build/lib/<平台>/<架构>/<模式>`，防止
-Debug/Release 库相互覆盖。七个示例（含 Engine Lab、Marble Temple 和 Garden Guard）及 tests/smoke 的可执行文件仍共用 `bin`，
-根工程 FORGE 与其逻辑测试位于 `bin/forge_runner`；
-构建规则在每个可执行文件旁保存 `.raygame-config` 配置标记，切换模式后强制
-重新链接，避免模式独立的缓存误判共享 EXE。相同配置的无改动构建仍复用产物。
-切换配置后需运行构建，不能将此前的 EXE 当作当前配置产物；配置标记无需分发。
+Debug/Release 库相互覆盖。桌面 EXE、PDB、ILK、测试程序都在
+`build/desktop/<平台>/<架构>/<模式>` 中生成，Forge 使用其下的 `forge_runner/`。
+构建完成后只把游戏 EXE、运行资源和说明复制到 `bin/`（Forge 在 `bin/forge_runner/`）。
+`xmake run` 使用对应模式的 build 目标与资源；切换模式后再次构建会更新 bin 发布副本，
+不再依赖旁置 `.raygame-config` 标记或强制重新链接。
 
 SDK 导出 `raygame/TextToSpeech.h`，Windows 的 SAPI/COM 系统库由接入脚本传递。
 语音用法与 Android Java 打包要求见 [TTS](TEXT_TO_SPEECH.md)；当前安装 SDK 入口

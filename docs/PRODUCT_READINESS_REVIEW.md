@@ -611,3 +611,17 @@ CI 固定工具版本并加入不同安装布局的测试。
 重新构建校验，Windows/MSVC Release 八示例与 437 引擎逻辑通过。
 尚未安装其他 NDK 或运行真机；r27/r29 仅验证发现逻辑，其编译兼容性未实测。
 未收到用户另一机器的具体报错，已修复固定目录依赖，不把此事作为所有报错的结论。
+
+**30. 构建产物隔离与 Android xmake/Lua 入口**
+
+2026-10-14 将桌面编译/链接产物、符号、测试程序和 Android 原生库/打包暂存统一
+留在 build，bin 只发布游戏及资源、完整 APK。Forge 独立 SDK 构建与消费验证临时
+工程也进入根 build。Android PowerShell 编排改为 `xmake android`，保留发现、
+配置隔离、密钥复用与完整 APK 校验；新增 Lua 环境安装入口 `xmake android-setup`。
+旧产物通过 Windows 回收站可恢复清理，密钥与共享工具保留；具体数量见 AGENT_STATE。
+
+本包 Windows 两模式各 437/130/37 逻辑、所有示例图形 smoke、静音 TTS、SDK
+Release 图形消费、Forge 独立构建、八 Release APK 和 Lab Debug APK 校验通过。
+18 项发现测试、发布副本恢复、失败后环境/桌面配置保持通过。尚未实测从零下载安装
+全部工具、其它主机构建、Android 设备或新远端 CI。目录与入口调整
+不替代干净机器发行、设备运行、稳定签名或 M0 硬件/长稳验收。

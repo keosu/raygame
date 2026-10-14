@@ -6,7 +6,7 @@
 
 ```powershell
 xmake run garden_guard
-pwsh -NoProfile -File scripts/build-android.ps1 -Game garden_guard
+xmake android --game=garden_guard
 ```
 
 选择上方种子卡或键盘 1–6，点击/触摸空格种植；点击阳光收集。卡片需要阳光和冷却，

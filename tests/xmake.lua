@@ -6,7 +6,7 @@ if has_config("build_tests") and not is_plat("android") then
         set_default(false)
         add_files("campaigns.cpp")
         add_deps("raygame")
-        set_targetdir("$(projectdir)/bin")
+        set_targetdir("$(builddir)/desktop/$(plat)/$(arch)/$(mode)")
     target_end()
     if is_plat("windows", "mingw") then
         target("tts_smoke")
@@ -15,7 +15,7 @@ if has_config("build_tests") and not is_plat("android") then
             set_default(false)
             add_files("tts_smoke.cpp")
             add_deps("raygame")
-            set_targetdir("$(projectdir)/bin")
+            set_targetdir("$(builddir)/desktop/$(plat)/$(arch)/$(mode)")
         target_end()
     end
     target("tests")
@@ -25,7 +25,7 @@ if has_config("build_tests") and not is_plat("android") then
         set_default(false)
         add_files("main.cpp", "header_compat.cpp", "platform_files.cpp")
         add_deps("raygame")
-        set_targetdir("$(projectdir)/bin")
+        set_targetdir("$(builddir)/desktop/$(plat)/$(arch)/$(mode)")
     target_end()
 
     -- Requires an OpenGL-capable display.
@@ -36,6 +36,6 @@ if has_config("build_tests") and not is_plat("android") then
         add_files("smoke.cpp", "window_theme.cpp")
         add_deps("raygame", "example_assets")
         add_deps("space_shooter_assets", "bouncing_balls_assets", "neon_breakout_assets", "bullet_hell_assets")
-        set_targetdir("$(projectdir)/bin")
+        set_targetdir("$(builddir)/desktop/$(plat)/$(arch)/$(mode)")
     target_end()
 end

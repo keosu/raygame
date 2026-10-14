@@ -40,8 +40,8 @@ function add_forge_targets(options)
             add_raygame_sdk()
         else
             add_deps("raygame", "forge_headers")
-            set_targetdir(is_plat("android") and "$(projectdir)/bin/android/$(arch)/$(mode)"
-                          or "$(projectdir)/bin/forge_runner")
+            set_targetdir(is_plat("android") and "$(builddir)/native/$(arch)/$(mode)"
+                          or "$(builddir)/desktop/$(plat)/$(arch)/$(mode)/forge_runner")
         end
     end
 
@@ -51,6 +51,10 @@ function add_forge_targets(options)
             set_languages("c++17")
             add_files(path.join(forge_root, "src/*.cpp"))
             add_engine()
+            if not options.sdk and not is_plat("android") then
+                add_rules("raygame.publish")
+                set_values("raygame.publishdir", "$(projectdir)/bin/forge_runner")
+            end
             if is_plat("android") then
                 local staged_assets = path.join(build_root, "example-assets/forge_runner")
                 set_kind("shared")
@@ -91,6 +95,13 @@ function add_forge_targets(options)
                     local destination = path.join(target:targetdir(), name)
                     if not os.isfile(destination) or io.readfile(source) ~= io.readfile(destination) then
                         os.cp(source, destination)
+                    end
+                end
+                if not options.sdk then
+                    local published = path.join(os.projectdir(), "bin/forge_runner")
+                    sync_files(path.join(forge_root, "assets"), path.join(published, "assets"), os, io, assert)
+                    for _, name in ipairs({"README.md", "THIRD_PARTY_NOTICES.md"}) do
+                        os.cp(path.join(forge_root, name), path.join(published, name))
                     end
                 end
             end)

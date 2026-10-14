@@ -44,5 +44,13 @@ rule("raygame.android_tts")
         end, {dependfile = target:dependfile(output .. ".tts"),
               files = {base, source, androidjar, keystore, path.join(os.projectdir(), "xmake/rules/android-tts.lua")},
               values = {version, conf.android_sdk_version}, changed = not os.isfile(output)})
+        -- Publish only the completed APK. Native libraries, intermediate APKs and
+        -- apksigner's optional v4 sidecars remain in build/.
+        local published = path.join(os.projectdir(), "bin/android", target:arch(), get_config("mode"))
+        os.mkdir(published)
+        local apk = path.join(published, target:basename() .. ".apk")
+        if not os.isfile(apk) or io.readfile(apk, {encoding = "binary"}) ~= io.readfile(output, {encoding = "binary"}) then
+            os.cp(output, apk)
+        end
     end)
 rule_end()

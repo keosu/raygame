@@ -1,9 +1,10 @@
 set_project("raygame")
 set_version("0.2.0")
 
-includes("xmake/rules/desktop-config.lua")
+includes("xmake/rules/publish.lua")
 includes("xmake/rules/android-tts.lua")
-add_rules("mode.debug", "mode.release", "raygame.desktop_config")
+includes("xmake/tasks/android.lua")
+add_rules("mode.debug", "mode.release")
 set_encodings("utf-8")
 
 option("build_examples")
@@ -39,8 +40,7 @@ target("raygame")
     add_packages("raylib-cpp", {public = true})
 
     -- Libraries must survive mode switches without reusing another mode's archive.
-    set_targetdir(is_plat("android") and "$(projectdir)/bin/android/$(arch)/$(mode)"
-                  or "$(builddir)/lib/$(plat)/$(arch)/$(mode)")
+    set_targetdir("$(builddir)/lib/$(plat)/$(arch)/$(mode)")
 
     if is_plat("windows") then
         add_syslinks("winmm", "gdi32", "dwmapi", "advapi32", "shell32", "ole32", "sapi", {public = true})

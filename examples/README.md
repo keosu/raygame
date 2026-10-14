@@ -38,12 +38,12 @@ FORGE 在根工程中链接当前引擎，输出为 `bin/forge_runner/forge_runn
 无 `.exe` 后缀），相邻 `assets/`、README 和许可随构建复制，可整体打包。
 `build_examples=n` 关闭全部八个桌面示例；`build_tests=y` 仍可单独构建并运行
 `forge_tests`，默认使用隔离的测试存档目录。Android 默认也包含 FORGE；单独构建
-使用 `pwsh -NoProfile -File scripts/build-android.ps1 -Game forge_runner`，生成
+使用 `xmake android --game=forge_runner`，生成
 `bin/android/arm64-v8a/release/forge_runner.apk`，触屏与验收边界见游戏说明。
 
 FORGE 同时保留自己的独立 SDK 入口：Windows 可运行
-`pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify`，输出仍为
-`examples/forge_runner/build/windows/x64/<mode>/forge_runner.exe`。也可将整个
+`pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify`，独立验证产物位于
+`build/forge/<mode>/game-build/windows/x64/<mode>/forge_runner.exe`。也可将整个
 游戏目录复制到仓库外，使用已安装的 SDK 构建。两个入口复用 `targets.lua`，
 源码、资源与测试保持一致；SDK 接入见 [SDK 文档](../docs/SDK.md)。
 

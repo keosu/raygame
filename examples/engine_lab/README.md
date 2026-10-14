@@ -7,7 +7,7 @@
 xmake build engine_lab
 xmake run engine_lab
 # 仅构建 Android APK，不安装设备：
-pwsh -NoProfile -File scripts/build-android.ps1 -Game engine_lab
+xmake android --game=engine_lab
 ```
 
 Windows 入口 `bin/engine_lab.exe`，保留同级 `assets/`；Android 入口

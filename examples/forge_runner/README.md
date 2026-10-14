@@ -52,7 +52,7 @@ Linux 在根目录配置 `xmake f -p linux -m release -y` 后使用相同的构�
 
 ```powershell
 pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify
-./examples/forge_runner/build/windows/x64/release/forge_runner.exe
+./build/forge/release/game-build/windows/x64/release/forge_runner.exe
 ```
 
 脚本在独立配置中构建/安装 SDK，然后构建游戏，不改 IDE 当前桌面配置。
@@ -65,7 +65,7 @@ Windows 总游戏包中的 `forge_runner/` 也包含完整游戏。Linux 下载�
 没有可用 OpenGL 显示环境时可加 `-SkipGraphics`；Windows CI 使用此选项，仅运行
 构建、逻辑和内嵌图标检查，不把图形 smoke 标为通过。
 
-也可以把整个 `examples/forge_runner` 复制到另一个目录，使用已安装的 SDK。
+也可以把 `examples/forge_runner` 的源码和资源复制到另一个目录（排除 build/bin/.xmake），使用已安装的 SDK。
 先切换到复制后的游戏目录，再运行：
 
 ```powershell
@@ -87,7 +87,7 @@ Linux 实机运行和发行包签名尚未验收。
 target SDK 35。使用与其他示例相同的隔离构建、签名和校验脚本：
 
 ```powershell
-pwsh -NoProfile -File scripts/build-android.ps1 -Game forge_runner -Mode release
+xmake android --game=forge_runner --mode=release
 ```
 
 输出为 `bin/android/arm64-v8a/release/forge_runner.apk`，包名 `org.raygame.forge`。

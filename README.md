@@ -395,11 +395,13 @@ The current build targets Android 8.0+ (API 26), target SDK 35, and includes bun
 fonts, touch controls, pause/exit UI and application-private saves/logs.
 
 ```powershell
-pwsh -NoProfile -File scripts/build-android.ps1
+# On a machine without Android tools:
+# xmake android-setup
+xmake android
 ```
 
 Outputs: `bin/android/arm64-v8a/release/*.apk`. These use Release native code and a
-local debug signing key. The script keeps the desktop xmake configuration intact
+local debug signing key. The task keeps the desktop xmake configuration intact
 and checks signatures, native entry points, assets and 16 KiB page alignment.
 Device execution is still pending manual validation. See [Android setup, controls
 and platform limits](docs/ANDROID.md) (Chinese) for prerequisites and commands.
@@ -491,7 +493,13 @@ resources under `examples/<name>/`; the seven examples share fonts in
 `examples/common/assets/fonts`. The engine's Android raylib recipe is in
 `xmake/packages/raylib.lua`. Desktop assets are copied to `bin/assets/fonts` and
 `bin/assets/<name>/`; each APK contains only common fonts and its own assets.
-Android packages remain in `bin/android/<arch>/<mode>`. See the
+Compiled targets, static libraries, debug symbols, test executables and packaging
+intermediates stay in `build/`, separated by platform, architecture and mode.
+`bin/` contains the published games, runtime assets and documentation; Android
+packages remain in `bin/android/<arch>/<mode>`. `xmake run` uses the corresponding
+build target and its staged assets. After switching modes, build once to publish
+that mode's games. Preserve `build/android/debug.keystore` when removing caches.
+The root `.xmake/` remains xmake's normal local configuration directory. See the
 [example directory guide](examples/README.md) for ownership and build entries.
 
 ```bash
@@ -568,7 +576,7 @@ Build and run its headless tests with `xmake build forge_tests` and `xmake run f
 The separate installed-SDK entry remains available on Windows through
 `pwsh -NoProfile -File scripts/build-forge.ps1 -Mode release -Verify`.
 An experimental Android build adds multitouch movement/jump/dash controls and touch
-menus: `pwsh -NoProfile -File scripts/build-android.ps1 -Game forge_runner`.
+menus: `xmake android --game=forge_runner`.
 APK build checks pass locally; Android device execution still needs manual validation.
 
 ## Tests & CI
