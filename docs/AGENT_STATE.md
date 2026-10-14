@@ -1,6 +1,6 @@
 # Agent 工作状态
 
-更新时间：2026-10-13。
+更新时间：2026-10-14。
 
 ## 目标与约束
 
@@ -11,7 +11,50 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：Android 构建工具自动发现（本地验证通过）
+## 最近工作包：本地目录体积审计（仅分析，未清理）
+
+用户询问轻量 2D 框架目录为何超过 1 GB、哪些下载占空间。开始时 HEAD 为
+`54a4cf0`、工作区干净；已确认上一包 Android 工具发现改动实际已提交，
+其旧“下一步：提交”记录已过时。本包未核对远端或 CI。
+
+- 写入本记录前，项目 3,988 个文件合计 **1,538,146,859 B（1.433 GiB）**。
+  `build/` 1,102.69 MiB、`bin/` 259.60 MiB、`examples/` 96.80 MiB、
+  `.git/` 7.16 MiB。337 个 Git 跟踪文件仅 **8.00 MiB**，其中示例 7.40 MiB；
+  引擎 `include/ + src/` 合计约 205 KiB。被 Git 忽略的本地文件占 **98.97%**。
+- `build/android/` 429.91 MiB：`.gens/` 222.65 MiB（多阶段 APK 与共享库副本）、
+  `.build_cache/` 142.27 MiB、`.objs/` 55.76 MiB 等；Debug/Release 同时保留。
+  `bin/android/` 125.84 MiB，其中 Debug 91.12 MiB；八个最终 Release APK
+  合计仅 14.57 MiB，单包约 1.23–4.10 MiB。
+- 桌面 `build/.objs/` 134.68 MiB；临时工程 `build/polish-desktop/` 115.54 MiB，
+  内含复制的 Forge 构建目录。根 `examples/forge_runner/build/` 89.38 MiB，
+  解释了示例目录的大部分体积；全部 `bin/` 中 PDB 符号占 94.16 MiB。
+  `build/` 排除 Android 与临时工程副本后，截图/预览/生成资源 PNG 共
+  954 张、349.18 MiB；日志全项目只有约 2.63 MiB。历次验收目录未轮换是主要增量。
+- 项目外 `%LOCALAPPDATA%/raygame/android-sdk` 2.369 GiB（NDK 2.122 GiB）、
+  `android-jdk17` 302.84 MiB；`downloads/` 另存 1,021.51 MiB ZIP，
+  其中 NDK 压缩包 713.46 MiB。这些不计入上述项目目录大小，桌面构建不需要它们。
+- 项目外共享 `%LOCALAPPDATA%/.xmake` 共 592.75 MiB；raylib/raylib-cpp 已安装
+  缓存合计 26.57 MiB。主要大项 ONNX Runtime 433.89 MiB 不在本项目构建依赖中，
+  不应归为 RayGame 必需内容，也不能按本项目清理范围删除共享缓存。
+
+### 已完成核验
+
+包含隐藏目录的文件长度统计、Git 跟踪/忽略列表交叉核对、构建配置与脚本路径溯源、
+外部工具目录统计；扫描无读取错误或重解析点。这里统计逻辑文件长度，不是 NTFS
+分配空间或精确网络下载量。原始统计保留在忽略文件 `build/storage-audit.json`。
+文档 UTF-8/LF 与 `git diff --check` 通过。
+
+### 未执行与下一步
+
+本包未清理任何原有文件、未改代码/构建设置，未重跑编译或游戏测试。
+若后续实施清理，优先处理过期图形验收目录、临时工程副本、旧 Debug 与可重建缓存；
+先保留最新验收证据、所需发行产物及 **`build/android/debug.keystore`**。
+不要对整个 build 目录或全部 Git 忽略文件无差别删除：当前签名密钥也在其中。
+仅按文件总量估算，本地忽略内容约 1.418 GiB，实际回收量须扣除保留项。
+后续可把截图改为只保留最近轮次，复制工程时排除 build/bin/.xmake；源码和 Git
+历史合计约 15.17 MiB，无需为目录体积问题删减引擎能力。
+
+## 上一工作包：Android 构建工具自动发现（本地验证通过）
 
 用户反馈其他机器 Android 脚本报错，指出假定了 NDK 版本。原脚本默认只查找
 `ndk/28.2.13676358`，Build Tools 也只用 `35.0.0`；虽然支持 `-NdkRoot`，
