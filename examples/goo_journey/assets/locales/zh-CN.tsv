@@ -1,0 +1,74 @@
+# Shared campaign interface, merged into each game's own catalog by prepare-campaign-fonts.py.
+ADVENTURE COMPLETE	旅程完成
+BACK	返回
+BEST	最高分
+CHOOSE A LEVEL	选择关卡
+CONTINUE ADVENTURE	继续旅程
+Changes apply immediately and are saved.	设置立即生效并自动保存
+Clear each stage to unlock the next.	完成当前关卡即可解锁下一关
+Could not save progress. See game.log.	保存失败，请查看 game.log 日志
+DISPLAY	显示模式
+EXIT	退出
+FULLSCREEN	全屏
+HOW TO PLAY	玩法说明
+LANGUAGE	语言
+LEVEL CLEARED	关卡完成
+LOCKED	未解锁
+MAIN MENU	主菜单
+NEXT LEVEL	下一关
+OFF	关闭
+ON	开启
+PAUSE	暂停
+PAUSED	已暂停
+PLAY AGAIN	再次挑战
+Progress saved. Your next challenge awaits.	进度已保存，继续下一场挑战
+QUALITY	画质
+R  restart     P / Back  pause     F11  fullscreen	R 重试    P / 返回键 暂停    F11 全屏
+RAYGAME  /  ARCADE ADVENTURE	RAYGAME / 休闲冒险
+RESTART	重新开始
+RESUME	继续游戏
+SAVE & RETURN	保存并返回
+SCORE	得分
+SETTINGS	设置
+SMOOTH	精细
+SOUND	音效
+SOUND OFF	音效关闭
+SOUND ON	音效开启
+STANDARD	标准
+START ADVENTURE	开始旅程
+TRY AGAIN	再试一次
+Take a break. The world is waiting.	休息一下，随时继续
+VOLUME +	增大音量
+VOLUME -	减小音量
+WINDOWED	窗口
+简体中文	简体中文
+GOO JOURNEY	粘球远行
+Build a little courage. Carry the light.	搭起小小勇气，送微光回家
+Across the Quiet Brook	静溪上的桥
+Up to the Lantern	向着灯笼生长
+The Windmill Pass	穿过风之隘口
+Build triangles. Keep the bridge steady before sending the lights.	搭出三角支撑，稳住桥梁再送出微光
+BUILD	搭建
+BUILD SELECTED	搭建 · 已选
+RECYCLE	回收
+RECYCLE SELECTED	回收 · 已选
+SEND THE LIGHTS	送出微光
+LIGHTS ON THE WAY	微光正在出发
+BALLS	粘球
+RESCUED	已送达
+TIME	余时
+PATH READY - SEND THE LIGHTS	道路已接通，可以送出微光
+Tap a green ball to recycle it.	点击绿色粘球回收，留意失去支撑的连接
+Drag from BUILD or tap between two balls.	拖出搭建按钮，或点击两个粘球附近
+Fixed sockets cannot be removed.	金色固定点无法回收
+Find two nearby balls and leave room for a triangle.	靠近两个粘球，留出组成三角形的空间
+Connect the starting nest to a lantern socket first.	先把起点的巢与灯笼固定点连接起来
+The lights are on their way. Keep the path connected!	微光出发了！请保持道路连通
+Drag from BUILD, or tap an empty spot near two balls.	拖出搭建按钮，或点击两个粘球附近的空位
+Preview strands must form a triangle. Release to build.	预览连线要组成三角形，松开即可搭建
+Drag green balls gently. Golden sockets stay fixed.	轻轻拖动绿色粘球，金色固定点不会移动
+Join both sides, then SEND THE LIGHTS to the lantern.	接通两端后，点击送出微光前往灯笼
+Travelers add weight. Red strands may snap under strain.	微光会增加重量，变红的连接可能因受力断开
+Recycle balls to rebuild. Falling lights cannot be saved.	回收粘球可以重建，掉落的微光无法救回
+Rescue the required lights before the four-minute dusk.	在四分钟暮色降临前，送达足够数量的微光
+1 build   2 recycle   3 send   4 physics view	1 搭建　2 回收　3 出发　4 物理视图

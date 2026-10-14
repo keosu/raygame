@@ -11,7 +11,52 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：合并远端引擎扩展与本地构建迁移（已推送，CI 通过）
+## 最近工作包：Box2D 与完整粘球游戏（已本地提交）
+
+用户要求按距离关节方案做完整游戏并放入 examples。开始于 `3449682`，工作区干净。
+新增 `physics_box2d` 可选项和 Box2D 2.4.2（保持 Android API 26），场景拥有独立
+世界，支持圆/旋转盒、弹性距离关节、拖拽、受力查询、插值和句柄失效保护。
+`examples/goo_journey` 提供原创三关搭桥/搭塔/风中跨障碍、连接图上有重量的微光
+旅客、断裂、回收、限时胜败、中文/英文菜单、设置、存档和音效。
+
+实现边界：节点由 Box2D 独立负责，旧 Rigidbody/Collider 世界与其互不碰撞。
+连接带只绘制，不设独立杆件碰撞体；放置时拒绝穿过地形，微光沿图移动并对端点
+施加重量。适配器提供圆/旋转盒和中心距离/拖拽关节，尚未暴露其它关节、复杂
+多边形或接触事件。单位、所有权和 SDK 接入详见 `docs/PHYSICS2D.md`。
+
+### 本包已通过
+
+- Windows/MSVC x64 Debug/Release 全目标构建（ccache=n），各 **454 引擎、130
+  Forge、37 原 campaign、70 新物理/粘球玩法** 检查全部通过；旧四示例 smoke、
+  Forge/Lab/Marble/Garden/Goo 图形和静音 TTS 两模式均零失败。
+- 新游戏真实鼠标/捕获触屏搭建、拖拽释放、回收、失焦取消、暂停与设置、三关
+  实际通关/解锁、超时失败/重试、新应用存档恢复及三种附加窗口比例通过。
+  已查看菜单、帮助、第三关、竖屏截图。逻辑回归还覆盖受力断裂、旅客坠落失败、
+  句柄/场景清理、摩擦落地、30/60/144 FPS 固定步一致性；每次放置等待
+  0.25/1/2/5 秒的四种节奏均能用普通放置指令完成三关。
+- 两模式 SDK 独立搬迁、单头文件、Box2D 实际调用、图形和配置拒绝通过。
+  单独关闭 Box2D 的 Release 引擎/454 逻辑、安装 SDK、独立消费也通过。
+- 九 ARM64 Release APK 构建、签名、16 KiB ZIP/ELF 对齐、资源/hash/图标/TTS
+  校验通过，新 Goo APK 1,554,821 B；默认 Android 入口与 CI 已扩到九示例。
+- clang-format 19.1.5 默认 54 C++ 文件、actionlint、18 项 Lua Android 工具发现
+  检查通过；新字体源 SHA-256 与既有 Noto 来源一致，资产生成工具位于 build。
+- 最终恢复 Windows/MSVC x64 Release、examples/tests=y、console=n、ccache=n。
+  新游戏发布 EXE 1,452,544 B，与 build 目标及全部发布资源逐字节一致；bin 中无
+  编译中间文件或测试程序。修改/新增文本 UTF-8/LF 和 `git diff --check` 通过。
+
+最终日志在 `build/goo-validation/{release,debug}/`；慢速建造额外记录为
+`cadence-{15,60,120,300}.log`。无 Box2D 的证据在 `without-box2d/`；SDK 报告
+在 `build/sdk-validation/windows/x64/{debug,release}/`，Android 最终日志为
+`build/goo-validation/android-release-final.log`，报告为
+`build/android/verification-release.json`。早期失败日志不作为最终验收依据。
+
+### 尚未运行与下一步
+
+未运行 Linux/macOS、本包 Android Debug、Android 设备或新远端 CI；没有人工
+完整试玩/试听或长稳硬件验收。代码已本地提交，继续优先收集真实设备的拖拽、
+触控精度与难度反馈；自动通关不能替代游戏手感验收。未创建子 agent。
+
+## 上一工作包：合并远端引擎扩展与本地构建迁移（已推送，CI 通过）
 
 用户要求解决正在进行的 merge 并推送。开始时本地 `e108752`，MERGE_HEAD
 为 `095bbea`，共同基线 `54a4cf0`；本地 2 个、远端 5 个独立提交。

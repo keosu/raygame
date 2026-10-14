@@ -12,10 +12,11 @@ from fontTools.varLib.instancer import instantiateVariableFont
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("source", type=Path)
 parser.add_argument("--output", type=Path, help="Isolated output root for reproducibility checks")
+parser.add_argument("--game", choices=("marble_temple", "garden_guard", "goo_journey"))
 args = parser.parse_args()
 root = Path(__file__).resolve().parent.parent
 shared = (root / "common/locales/zh-CN.tsv").read_text(encoding="utf-8")
-for game in ("marble_temple", "garden_guard"):
+for game in ([args.game] if args.game else ("marble_temple", "garden_guard", "goo_journey")):
     owned = (root / game / "artwork/zh-CN.tsv").read_text(encoding="utf-8")
     catalog = shared + owned
     output = args.output / game if args.output else root / game / "assets"

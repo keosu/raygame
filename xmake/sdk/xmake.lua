@@ -1,5 +1,6 @@
 -- Installed in <sdk>/share/raygame; this file only uses the installed SDK.
 local sdk_root = path.absolute("../..", os.scriptdir())
+includes(path.join(sdk_root, "share/raygame/features.lua"))
 
 add_requires("raylib-cpp 5.5.0")
 add_requireconfs("raylib-cpp.raylib", {version = "5.5"})
@@ -26,6 +27,7 @@ rule_end()
 
 -- Call inside a consumer target after including this file.
 function add_raygame_sdk()
+    add_raygame_features()
     add_rules("raygame.sdk")
     add_includedirs(path.join(sdk_root, "include"))
     add_linkdirs(path.join(sdk_root, "lib"))

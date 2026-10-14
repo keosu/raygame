@@ -421,7 +421,7 @@ save.Save("save.txt");
 
 ## Android APK (experimental)
 
-All eight examples, including FORGE, Engine Lab and the two campaign games, can be packaged as ARM64 NativeActivity APKs with xmake and raylib.
+All nine examples, including FORGE, Engine Lab and the three campaign games, can be packaged as ARM64 NativeActivity APKs with xmake and raylib.
 The current build targets Android 8.0+ (API 26), target SDK 35, and includes bundled
 fonts, touch controls, pause/exit UI and application-private saves/logs.
 
@@ -448,6 +448,12 @@ and platform limits](docs/ANDROID.md) (Chinese) for prerequisites and commands.
 | `engine_lab` | Six interactive pages: components, physics, sprites, particles/events/pools, tilemaps, system TTS and saves |
 | `marble_temple` | Three-stage Zuma-style campaign: curved marble chains, insertion, match-3, chain reactions, blast shots and saved progress |
 | `garden_guard` | Three-stage Plants-vs-Zombies-style campaign: sun economy, six plants, five lanes, enemy waves, mowers and saved progress |
+| `goo_journey` | Three-stage elastic bridge-building campaign: Box2D distance joints, drag/recycle, weighted travelers, breakage, wind and saved progress |
+
+[Goo Journey / 粘球远行](examples/goo_journey/README.md) uses the optional
+[Box2D backend](docs/PHYSICS2D.md), enabled by default in this repository.
+Run `xmake run goo_journey`; configure `--physics_box2d=n` to build without the
+backend and this example. External projects opt in with `--physics_box2d=y`.
 
 [Marble Temple](examples/marble_temple/README.md) and [Garden Guard](examples/garden_guard/README.md)
 are complete small campaigns with original artwork and sounds, menus, instructions, unlocks,
@@ -534,7 +540,7 @@ The root `.xmake/` remains xmake's normal local configuration directory. See the
 [example directory guide](examples/README.md) for ownership and build entries.
 
 ```bash
-xmake            # build the library and all eight desktop examples, including FORGE
+xmake            # build the library and all nine desktop examples, including FORGE
 xmake run neon_breakout
 xmake run bullet_hell
 xmake run forge_runner
@@ -561,7 +567,7 @@ with `--build_examples=n --build_tests=n`. Install with
 headers and library through the supplied SDK integration script. See
 [SDK setup and verification](docs/SDK.md).
 
-All eight desktop examples build as Windows GUI applications by default: launching an EXE
+All nine desktop examples build as Windows GUI applications by default: launching an EXE
 does not open a console, and raylib trace output is disabled. To enable the console
 and logs for debugging the four small examples, run `xmake f --example_console=y` and rebuild. Use
 `xmake f --example_console=n` to return to quiet launches. The `tests` and `smoke`
@@ -620,10 +626,10 @@ tilemaps, tween callback mutation, timers, pooling, events and saves.
 an independent consumer with no engine source/example paths. It checks fixed-step
 physics, input, storage, and configuration mismatch diagnostics; `--graphics` also
 checks a native window and texture cleanup. Desktop CI runs the headless consumer.
-GitHub Actions builds all eight desktop examples and runs the engine, FORGE and campaign game logic
+GitHub Actions builds all nine desktop examples and runs the engine, FORGE and campaign game logic
 suites in Debug and Release on Linux and Windows; Windows explicitly selects MSVC
 and also verifies FORGE's standalone SDK build. A separate Windows job builds and verifies
-the eight ARM64 Android Release APKs with JDK 17, SDK 35 and NDK r28c. All jobs use
+the nine ARM64 Android Release APKs with JDK 17, SDK 35 and NDK r28c. All jobs use
 xmake 3.1.1 (`.github/workflows/ci.yml`). CI runs on pushes/PRs to `main` and supports
 manual **Actions → CI → Run workflow** runs.
 
@@ -631,11 +637,11 @@ Successful runs provide downloadable artifacts for 14 days:
 
 | Artifact | Contents |
 | --- | --- |
-| `raygame-windows-x64-release` | Seven Release EXEs (including Engine Lab, Marble Temple and Garden Guard), shared `assets/`, and complete FORGE in `forge_runner/` |
-| `raygame-windows-x64-debug` | The same eight examples and assets in Debug mode |
+| `raygame-windows-x64-release` | Eight Release EXEs (including Goo Journey), shared `assets/`, and complete FORGE in `forge_runner/` |
+| `raygame-windows-x64-debug` | The same nine examples and assets in Debug mode |
 | `raygame-forge-windows-x64-<mode>` | FORGE EXE, its own `assets/`, README and third-party notices |
 | `raygame-forge-linux-x86_64-<mode>` | FORGE Linux executable, `assets/`, README and third-party notices |
-| `raygame-android-arm64-release` | Eight APKs including the campaign games, and `verification.json` with SHA-256 hashes |
+| `raygame-android-arm64-release` | Nine APKs including the campaign games, and `verification.json` with SHA-256 hashes |
 
 Open a CI run and download from **Artifacts**. Keep `assets/` next to the extracted
 Windows EXEs. The separate FORGE artifacts put the executable and assets at the

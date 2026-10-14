@@ -11,6 +11,7 @@ option("example_console")
 option_end()
 
 local example_names = {"space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "engine_lab", "marble_temple", "garden_guard"}
+if has_config("physics_box2d") then table.insert(example_names, "goo_journey") end
 local examples_root = os.scriptdir()
 
 -- Each game owns its assets; only the small examples share fonts.
@@ -52,7 +53,7 @@ if not is_plat("android") and (has_config("build_examples") or has_config("build
                 for _, dir in ipairs({desktop_dir, path.join(os.projectdir(), "bin")}) do
                     copy_assets(path.join(examples_root, name, "assets"), path.join(dir, "assets", name), os, io)
                 end
-                if name == "engine_lab" or name == "marble_temple" or name == "garden_guard" then
+                if name == "engine_lab" or name == "marble_temple" or name == "garden_guard" or name == "goo_journey" then
                     os.cp(path.join(examples_root, name, "README.md"), path.join(os.projectdir(), "bin", name .. "-README.md"))
                 end
             end)

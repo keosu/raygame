@@ -39,7 +39,7 @@ public:
     // Engine phases are separate from virtual callbacks, so every object's
     // pre-physics logic completes before any rigidbody integrates.
     void BeginFixedStep();
-    void IntegratePhysics(float dt);
+    virtual void IntegratePhysics(float dt);
     virtual void PostFixedUpdate();
     virtual void LateUpdate();
     void SetInterpolationAlpha(float alpha);
@@ -144,7 +144,7 @@ public:
     void DestroyGameObject(Ref<GameObject> obj) { Destroy(obj); }
 
     // Also finalizes externally retained objects before releasing scene resources.
-    void Clear() {
+    virtual void Clear() {
         if (clearing) { if (!updating) FlushPending(); return; }
         clearing = true;
         ++generation;

@@ -3,6 +3,9 @@
 桌面项目可以安装引擎的公开头文件和静态库，再通过 xmake 接入。消费项目只
 引用安装目录；无需引用引擎的 `src`、`examples` 或测试文件。当前依赖仍由
 xmake 下载/缓存：raylib-cpp 5.5.0 和 raylib 5.5，SDK 不包含它们的二进制。
+启用 `--physics_box2d=y` 的安装还会请求固定 Box2D 2.4.2 静态包，并由 SDK
+自动传递 `RAYGAME_WITH_BOX2D`。根工程默认启用，可用 `--physics_box2d=n` 关闭。
+物理模块的用法与单位约定见 [PHYSICS2D.md](PHYSICS2D.md)。
 
 ## 构建与安装
 
@@ -23,6 +26,7 @@ include/raygame/*.h
 lib/raygame.lib                  # Linux 为 libraygame.a
 share/raygame/xmake.lua          # 可搬迁的接入脚本
 share/raygame/sdk.lua            # 版本、平台、架构、模式和系统依赖
+share/raygame/features.lua       # 可选模块的依赖与公开编译定义
 ```
 
 Windows 默认使用 Release `MD` / Debug `MDd`。消费项目必须使用相同平台、架构、

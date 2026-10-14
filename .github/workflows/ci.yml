@@ -82,6 +82,11 @@ jobs:
       - name: Verify installed SDK from an independent project
         run: xmake lua scripts/verify-sdk.lua
 
+      - name: Verify Box2D and Goo Journey campaign
+        run: |
+          xmake build -y goo_tests
+          xmake run goo_tests 120
+
       - name: Verify Windows embedded icons
         if: runner.os == 'Windows'
         run: |
@@ -120,6 +125,8 @@ jobs:
             bin/marble_temple-README.md
             bin/garden_guard.exe
             bin/garden_guard-README.md
+            bin/goo_journey.exe
+            bin/goo_journey-README.md
             bin/*.dll
             bin/assets/
             bin/forge_runner/forge_runner.exe
@@ -159,7 +166,7 @@ jobs:
       - name: Check Android tool discovery
         run: xmake lua tests/android_tools.lua
 
-      - name: Build and verify eight APKs including campaign games
+      - name: Build and verify nine APKs including Goo Journey
         run: |
           xmake android --mode=release --sdk="$env:ANDROID_HOME" `
             --ndk="$env:ANDROID_HOME/ndk/28.2.13676358" --jdk="$env:JAVA_HOME" --build-tools=35.0.0

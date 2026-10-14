@@ -6,7 +6,7 @@ import wave
 
 root = Path(__file__).resolve().parents[1]
 notes = {"click": (700, 0.07), "shot": (440, 0.12), "clear": (880, 0.22), "hurt": (110, 0.12), "win": (660, 0.6)}
-for name in ("marble_temple", "garden_guard"):
+for name in ("marble_temple", "garden_guard", "goo_journey"):
     assets = root / name / "assets"
     assets.mkdir(parents=True, exist_ok=True)
     for effect, (frequency, duration) in notes.items():

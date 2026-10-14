@@ -1,5 +1,15 @@
 -- Desktop tests; the smoke target also exercises the real example games.
 if has_config("build_tests") and not is_plat("android") then
+    if has_config("physics_box2d") then
+        target("goo_tests")
+            set_kind("binary")
+            set_languages("c++17")
+            set_default(false)
+            add_files("goo.cpp")
+            add_deps("raygame")
+            set_targetdir("$(builddir)/desktop/$(plat)/$(arch)/$(mode)")
+        target_end()
+    end
     target("campaign_tests")
         set_kind("binary")
         set_languages("c++17")

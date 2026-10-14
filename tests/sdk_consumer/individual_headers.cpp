@@ -12,8 +12,21 @@
 #include <raygame/TextToSpeech.h>
 #include <raygame/Effects.h>
 #include <raygame/Projectile.h>
+#include <raygame/Physics2D.h>
 
 bool CheckIndividualHeaders() {
+#ifdef RAYGAME_WITH_BOX2D
+    RayGame::PhysicsScene2D joints("installed Box2D");
+    RayGame::Body2DOptions fixed;
+    fixed.motion = RayGame::Motion2D::Static;
+    auto anchor = joints.dynamics.Circle({0, 0}, 10, fixed);
+    auto ball = joints.dynamics.Circle({50, 0}, 10);
+    auto link = joints.dynamics.DistanceJoint(anchor, ball);
+    joints.IntegratePhysics(1.0f / 60);
+    if (!joints.dynamics.Valid(link) || joints.dynamics.Position(ball).y <= 0) return false;
+    joints.Clear();
+    if (joints.dynamics.Valid(ball) || joints.dynamics.Valid(link)) return false;
+#endif
     // Invalid input exercises the installed implementation without speaking.
     bool speechValid = !RayGame::TextToSpeech::Speak("") && !RayGame::TextToSpeech::GetLastError().empty();
     RayGame::TextToSpeech::Shutdown();

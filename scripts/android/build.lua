@@ -3,7 +3,7 @@ import("verify")
 
 function main(opt)
     local games = {"space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "forge_runner",
-                   "engine_lab", "marble_temple", "garden_guard"}
+                   "engine_lab", "marble_temple", "garden_guard", "goo_journey"}
     local mode, game = opt.mode or "release", opt.game or "all"
     local jobs = tonumber(opt.jobs or "4")
     assert(mode == "debug" or mode == "release", "Mode must be debug or release")
@@ -31,7 +31,7 @@ function main(opt)
         os.execv(os.programfile(), {"f", "-P", root, "-p", "android", "-a", "arm64-v8a", "-m", mode,
             "--toolchain=ndk", "--ndk=" .. resolved.ndk, "--android_sdk=" .. resolved.sdk,
             "--ndk_sdkver=26", "--build_toolver=" .. resolved.build_version, "--runtimes=c++_static",
-            "--build_examples=y", "--build_tests=n", "--ccache=n", "--android_keystore=" .. key,
+            "--build_examples=y", "--build_tests=n", "--physics_box2d=y", "--ccache=n", "--android_keystore=" .. key,
             "-o", path.join(root, "build/android"), "-y"}, {envs = envs})
         local args = {"build", "-P", root, "-j", tostring(jobs), "-y"}
         if opt.rebuild then table.insert(args, "-r") end

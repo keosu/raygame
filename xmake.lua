@@ -26,6 +26,12 @@ option("build_tests")
 option_end()
 
 if is_plat("android") then includes("xmake/packages/raylib.lua") end
+option("physics_box2d")
+    set_default(standalone)
+    set_showmenu(true)
+    set_description("Enable Box2D 2.4.2 and the Goo Journey example")
+option_end()
+if has_config("physics_box2d") then add_requires("box2d 2.4.2", {configs = {shared = false}}) end
 add_requires("raylib-cpp 5.5.0")
 add_requireconfs("raylib-cpp.raylib", {version = "5.5"})
 
@@ -44,6 +50,11 @@ target("raygame")
     add_includedirs("include", {public = true})
 
     add_packages("raylib-cpp", {public = true})
+    if has_config("physics_box2d") then
+        add_packages("box2d", {public = true})
+        add_defines("RAYGAME_WITH_BOX2D", {public = true})
+        add_installfiles("examples/goo_journey/assets/box2d-LICENSE.txt", {prefixdir = "share/raygame/licenses"})
+    end
 
     -- Libraries must survive mode switches without reusing another mode's archive.
     set_targetdir("$(builddir)/lib/$(plat)/$(arch)/$(mode)")
@@ -77,8 +88,13 @@ target("raygame")
             mode = get_config("mode"),
             runtimes = target:runtimes(),
             syslinks = target:get("syslinks"),
-            frameworks = target:get("frameworks")
+            frameworks = target:get("frameworks"),
+            box2d = has_config("physics_box2d")
         })
+        io.writefile(path.join(target:installdir(), "share/raygame/features.lua"),
+            has_config("physics_box2d") and
+            'add_requires("box2d 2.4.2", {configs = {shared = false}})\nfunction add_raygame_features()\n    add_packages("box2d")\n    add_defines("RAYGAME_WITH_BOX2D")\nend\n'
+            or 'function add_raygame_features() end\n')
     end)
 target_end()
 

@@ -1,6 +1,6 @@
 # Android APK 构建与手动验证
 
-当前提供八个 **实验性 Android APK**（含 FORGE、Engine Lab 和两款完整小游戏）：Android 8.0 / API 26 起、ARM64
+当前提供九个 **实验性 Android APK**（含 FORGE、Engine Lab 和三款完整小游戏）：Android 8.0 / API 26 起、ARM64
 (`arm64-v8a`)、OpenGL ES 2.0，target SDK 35。已实际交叉编译并检查 APK，
 尚未在真机或模拟器运行；用户负责本轮安装验证。
 
@@ -18,6 +18,7 @@ Release 原生代码使用本地调试密钥签名，适合侧载测试。它不
 | `engine_lab.apk` | 横屏，可反向横屏 | 左侧切页、底部操作；Services 试听中英文 TTS；Back 退出 |
 | `marble_temple.apk` | 横屏，可反向横屏 | 拖动瞄准、抬手发射；SWAP 换球；Back 暂停/返回 |
 | `garden_guard.apk` | 横屏，可反向横屏 | 选择种子卡，点击草坪种植；点击阳光收集；铲子移除植物 |
+| `goo_journey.apk` | 横屏，可反向横屏 | 拖拽/点击搭建三角连接，回收重建，接通道路后送出微光 |
 
 两款新游戏有三关、说明/选关菜单、胜负结算/重试、自动保存进度；共用等比居中场地，
 失焦自动暂停。具体机制见各自 README；APK 构建验证不代替 Android 设备试玩。
@@ -50,7 +51,8 @@ Android 8+ 自适应图标和 Android 13+ 主题单色图层。原始 SVG、生�
 
 包名分别是 `org.raygame.spaceshooter`、`org.raygame.bouncingballs`、
 `org.raygame.neonbreakout`、`org.raygame.bullethell`、`org.raygame.forge`、
-`org.raygame.enginelab`、`org.raygame.marbletemple`、`org.raygame.gardenguard`，八个包可同时安装。
+`org.raygame.enginelab`、`org.raygame.marbletemple`、`org.raygame.gardenguard`、
+`org.raygame.goojourney`，九个包可同时安装。
 Android 首次侧载时按系统提示允许相应文件管理器安装应用。后续更新保留同一
 调试密钥，才能直接覆盖安装并保留数据；不要删除 `build/android/debug.keystore`。
 密钥、工具链与 APK 均不提交到 Git。
@@ -66,7 +68,7 @@ xmake android --game=forge_runner --mode=debug
 xmake android --verify-only
 ```
 
-默认构建并校验八个 ARM64 Release APK，`--jobs=4` 控制并行编译数。
+默认构建并校验九个 ARM64 Release APK，`--jobs=4` 控制并行编译数。
 `--rebuild` 强制重新编译；Android 任务关闭编译缓存，保留正常的依赖增量构建。
 只运行构建与静态校验，不安装或启动设备。
 
@@ -132,7 +134,7 @@ xmake android-setup --sdk="C:/Android/Sdk" --jdk="C:/Java/jdk-17"
 `.github/workflows/ci.yml` 的 Android 任务在 Windows 2022 runner 上调用同一
 `xmake android`，固定 xmake 3.1.1、JDK 17、SDK 35/build-tools 35.0.0 和 NDK r28c。
 推送到 `main`、面向 `main` 的 PR，或在 Actions → CI → Run workflow 手动触发
-后，成功运行的 Artifacts 中提供 `raygame-android-arm64-release`，含八个 APK
+后，成功运行的 Artifacts 中提供 `raygame-android-arm64-release`，含九个 APK
 及 `verification.json`，保留 14 天。同一工作流还构建并上传 Windows x64
 Debug/Release EXE 和字体资源，Linux 保留 Debug/Release 构建与逻辑测试。
 
@@ -208,7 +210,7 @@ raygame 的 `android` / `android-setup` task 仅在本仓库作为根工程时�
 
 ## 指定自己的签名 key
 
-目前直接 xmake 支持 `--android_keystore=/绝对路径/自己的.keystore`，但八个
+目前直接 xmake 支持 `--android_keystore=/绝对路径/自己的.keystore`，但九个
 游戏的打包规则都把密码固定为 `android`；未提供自定义密码、alias 或独立
 key password 的配置项。`xmake android` 任务也没有 keystore 参数，始终使用
 仓库下的本地调试 key。
@@ -261,7 +263,7 @@ Windows PowerShell（当前终端需配置 `JAVA_HOME` / `ANDROID_HOME`）：
   和 AssetManager 读取，支持压缩资源与大小上限。普通 `ReadText/WriteAtomic`
   仍用于应用私有存档，不把存档查询混入 APK 资源。
 - Android 输入帧保存最多 8 个触点 ID/位置；`Input::GetTouchPosition` 按当前
-  Display 画布换算。Android 由原生 Surface 决定实际窗口尺寸，八个示例都使用
+  Display 画布换算。Android 由原生 Surface 决定实际窗口尺寸，九个示例都使用
   Expand 等比适配；Forge 和 Bullet Hell 复用 TouchTracker 跟踪触点 ID 和取消。
   CanvasLayout 支持内容矩形，但尚未自动查询 WindowInsets。桌面专用标题栏/窗口大小
   API 不会在 Android 正常游戏流程中调用。

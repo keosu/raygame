@@ -24,6 +24,7 @@
 #include "Sprite.h"
 #include "ParticleSystem.h"
 #include "Physics.h"
+#include "Physics2D.h"
 #include "Timer.h"
 #include "Tilemap.h"
 #include "UI.h"
