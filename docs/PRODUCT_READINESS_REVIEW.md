@@ -636,5 +636,7 @@ SDK 验证的重复 `-P`，根工程专用 Android task 不覆盖外部 task，A
 合并后 Windows 两模式各 454/130/37 逻辑、所有示例图形 smoke、静音 TTS、SDK
 图形消费与八 Release APK 校验通过；含空格路径的外部 includes 桌面/Android
 真实构建与打包校验通过。保留完整日志和边界，见 AGENT_STATE。原远端 `095bbea`
-CI 已成功，新合并 CI 待推送后核对；本地其它主机、Android 设备和 M0 硬件/长稳
-验收仍未完成。
+CI 已成功；合并提交 `2072617` 已普通推送，其
+[CI run 38534787840](https://github.com/keosu/raygame/actions/runs/38534787840)
+的 Windows/Linux Debug/Release、C++ 格式、Android ARM64 八 APK 六项全部通过。
+本地其它主机、Android 设备和 M0 硬件/长稳验收仍未完成。

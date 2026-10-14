@@ -11,7 +11,7 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：合并远端引擎扩展与本地构建迁移（本地验证通过）
+## 最近工作包：合并远端引擎扩展与本地构建迁移（已推送，CI 通过）
 
 用户要求解决正在进行的 merge 并推送。开始时本地 `e108752`，MERGE_HEAD
 为 `095bbea`，共同基线 `54a4cf0`；本地 2 个、远端 5 个独立提交。
@@ -44,7 +44,11 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
   `git diff --check` 通过。最终桌面配置恢复 Release/MSVC/ccache=n，八 EXE 图标
   及发布副本与 build 目标 hash 一致；bin 没有编译中间文件。
 - 只读查询确认远端原 `095bbea` 的 CI run `38509709614` 已全部成功，这是原
-  远端提交的证据，与本包合并后的本地检查分开。新合并 CI 将在推送后核对。
+  远端提交的证据，与本包合并后的检查分开。
+- 合并提交 `2072617` 已普通推送 origin/main；对应 CI
+  [run 38534787840](https://github.com/keosu/raygame/actions/runs/38534787840)
+  六项全部成功：Windows/MSVC Debug、Release，Ubuntu Debug、Release，C++
+  格式检查，以及 Android ARM64 八 APK 构建/校验。
 
 日志集中在 `build/merge-validation/`，外部探针使用 `external-isolated-*` 和
 `external-android-*`；根 SDK 日志在 `build/sdk-validation/windows/x64/{debug,release}`。
@@ -54,8 +58,9 @@ Android 报告仍在 `build/android/verification-release.json`。
 
 未在本机运行 Linux/macOS、Android 设备、此次 Android Debug 或从零下载安装工具；
 没有人工试玩/试听、多 DPI、长稳或外部真实游戏的全面回归。本包不改变远端引擎
-功能实现，主要协调构建与文档。下一步提交现有 merge，普通推送 origin/main 并检查
-新 CI；不 force push，保留备份分支。
+功能实现，主要协调构建与文档。合并提交 `2072617` 的父提交为 `e108752` / `095bbea`，
+已正常推送，无 force push，备份分支保留。合并与推送工作已完成；后续产品验收
+优先运行干净环境工具安装和 Android 设备回归，CI 通过不代替这些尚未执行的检查。
 
 ## 上一工作包：构建产物归位与 Android Lua 入口（本地提交）
 
