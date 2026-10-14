@@ -138,7 +138,8 @@ public:
         inFrame = false;
         EndTextureMode();
         Rectangle window{0, 0, (float)::GetScreenWidth(), (float)::GetScreenHeight()};
-        bool margins = viewport.bounds.width < window.width - 0.5f || viewport.bounds.height < window.height - 0.5f;
+        bool margins = viewport.bounds.width < window.width - 0.5f ||
+                       viewport.bounds.height < window.height - 0.5f;
         if (margins && marginStyle == MarginStyle::BlurredCanvas)
             PrepareMarginBlur(canvas.texture);
         BeginDrawing();
@@ -171,7 +172,8 @@ public:
     static void PrepareMarginBlur(Texture2D source) {
         Texture2D current = source;
         for (int i = 0; i < 3; ++i) {
-            int w = std::max(1, source.width >> (2 * (i + 1))), h = std::max(1, source.height >> (2 * (i + 1)));
+            int w = std::max(1, source.width >> (2 * (i + 1))),
+                h = std::max(1, source.height >> (2 * (i + 1)));
             RenderTexture2D& stage = blurStages[i];
             if (stage.texture.width != w || stage.texture.height != h) {
                 if (stage.id)
@@ -193,12 +195,14 @@ public:
     }
     static void DrawMarginFill(Rectangle window, Rectangle bounds) {
         DrawRectangleRec(window, marginColor);
-        if (marginStyle != MarginStyle::BlurredCanvas || !blurReady || bounds.width <= 0 || bounds.height <= 0)
+        if (marginStyle != MarginStyle::BlurredCanvas || !blurReady || bounds.width <= 0 ||
+            bounds.height <= 0)
             return;
         // Cover the window with the canvas aspect, centered like the canvas itself.
         float scale = std::max(window.width / bounds.width, window.height / bounds.height);
         float w = bounds.width * scale, h = bounds.height * scale;
-        Rectangle cover{bounds.x + bounds.width / 2 - w / 2, bounds.y + bounds.height / 2 - h / 2, w, h};
+        Rectangle cover{bounds.x + bounds.width / 2 - w / 2, bounds.y + bounds.height / 2 - h / 2,
+                        w, h};
         auto level = (unsigned char)std::lround(255 * marginBrightness);
         PresentOpaque(blurStages[2].texture, cover, {level, level, level, 255});
     }

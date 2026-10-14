@@ -113,10 +113,34 @@ public:
     bool Finished() const { return finished; }
 
 private:
+    // A destroyed collider's address can be reused by a new one, so hits are remembered
+    // through the owning component reference; a raw pointer is only kept for unowned colliders.
+    struct Hit {
+        std::weak_ptr<Component> owner;
+        const Collider* collider;
+        bool owned;
+    };
     Vector2 origin = {0, 0};
     float age = 0;
     bool returning = false, finished = false;
-    std::vector<const Collider*> hits;
+    std::vector<Hit> hits;
+
+    bool AlreadyHit(const Collider* c) const {
+        for (const auto& h : hits) {
+            if (h.collider != c) continue;
+            if (!h.owned) return true;
+            auto alive = h.owner.lock();
+            if (alive && alive.get() == static_cast<const Component*>(c)) return true;
+        }
+        return false;
+    }
+
+    static Hit Remember(Collider* c) {
+        if (GameObject* owner = c->GetGameObject())
+            for (const auto& comp : owner->GetAllComponents())
+                if (comp.get() == static_cast<Component*>(c)) return {comp, c, true};
+        return {{}, c, false};
+    }
 
     void Place(Vector2 p) { gameObject->transform->position = p; }
 
@@ -142,8 +166,8 @@ private:
         if (!gameObject || !gameObject->scene) return;
         for (Collider* c : gameObject->scene->GetPhysicsWorld().OverlapCircle(p, hitRadius, layerMask, includeTriggers)) {
             if (c->GetGameObject() == gameObject) continue;
-            if (std::find(hits.begin(), hits.end(), c) != hits.end()) continue;
-            hits.push_back(c);
+            if (AlreadyHit(c)) continue;
+            hits.push_back(Remember(c));
             if (onHit) onHit(*this, c);
             if (finished) return;
             if (!pierce) {

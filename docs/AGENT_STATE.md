@@ -11,7 +11,23 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：Fit 画布留边的填充方式（已实现并本地验证，`809343d`）
+## 最近工作包：弹道命中记录的地址复用问题（已修复并本地验证）
+
+基线 `d945ebc`。外部塔防游戏的平衡机器人在同一种子下偶发结果不同。原因：`Projectile`
+用裸 `Collider*` 记录本程已命中的对象；怪兽死亡后新怪兽的碰撞体可能分配在同一地址
+（Windows 堆的块选择不完全确定），长寿命的穿透/回旋弹会把新目标当成已命中而穿过。
+现在命中记录保存所属组件的 `weak_ptr`，地址相同且原对象仍存活才视为已命中；没有
+所属对象的碰撞体仍按指针记录。新增回归测试：静止穿透弹位置上反复销毁并重建目标
+40 次，每次都须命中（去掉修复后 3/3 次失败）。顺带对 `Display.h`（上一包遗漏）与新测试
+运行 clang-format，只有换行变化。
+
+通过：Windows/MSVC x64 Debug/Release 全构建；两模式各 3 次 **454 引擎逻辑**零失败，
+130 Forge、37 campaign 零失败，`smoke` 两模式 0 failures；clang-format 19.1.5 的 47 文件
+检查通过，`git diff --check` 通过。外部游戏平衡机器人连续 4 次报告逐字节一致。
+注意：用 `Copy-Item` 恢复头文件会保留旧修改时间，xmake 不会重新编译（本包曾因此
+误判一次失败），恢复后需更新时间戳。未运行：Linux/macOS、Android。
+
+## 上一工作包：Fit 画布留边的填充方式（已实现并本地验证，`809343d`）
 
 基线 `d942764`。用户希望窗口比例不同时，四周留边不再是纯黑。`Display` 新增
 `MarginStyle::{Solid, BlurredCanvas}`、`SetMarginStyle(style, brightness)`、`SetMarginColor`；

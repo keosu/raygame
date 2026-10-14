@@ -456,6 +456,24 @@ static void Projectiles() {
     CHECK((hits == std::vector<Collider*>{near, far, far, near})); // both legs hit
     CHECK(arrivals == 1 && Approx(arrivedAt.x, 0) && boomerang->Finished());
 
+    // Replacements spawned where a destroyed target stood (often at its old address) are new hits.
+    auto lance = launch(ProjectileMotion::Straight, {-300, 0});
+    lance->pierce = true;
+    lance->maxLife = 100;
+    int replacementsHit = 0;
+    for (int i = 0; i < 40; ++i) {
+        hits.clear();
+        Collider* target = AddCircle(scene, {-300, 0}, 10, 1);
+        run(2 / 60.0f);
+        if (hits.size() == 1 && hits[0] == target)
+            ++replacementsHit;
+        scene.Destroy(target->GetGameObject());
+        run(1 / 60.0f);
+    }
+    CHECK(replacementsHit == 40 && !lance->Finished());
+    lance->Finish();
+    run(1 / 60.0f);
+
     arrivals = 0;
     auto prey = scene.CreateGameObject("prey");
     prey->transform->position = {0, 300};
