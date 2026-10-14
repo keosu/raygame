@@ -372,8 +372,158 @@ static void Codepoints() {
     CHECK(emoji.size() == 1 && emoji[0] == 0x1f600);
 }
 
+static void Effects() {
+    auto object = CreateRef<GameObject>();
+    auto fx = object->AddComponent<EffectLayer>();
+    EffectLayer::RingOptions ring{4, 40, 4, 0.5f};
+    EffectLayer::TextOptions text;
+    text.life = 1;
+    text.rise = 10;
+    fx->Beam({0, 0}, {10, 0}, {});
+    fx->Ring({0, 0}, ring);
+    fx->Text({0, 100}, "hit", text);
+    fx->Beam({NAN, 0}, {1, 1}, {});
+    fx->Text({0, 0}, "", text);
+    CHECK(fx->BeamCount() == 1 && fx->RingCount() == 1 &&
+          fx->TextCount() == 1); // invalid input is ignored
+    CHECK(Approx(EffectLayer::RingRadius(ring, 0.5f), 4) &&
+          Approx(EffectLayer::RingRadius(ring, 0), 40));
+    fx->Advance(0.35f);
+    CHECK(fx->BeamCount() == 0 && fx->RingCount() == 1 && fx->TextCount() == 1);
+    fx->Advance(NAN);
+    fx->Advance(0.2f);
+    CHECK(fx->RingCount() == 0 && fx->TextCount() == 1);
+    fx->Advance(0.5f);
+    CHECK(fx->TextCount() == 0);
+}
+
+static void Projectiles() {
+    Scene scene;
+    Collider* near = AddCircle(scene, {100, 0}, 10, 1);
+    Collider* far = AddCircle(scene, {200, 0}, 10, 1);
+    AddCircle(scene, {150, 0}, 10, 2); // other layer: never hit
+    scene.Start();
+    std::vector<Collider*> hits;
+    int arrivals = 0;
+    Vector2 arrivedAt{};
+    auto launch = [&](ProjectileMotion motion, Vector2 at) {
+        auto object = scene.CreateGameObject("shot");
+        object->transform->position = at;
+        auto p = object->AddComponent<Projectile>();
+        p->motion = motion;
+        p->layerMask = 1u << 1;
+        p->hitRadius = 4;
+        p->onHit = [&](Projectile&, Collider* c) { hits.push_back(c); };
+        p->onArrive = [&](Projectile&, Vector2 where) {
+            ++arrivals;
+            arrivedAt = where;
+        };
+        return p;
+    };
+    float clock = 0;
+    auto run = [&](float seconds, const std::function<void()>& each = nullptr) {
+        for (float t = 0; t < seconds; t += 1 / 60.0f) {
+            if (each)
+                each();
+            clock += 1 / 60.0f;
+            GameTime::FixedStepScope step(1 / 60.0f, clock);
+            scene.FixedUpdate();
+        }
+    };
+
+    auto bullet = launch(ProjectileMotion::Straight, {0, 0});
+    bullet->velocity = {600, 0};
+    int steps = 0;
+    bullet->onStep = [&](Projectile&) { ++steps; };
+    run(1);
+    CHECK(hits.size() == 1 && hits[0] == near && bullet->Finished() && arrivals == 0);
+    CHECK(steps >= 8 && steps <= 10); // one per fixed step until the hit at x ~ 90
+
+    hits.clear();
+    auto spear = launch(ProjectileMotion::Straight, {0, 0});
+    spear->velocity = {600, 0};
+    spear->pierce = true;
+    spear->maxLife = 0.6f;
+    run(1);
+    CHECK((hits == std::vector<Collider*>{near, far}) && spear->Finished());
+
+    hits.clear();
+    auto boomerang = launch(ProjectileMotion::Boomerang, {0, 0});
+    boomerang->target = {250, 0};
+    boomerang->speed = 1000;
+    boomerang->pierce = true;
+    run(1);
+    CHECK((hits == std::vector<Collider*>{near, far, far, near})); // both legs hit
+    CHECK(arrivals == 1 && Approx(arrivedAt.x, 0) && boomerang->Finished());
+
+    // Replacements spawned where a destroyed target stood (often at its old address) are new hits.
+    auto lance = launch(ProjectileMotion::Straight, {-300, 0});
+    lance->pierce = true;
+    lance->maxLife = 100;
+    int replacementsHit = 0;
+    for (int i = 0; i < 40; ++i) {
+        hits.clear();
+        Collider* target = AddCircle(scene, {-300, 0}, 10, 1);
+        run(2 / 60.0f);
+        if (hits.size() == 1 && hits[0] == target)
+            ++replacementsHit;
+        scene.Destroy(target->GetGameObject());
+        run(1 / 60.0f);
+    }
+    CHECK(replacementsHit == 40 && !lance->Finished());
+    lance->Finish();
+    run(1 / 60.0f);
+
+    arrivals = 0;
+    auto prey = scene.CreateGameObject("prey");
+    prey->transform->position = {0, 300};
+    auto missile = launch(ProjectileMotion::Homing, {0, 0});
+    missile->follow = prey;
+    missile->speed = 300;
+    missile->hitRadius = 0;
+    run(2, [&] { prey->transform->position.x += 2; });
+    CHECK(arrivals == 1 && Approx(arrivedAt.y, 300) && arrivedAt.x > 10);
+
+    arrivals = 0;
+    auto bomb = launch(ProjectileMotion::Lob, {0, -100});
+    bomb->target = {50, 0};
+    bomb->flightTime = 0.45f;
+    bomb->hitRadius = 0;
+    run(0.3f);
+    CHECK(arrivals == 0 && !bomb->Finished());
+    run(0.3f);
+    CHECK(arrivals == 1 && Approx(arrivedAt.x, 50) && Approx(arrivedAt.y, 0));
+
+    auto idle = launch(ProjectileMotion::Straight, {0, 500});
+    idle->maxLife = 0.2f;
+    run(0.3f);
+    CHECK(idle->Finished() && arrivals == 1);
+    scene.Clear();
+}
+
+static void Streaks() {
+    auto object = CreateRef<GameObject>();
+    auto emitter = object->AddComponent<ParticleEmitter>();
+    emitter->emitting = false;
+    emitter->alignToVelocity = true;
+    emitter->stretch = 0.05f;
+    emitter->startVelocityMin = emitter->startVelocityMax = {0, 50};
+    emitter->acceleration = {100, 0};
+    emitter->lifetimeMin = emitter->lifetimeMax = 2;
+    object->Start();
+    emitter->Burst(1);
+    CHECK(Approx(emitter->GetParticles()[0].rotation, 90, 0.01f)); // faces its initial velocity
+    GameTime::Advance(0.5f, 0.5f);
+    emitter->Update();
+    CHECK(Approx(emitter->GetParticles()[0].rotation, 45, 0.01f)); // and turns with it
+    GameTime::Reset();
+}
+
 static void Run() {
     printf("[engine extensions]\n");
+    Effects();
+    Projectiles();
+    Streaks();
     DepthSorting();
     Particles();
     Queries();

@@ -27,6 +27,8 @@
 #include "Timer.h"
 #include "Tilemap.h"
 #include "UI.h"
+#include "Effects.h"
+#include "Projectile.h"
 #include "SaveSystem.h"
 #include "ResourceManager.h"
 #include "GameEngine.h"

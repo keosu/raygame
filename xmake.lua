@@ -1,20 +1,26 @@
-set_project("raygame")
-set_version("0.2.0")
+-- raygame can also be included from another project's xmake.lua (e.g. as a git submodule):
+-- it then only contributes the engine target, keeps that project's name, and leaves the
+-- bundled examples and tests off unless requested with --build_examples/--build_tests.
+local standalone = path.absolute(os.projectdir()) == path.absolute(os.scriptdir())
+if standalone then
+    set_project("raygame")
+    set_version("0.2.0")
+end
 
 includes("xmake/rules/publish.lua")
 includes("xmake/rules/android-tts.lua")
-includes("xmake/tasks/android.lua")
+if standalone then includes("xmake/tasks/android.lua") end
 add_rules("mode.debug", "mode.release")
 set_encodings("utf-8")
 
 option("build_examples")
-    set_default(true)
+    set_default(standalone)
     set_showmenu(true)
     set_description("Build the bundled example games")
 option_end()
 
 option("build_tests")
-    set_default(true)
+    set_default(standalone)
     set_showmenu(true)
     set_description("Define the desktop logic and graphics smoke targets")
 option_end()

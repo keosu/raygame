@@ -196,6 +196,21 @@ public:
         Expect(presented.b == 0 && presented.r > 90 && presented.r < 110, "opaque presentation ignores canvas alpha");
         UnloadRenderTexture(source); UnloadRenderTexture(dest);
 
+        // Margin fill: a blurred, dimmed copy of the frame continues its colors into the bars.
+        auto frameSource = LoadRenderTexture(64, 32), bars = LoadRenderTexture(64, 32);
+        BeginTextureMode(frameSource); ClearBackground({200, 0, 0, 255}); EndTextureMode();
+        Display::SetMarginStyle(Display::MarginStyle::BlurredCanvas, 0.5f);
+        Display::SetMarginColor({0, 0, 200, 255});
+        Display::PrepareMarginBlur(frameSource.texture);
+        BeginTextureMode(bars); ClearBackground(BLACK); Display::DrawMarginFill({0, 0, 64, 32}, {16, 0, 32, 32}); EndTextureMode();
+        Color blurred = Pixel(bars, 2, 16);
+        Expect(blurred.r > 85 && blurred.r < 115 && blurred.b < 10, "blurred margins continue the frame's colors, dimmed");
+        Display::SetMarginStyle(Display::MarginStyle::Solid);
+        BeginTextureMode(bars); ClearBackground(BLACK); Display::DrawMarginFill({0, 0, 64, 32}, {16, 0, 32, 32}); EndTextureMode();
+        Expect(Pixel(bars, 2, 16).b == 200 && Pixel(bars, 2, 16).r == 0, "solid margins use the margin color");
+        Display::SetMarginColor({4, 7, 16, 255});
+        UnloadRenderTexture(frameSource); UnloadRenderTexture(bars);
+
         // An offscreen pass in the middle of a frame resumes the canvas and its projection.
         auto baked = LoadRenderTexture(16, 16);
         Display::Begin();
@@ -244,6 +259,34 @@ public:
         Expect(lit.r >= 195 && lit.r <= 205 && dark.r == 40, "textured additive particles add their color");
         UnloadRenderTexture(target);
         ResourceManager::UnloadTextureNamed("particle-test");
+
+        // Themed buttons: a disabled button draws its disabled body and never clicks;
+        // outlined text draws the outline around the glyphs.
+        auto widgets = LoadRenderTexture(120, 60);
+        Input::Reset(); UI::ResetInteraction();
+        InputFrame press;
+        press.mousePosition = Display::CanvasToScreen({30, 20});
+        press.mouse.held[MOUSE_BUTTON_LEFT] = true;
+        ButtonStyle style{{200, 40, 40, 255}, {255, 220, 90, 255}, WHITE, 0.2f};
+        BeginTextureMode(widgets); ClearBackground(BLACK);
+        Input::SetFrame(press);
+        bool pressedDisabled = UI::Button({0, 0, 60, 40}, "", style, 12, false);
+        press.mouse.held[MOUSE_BUTTON_LEFT] = false;
+        Input::SetFrame(press);
+        bool releasedDisabled = UI::Button({0, 0, 60, 40}, "", style, 12, false);
+        UI::Text(90, 20, "W", 30, WHITE, UI::Align::Center, false, 3, {0, 255, 0, 255});
+        EndTextureMode();
+        Input::Reset(); UI::ResetInteraction();
+        Expect(!pressedDisabled && !releasedDisabled, "disabled themed buttons never click");
+        Color body = Pixel(widgets, 30, 26);
+        Expect(body.r < 60 && body.g < 60, "disabled buttons use the disabled body instead of the theme color");
+        Image glyphs = LoadImageFromTexture(widgets.texture);
+        bool outlined = false;
+        for (int y = 0; y < 60; ++y)
+            for (int x = 66; x < 120; ++x) outlined |= GetImageColor(glyphs, x, y).g > 200 && GetImageColor(glyphs, x, y).r < 50;
+        UnloadImage(glyphs);
+        Expect(outlined, "UI::Text draws the requested outline");
+        UnloadRenderTexture(widgets);
     }
 
     void TestAudioVoices() {

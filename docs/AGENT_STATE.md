@@ -11,7 +11,53 @@ GameObject/Component 和 raylib，维持原四个游戏及 FORGE 可用。用户
 用户偏好：中文交流，直接推进已授权工作，验证后提交；示例无控制台但保留
 文件日志，标题栏跟随 Windows 主题，游戏适配窗口比例。未授权创建子 agent。
 
-## 最近工作包：构建产物归位与 Android Lua 入口（本地提交）
+## 最近工作包：合并远端引擎扩展与本地构建迁移（本地验证通过）
+
+用户要求解决正在进行的 merge 并推送。开始时本地 `e108752`，MERGE_HEAD
+为 `095bbea`，共同基线 `54a4cf0`；本地 2 个、远端 5 个独立提交。
+备份分支 `backup/before-merge-20261014-e108752`，原索引/工作区差异保存在
+`build/merge-validation/`。沿用原 merge，不重写双方历史。
+
+- 状态文档保留双方记录；删除/修改冲突保留已迁移的 Lua Android 入口，远端
+  PowerShell 新增的 `-P` 固定工程已由 Lua 等价实现，不恢复旧脚本。
+- SDK 验证保留 build 内临时工程与统一 `pinned` 包装，消除自动合并后重复的 `-P`。
+- 保留远端 EffectLayer、Projectile、地址复用修复、拖尾粒子、主题 UI、模糊留边，
+  以及外部 includes 接入和按规则位置解析 Java 桥接。
+- 协调根构建与外部项目：只在独立根工程注册专用 Android tasks；示例显式
+  设置 APK 发布目录，单独使用 TTS 规则不强制改变外部项目输出布局。
+  Android 文档去除自动合并引入的旧 PowerShell 入口说明。
+
+### 本包已通过
+
+- Windows/MSVC x64 Debug/Release 关闭编译缓存完整重建；各 **454 引擎、130 Forge、
+  37 campaign** 逻辑零失败。原四示例 smoke、Forge/Lab/Marble/Garden 图形 smoke、
+  静音 TTS 两模式零失败；SDK 两模式独立搬迁、单头文件、逻辑/图形和配置拒绝通过。
+- 八 ARM64 Release APK 从 Lua 入口重新编译/打包，签名、16 KiB ZIP/ELF 对齐、
+  入口、资源集合/hash、图标、TTS 桥接校验通过；复用原调试密钥，未安装启动设备。
+- 外部工程（路径含空格）真实桌面构建/运行通过：只含 raygame 与消费目标，
+  项目名、自定义 android task 与 examples/tests 默认关闭保持。外部 ARM64 APK
+  编译/签名/对齐、APK 中的 TTS dex/manifest、资源 hash、ELF/入口/静态运行库通过；
+  只使用 TTS 规则时没有额外 bin 发布目录。探针与报告在 build/merge-validation。
+  探针命令使用目标工程工作目录及 `-P .`；初次从仓库根运行 `-P <外部工程>`
+  会复用调用目录的 xmake 配置，早期失败日志不作为最终验收证据。
+- 18 项 Lua 工具发现、clang-format 19.1.5 默认 47 文件、actionlint、UTF-8/LF、
+  `git diff --check` 通过。最终桌面配置恢复 Release/MSVC/ccache=n，八 EXE 图标
+  及发布副本与 build 目标 hash 一致；bin 没有编译中间文件。
+- 只读查询确认远端原 `095bbea` 的 CI run `38509709614` 已全部成功，这是原
+  远端提交的证据，与本包合并后的本地检查分开。新合并 CI 将在推送后核对。
+
+日志集中在 `build/merge-validation/`，外部探针使用 `external-isolated-*` 和
+`external-android-*`；根 SDK 日志在 `build/sdk-validation/windows/x64/{debug,release}`。
+Android 报告仍在 `build/android/verification-release.json`。
+
+### 尚未运行与下一步
+
+未在本机运行 Linux/macOS、Android 设备、此次 Android Debug 或从零下载安装工具；
+没有人工试玩/试听、多 DPI、长稳或外部真实游戏的全面回归。本包不改变远端引擎
+功能实现，主要协调构建与文档。下一步提交现有 merge，普通推送 origin/main 并检查
+新 CI；不 force push，保留备份分支。
+
+## 上一工作包：构建产物归位与 Android Lua 入口（本地提交）
 
 开始于 `c8f5421`，工作区干净。用户先要求不提交并确认直接迁移 Android 到
 xmake/Lua，完成验证后又授权提交。本包仅本地提交，未推送、未创建子 agent，
@@ -143,7 +189,103 @@ build 约 **1,086.9 MiB**，包含当前两模式对象/链接符号、Android s
 后续可把截图改为只保留最近轮次，复制工程时排除 build/bin/.xmake；源码和 Git
 历史合计约 15.17 MiB，无需为目录体积问题删减引擎能力。
 
-## 上一工作包：Android 构建工具自动发现（本地验证通过）
+## 远端工作包：弹道命中记录的地址复用问题（已修复并本地验证）
+
+基线 `d945ebc`。外部塔防游戏的平衡机器人在同一种子下偶发结果不同。原因：`Projectile`
+用裸 `Collider*` 记录本程已命中的对象；怪兽死亡后新怪兽的碰撞体可能分配在同一地址
+（Windows 堆的块选择不完全确定），长寿命的穿透/回旋弹会把新目标当成已命中而穿过。
+现在命中记录保存所属组件的 `weak_ptr`，地址相同且原对象仍存活才视为已命中；没有
+所属对象的碰撞体仍按指针记录。新增回归测试：静止穿透弹位置上反复销毁并重建目标
+40 次，每次都须命中（去掉修复后 3/3 次失败）。顺带对 `Display.h`（上一包遗漏）与新测试
+运行 clang-format，只有换行变化。
+
+通过：Windows/MSVC x64 Debug/Release 全构建；两模式各 3 次 **454 引擎逻辑**零失败，
+130 Forge、37 campaign 零失败，`smoke` 两模式 0 failures；clang-format 19.1.5 的 47 文件
+检查通过，`git diff --check` 通过。外部游戏平衡机器人连续 4 次报告逐字节一致。
+注意：用 `Copy-Item` 恢复头文件会保留旧修改时间，xmake 不会重新编译（本包曾因此
+误判一次失败），恢复后需更新时间戳。未运行：Linux/macOS、Android。
+
+## 上一工作包：Fit 画布留边的填充方式（已实现并本地验证，`809343d`）
+
+基线 `d942764`。用户希望窗口比例不同时，四周留边不再是纯黑。`Display` 新增
+`MarginStyle::{Solid, BlurredCanvas}`、`SetMarginStyle(style, brightness)`、`SetMarginColor`；
+BlurredCanvas 把当前画布经三级 1/4 缩小的离屏纹理模糊后按画布比例铺满窗口并调暗，
+只在实际存在留边时计算。`PresentOpaque` 增加可选 tint；`PrepareMarginBlur` /
+`DrawMarginFill` 公开供自定义呈现与测试。默认仍为原来的深色纯色，现有游戏外观不变。
+README 渲染一节补充说明。
+
+通过：Windows/MSVC x64 Release 全构建、453 引擎逻辑、图形 smoke 0 failures（新增：模糊
+留边延续画布颜色并按亮度调暗、纯色留边使用指定颜色）；外部塔防游戏 1100×860 窗口的
+合成截图确认上下留边为模糊场景色。未运行：Debug、Linux/macOS、Android 设备上的
+实际效果与开销（每帧三个小纹理 pass）。Ultra Guard 示例只在 `example/ultra-guard`
+分支，其状态记录也在该分支。
+
+## 上一工作包：作为子模块嵌入与外部项目 Android 打包（已实现并本地验证）
+
+基线 `0279a78`。外部塔防项目为支持 Android 改为 `includes` 本仓库 `xmake.lua`，
+暴露三处只在“raygame 不是根工程”时出现的问题，本包修复：
+
+- `xmake.lua`：检测是否为根工程；被包含时不调用 set_project/set_version，
+  `build_examples`/`build_tests` 默认关闭（根工程仍默认开启，CI 不受影响）。
+- `xmake/rules/android-tts.lua`：Java 桥接源码与依赖文件按规则文件位置解析，
+  不再用 `os.projectdir()`（外部项目中会指向错误目录）。
+- `scripts/build-android.ps1`、`scripts/verify-sdk.lua`：所有 xmake 调用加 `-P` 固定
+  本仓库。此前在子模块目录运行会选中父工程：Android 构建把 APK 写进父工程 bin
+  后找不到产物；SDK 检查的 install 找不到 raygame 构建。
+- `docs/ANDROID.md` 新增“外部项目以子模块使用 raygame 并打包 APK”。
+
+### 通过的检查
+
+- 根工程桌面 Release 配置列出全部示例/测试目标，全构建通过，453 引擎逻辑通过。
+- 在子模块目录内直接运行（此前失败的场景）：`build-android.ps1 -Game engine_lab`
+  成功并通过脚本全部 APK 检查（含 TTS 桥接）；`verify-sdk.lua` 通过。
+- 外部塔防项目：桌面构建只含 raygame + 游戏两个目标；Android ARM64 Release APK
+  构建、签名、16 KiB 对齐、ELF 入口、静态运行库、TTS dex、资源 SHA-256 检查通过。
+
+### 未运行与下一步
+
+未运行 `tests/android_tools.ps1`（未改发现逻辑）、Linux/macOS、Debug Android、
+任何 Android 设备/模拟器（本机无设备与模拟器）。下一步：推送后检查 CI。
+
+## 上一工作包：特效层、弹道组件、拖尾粒子与主题按钮（已实现并本地验证）
+
+基线 `3681079`，开始时工作区干净；提交前 rebase 到并行会话的 `54a4cf0`（仅 Android
+工具/CI/文档，与本包代码无重叠，状态文档冲突保留双方条目）。上一包迁移后塔防游戏仍需自写的部分是弹道、
+光线/冲击环/飘字、拖尾火花与按钮样式；用户要求把这些贡献给框架。游戏不作为
+示例提交（用户决定，涉及第三方 IP）。
+
+- `include/Effects.h`：`EffectLayer` 组件，`Beam`/`Ring`/`Text`（参数结构体），
+  随模拟时间老化（暂停冻结），光线与冲击环叠加混合，飘字带出现弹跳与描边；
+  非有限坐标、空文本、非正寿命忽略；`RingRadius` 供玩法查询冲击波前沿。
+- `include/Projectile.h`：`Projectile` 组件，`Straight/Homing/Boomerang/Lob`；
+  命中用场景 PhysicsWorld 的 `OverlapCircle`（层掩码/触发器过滤），`pierce` 每程
+  每个碰撞体一次，回旋返程重置；钩子 `onHit/onArrive/onStep/onDraw`；到达、非穿透
+  命中或 `maxLife` 后自毁，`Finish()` 可由回调提前结束；渲染位置可插值。
+- `ParticleEmitter::alignToVelocity/stretch`：粒子朝向速度，贴图拉长为条带，无贴图
+  画线；默认关闭。
+- `UI`：`Button(rect, label, ButtonStyle, size, enabled)`（复用 ButtonPainter，禁用态
+  仍捕获指针但不点击，按下时文字下沉），`Panel(rect, fill, border, roundness)`，
+  `Text(x, y, text, size, color, align, heading, outline, outlineColor)`；原 `Button`
+  改为调用新重载，外观不变。`RayGame.h` 与 SDK 单头文件测试包含两个新头。
+- README 新增“Effects, projectiles and themed UI”一节。
+
+### 通过的检查
+
+- Windows/MSVC x64 Debug/Release 全目标构建；各 **453 引擎逻辑**（新增 16 项：特效
+  老化/无效输入/冲击半径、四种弹道/穿透/回旋两程/追踪移动目标/抛物到达/寿命/
+  onStep、拖尾朝向随速度转向）、**130 Forge**、**37 campaign** 零失败。
+- `smoke` 两模式 0 failures（新增：禁用主题按钮不点击且绘制禁用底色、UI::Text 描边），
+  `tts_smoke` 两模式 0；Engine Lab、Marble Temple、Garden Guard、Forge `--smoke` 两模式
+  退出码 0（各模式先重建）。clang-format 47 文件通过；独立副本 `verify-sdk.lua --graphics`
+  通过（含新头文件单独包含）。
+- 外部塔防项目改用 EffectLayer/Projectile/拖尾/主题按钮后编译、平衡机器人、截图巡览正常。
+
+### 未运行与下一步
+
+未运行 Linux/macOS、Android 构建与设备、人工试玩。EffectLayer 文字依赖 UI 字体，
+未设置字体时退回 raylib 默认字体（不含中文）。下一步：推送后检查 CI。
+
+## 上一工作包：Android 构建工具自动发现（已推送 54a4cf0）
 
 用户反馈其他机器 Android 脚本报错，指出假定了 NDK 版本。原脚本默认只查找
 `ndk/28.2.13676358`，Build Tools 也只用 `35.0.0`；虽然支持 `-NdkRoot`，

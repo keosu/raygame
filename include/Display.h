@@ -3,6 +3,7 @@
 #include "Core.h"
 #include "Diagnostics.h"
 #include <rlgl.h>
+#include <array>
 #include <stdexcept>
 
 namespace RayGame {
@@ -136,10 +137,74 @@ public:
     static void End() {
         inFrame = false;
         EndTextureMode();
+        Rectangle window{0, 0, (float)::GetScreenWidth(), (float)::GetScreenHeight()};
+        bool margins = viewport.bounds.width < window.width - 0.5f ||
+                       viewport.bounds.height < window.height - 0.5f;
+        if (margins && marginStyle == MarginStyle::BlurredCanvas)
+            PrepareMarginBlur(canvas.texture);
         BeginDrawing();
-        ClearBackground({4, 7, 16, 255});
+        ClearBackground(marginColor);
+        if (margins)
+            DrawMarginFill(window, viewport.bounds);
         PresentOpaque(canvas.texture, viewport.bounds);
         EndDrawing();
+    }
+
+    // What fills the bars around a Fit canvas whose aspect differs from the window.
+    // BlurredCanvas stretches a soft, dimmed copy of the current frame across the window,
+    // so the margins continue the scene's colors instead of showing a flat bar.
+    enum class MarginStyle { Solid, BlurredCanvas };
+    static void SetMarginStyle(MarginStyle style, float brightness = 0.45f) {
+        marginStyle = style;
+        if (std::isfinite(brightness))
+            marginBrightness = Clamp(brightness, 0.0f, 1.0f);
+    }
+    static MarginStyle GetMarginStyle() {
+        return marginStyle;
+    }
+    static void SetMarginColor(Color color) {
+        marginColor = color;
+    }
+
+    // Building blocks of End, exposed for custom presentation and tests. Prepare must run
+    // outside any texture mode; DrawMarginFill draws into the current target, covering
+    // window (the area outside ounds is what stays visible).
+    static void PrepareMarginBlur(Texture2D source) {
+        Texture2D current = source;
+        for (int i = 0; i < 3; ++i) {
+            int w = std::max(1, source.width >> (2 * (i + 1))),
+                h = std::max(1, source.height >> (2 * (i + 1)));
+            RenderTexture2D& stage = blurStages[i];
+            if (stage.texture.width != w || stage.texture.height != h) {
+                if (stage.id)
+                    UnloadRenderTexture(stage);
+                stage = LoadRenderTexture(w, h);
+                if (!IsRenderTextureValid(stage)) {
+                    stage = {};
+                    blurReady = false;
+                    return;
+                }
+                SetTextureFilter(stage.texture, TEXTURE_FILTER_BILINEAR);
+            }
+            BeginTextureMode(stage);
+            PresentOpaque(current, {0, 0, (float)w, (float)h});
+            EndTextureMode();
+            current = stage.texture;
+        }
+        blurReady = true;
+    }
+    static void DrawMarginFill(Rectangle window, Rectangle bounds) {
+        DrawRectangleRec(window, marginColor);
+        if (marginStyle != MarginStyle::BlurredCanvas || !blurReady || bounds.width <= 0 ||
+            bounds.height <= 0)
+            return;
+        // Cover the window with the canvas aspect, centered like the canvas itself.
+        float scale = std::max(window.width / bounds.width, window.height / bounds.height);
+        float w = bounds.width * scale, h = bounds.height * scale;
+        Rectangle cover{bounds.x + bounds.width / 2 - w / 2, bounds.y + bounds.height / 2 - h / 2,
+                        w, h};
+        auto level = (unsigned char)std::lround(255 * marginBrightness);
+        PresentOpaque(blurStages[2].texture, cover, {level, level, level, 255});
     }
 
     // True between Begin and End, i.e. while scene and UI rendering target the canvas.
@@ -149,11 +214,11 @@ public:
 
     // Copies a render-texture color attachment without blending. Translucent drawing
     // lowers a canvas's alpha; presenting with blending would mix in whatever lies below.
-    static void PresentOpaque(Texture2D texture, Rectangle dest) {
+    static void PresentOpaque(Texture2D texture, Rectangle dest, Color tint = WHITE) {
         rlDrawRenderBatchActive();
         rlDisableColorBlend();
         DrawTexturePro(texture, {0, 0, (float)texture.width, -(float)texture.height}, dest, {0, 0},
-                       0, WHITE);
+                       0, tint);
         rlDrawRenderBatchActive();
         rlEnableColorBlend();
     }
@@ -186,6 +251,11 @@ public:
         if (canvas.id)
             UnloadRenderTexture(canvas);
         canvas = {};
+        for (auto& stage : blurStages)
+            if (stage.id)
+                UnloadRenderTexture(stage);
+        blurStages = {};
+        blurReady = false;
         viewport = {};
         failedWidth = failedHeight = 0;
         inFrame = false;
@@ -205,6 +275,11 @@ private:
     }
 
     static inline bool inFrame = false;
+    static inline MarginStyle marginStyle = MarginStyle::Solid;
+    static inline float marginBrightness = 0.45f;
+    static inline Color marginColor = {4, 7, 16, 255};
+    static inline std::array<RenderTexture2D, 3> blurStages{};
+    static inline bool blurReady = false;
     static inline int canvasWidth = 1, canvasHeight = 1;
     static inline CanvasScaleMode scaleMode = CanvasScaleMode::Fit;
     static inline CanvasQuality canvasQuality = CanvasQuality::Standard;

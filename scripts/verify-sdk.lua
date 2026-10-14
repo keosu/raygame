@@ -22,16 +22,24 @@ function main(graphics)
         os.cp(path.join(root, "tests/sdk_consumer", name), consumer)
     end
 
+    -- Pin each project explicitly: this checkout may sit inside another xmake project
+    -- (e.g. as a git submodule), which xmake would otherwise select from the parent.
+    local function pinned(args, directory)
+        local out = {args[1], "-P", directory}
+        for i = 2, #args do table.insert(out, args[i]) end
+        return out
+    end
+
     local function run(name, args, directory)
         print("SDK check: %s", name)
         local logfile = path.join(logs, name .. ".log")
-        local status = os.execv(os.programfile(), args, {
+        local status = os.execv(os.programfile(), pinned(args, directory), {
             curdir = directory, stdout = logfile, stderr = logfile, try = true
         })
         assert(status == 0, "SDK check failed: " .. name .. "; see " .. logfile)
         return io.readfile(logfile)
     end
-    run("install", {"install", "-P", root, "-o", staged, "raygame"}, root)
+    run("install", {"install", "-o", staged, "raygame"}, root)
     -- Move the installed tree so no consumer can rely on its original prefix.
     -- Both paths are literal children of the fresh workspace created above.
     assert(path.directory(path.absolute(staged)) == path.absolute(workspace))
@@ -45,15 +53,15 @@ function main(graphics)
     local metadata = io.load(path.join(installed, "share/raygame/sdk.lua"))
     assert(metadata and metadata.mode == mode and metadata.plat == plat)
     local sdkfile = path.join(installed, "share/raygame/sdk.lua")
-    local args = {"f", "-P", consumer, "-p", metadata.plat, "-a", metadata.arch, "-m", metadata.mode,
+    local args = {"f", "-p", metadata.plat, "-a", metadata.arch, "-m", metadata.mode,
                   "--raygame_sdk=" .. installed, "-y"}
     if plat == "windows" then table.insert(args, "--toolchain=msvc") end
 
     run("configure", args, consumer)
-    run("build", {"build", "-P", consumer, "-v", "-y"}, consumer)
-    print(run("run", {"run", "-P", consumer, "sdk_consumer"}, consumer):trim())
+    run("build", {"build", "-v", "-y"}, consumer)
+    print(run("run", {"run", "sdk_consumer"}, consumer):trim())
     if graphics then
-        run("graphics", {"run", "-P", consumer, "sdk_consumer", "--graphics"}, consumer)
+        run("graphics", {"run", "sdk_consumer", "--graphics"}, consumer)
     end
 
     -- Corrupt only this disposable SDK's declared configuration. The consumer
@@ -63,7 +71,7 @@ function main(graphics)
         metadata[field] = wrong
         io.save(sdkfile, metadata)
         local output = path.join(logs, "reject-" .. field .. ".log")
-        local status = os.execv(os.programfile(), args, {
+        local status = os.execv(os.programfile(), pinned(args, consumer), {
             curdir = consumer, stdout = output, stderr = output, try = true
         })
         metadata[field] = original
@@ -78,7 +86,7 @@ function main(graphics)
         reject("runtimes", metadata.runtimes == "MD" and "MT" or "MD", "RayGame SDK C runtime mismatch")
     end
     run("restore-configure", args, consumer)
-    print(run("restore-run", {"run", "-P", consumer, "sdk_consumer"}, consumer):trim())
+    print(run("restore-run", {"run", "sdk_consumer"}, consumer):trim())
     io.save(path.join(logs, "report.lua"), {
         sdk = metadata, workspace = workspace, consumer = consumer,
         installed = installed, passed = true, graphics = graphics ~= nil

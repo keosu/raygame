@@ -71,6 +71,7 @@ local function add_example(name)
             local staged_assets = path.absolute(path.join(get_config("builddir"), "example-assets", name), os.projectdir())
             set_kind("shared")
             set_targetdir("$(builddir)/native/$(arch)/$(mode)")
+            set_values("raygame.apk_publishdir", "$(projectdir)/bin/android/$(arch)/$(mode)")
             -- The Android rule resolves resource paths relative to this script.
             add_rules("android.native_app", {
                 android_sdk_version = "35",

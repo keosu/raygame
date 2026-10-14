@@ -58,6 +58,7 @@ function add_forge_targets(options)
             if is_plat("android") then
                 local staged_assets = path.join(build_root, "example-assets/forge_runner")
                 set_kind("shared")
+                set_values("raygame.apk_publishdir", "$(projectdir)/bin/android/$(arch)/$(mode)")
                 add_rules("android.native_app", {
                     android_sdk_version = "35",
                     android_manifest = path.join(forge_root, "android/AndroidManifest.xml"),
