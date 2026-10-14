@@ -12,6 +12,7 @@
 | [engine_lab/](engine_lab/README.md) | 对象实验室、引擎 API 与 Windows/Android TTS | 根目录 `xmake run engine_lab` |
 | [marble_temple/](marble_temple/README.md) | 祖玛玩法，三关彩球消除冒险 | 根目录 `xmake run marble_temple` |
 | [garden_guard/](garden_guard/README.md) | 植物大战僵尸玩法，三关五行塔防 | 根目录 `xmake run garden_guard` |
+| [ultra_guard/](ultra_guard/README.md) | 奥特曼同人塔防（非官方），组件化实体、弹道、特效层与中文界面 | 根目录 `xmake run ultra_guard` |
 | `common/` | 七个示例的 UI 辅助代码、共用字体及许可 | 随示例或图形 smoke 复制 |
 
 除 FORGE 外的示例目录布局一致：

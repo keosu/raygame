@@ -240,6 +240,33 @@ build 约 **1,086.9 MiB**，包含当前两模式对象/链接符号、Android s
 历史合计约 15.17 MiB，无需为目录体积问题删减引擎能力。
 
 ## 远端工作包：弹道命中记录的地址复用问题（已修复并本地验证）
+## 分支工作包：Ultra Guard 示例（仅在 `example/ultra-guard` 分支，不合入 main）
+
+用户要求把外部塔防游戏作为示例放到独立分支，不推送 main。基线 main `d942764`。
+游戏为奥特曼同人（第三方版权/商标），README 顶部有非官方声明；公开仓库的分支
+同样公开可见，已向用户说明。是否合入 main 由用户另行决定。
+
+- `examples/ultra_guard/`：9 个 .cpp + 头文件（与外部仓库 `406ed56` 的游戏一致，仅改
+  资源目录为 `bin/assets/ultra_guard/`、数据目录 `raygame.ultra_guard`、日志控制台跟随
+  `RAYGAME_QUIET_EXAMPLE`、Android 包名 `org.raygame.ultraguard`）；assets（字体子集与
+  OFL、合成音频）、android/、resources/windows/、tools/（字体/音频/图标脚本，路径改为
+  相对示例目录与本仓库 `scripts/subset-font.py`）、README。
+- `examples/xmake.lua`：示例名单加入 `ultra_guard`；源码改为 `<name>/*.cpp`（其余七个
+  示例目录都只有 main.cpp，行为不变）；README 随资源复制。`scripts/build-android.ps1`
+  的 -Game 选项与 all 列表加入 `ultra_guard`。`examples/README.md` 加一行。
+
+### 通过的检查
+
+- Windows/MSVC x64 Release 全目标构建；453 引擎逻辑、原图形 smoke 0 failures。
+- 示例 `--balance` 9 局胜 8（与外部仓库一致），`--capture` 14 张截图正常，日志确认从
+  `bin/assets/ultra_guard/` 加载字体与音频。
+- `build-android.ps1 -Game ultra_guard` 通过全部 APK 检查（7,368,296 B）。
+
+### 未运行
+
+Debug、Linux/macOS（CI 只在 main 推送/PR 或手动触发时运行）、Android 设备、人工试玩。
+
+## 最近工作包：弹道命中记录的地址复用问题（已修复并本地验证）
 
 基线 `d945ebc`。外部塔防游戏的平衡机器人在同一种子下偶发结果不同。原因：`Projectile`
 用裸 `Collider*` 记录本程已命中的对象；怪兽死亡后新怪兽的碰撞体可能分配在同一地址
