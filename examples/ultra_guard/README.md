@@ -78,7 +78,14 @@ wave     redking x6 every 1.5 | baltan x16 every 0.5 after 2 | zetton x1 after 1
 
 - 字体：`assets/fonts/UltraSC-*.ttf` 是 Noto Sans SC（SIL OFL，许可见同目录）的子集，
   修改界面、关卡或皮肤里的中文后运行 `python examples/ultra_guard/tools/make_font.py` 重新生成。
+  脚本默认用 `C:\Windows\Fonts\NotoSansSC-VF.ttf`（可变字体，Medium/Bold 两个实例）；
+  未安装时回退本机微软雅黑（`msyh.ttc`/`msyhbd.ttc`，静态字体，不再做 weight 实例化），
+  并把字体名改为 UltraGuard SC。运行时只加载 `charset.txt` 里的字，所以漏了这步
+  新中文会显示成方块。
 - 音频：`tools/make_audio.py` 合成全部音效（WAV）与两首 BGM（Ogg Vorbis，需要 numpy、soundfile）。
 - 图标：`tools/make_icon.py` 用 `--capture` 导出的头像生成 Windows ICO 与 Android 启动图标。
 - 头像可替换：把正方形 PNG 放到皮肤目录或游戏资源目录的 `avatars/<key>.png`
-  （key 为 ultraman、seven、tiga、cosmos、taro、zero）即可覆盖代码绘制的头像。
+  （key 为 z、orb、tiga、geed、arc、zero）即可覆盖代码绘制的头像。
+- 现成的真人头像：`assets/avatars/` 由 `tools/make_avatars.py` 从立绘抠图裁剪生成
+  （正方形、头部居中偏上、透明背景），源图可来自任意全身抠图；怪兽贴图见
+  `assets/skins/real/`，由 `tools/make_kaiju.py` 生成（紧贴内容边界、静止帧，脚底贴图片底边）。

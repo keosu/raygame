@@ -1,6 +1,47 @@
 # Agent 工作状态
 
-更新时间：2026-10-13。
+更新时间：2026-10-14。
+
+## 工作包：Ultra Guard 真实头像与怪獣贴图（2026-10-14）
+
+用户授权把 `examples/ultra_guard` 的资源替换为真实图片，仅限个人游玩。
+
+已完成：
+- `assets/avatars/*.png`：6 位英雄真人头像，由 `tools/make_avatars.py` 从全身抠图
+  裁剪生成（自动识别头/肩线，头部居中偏上，512→384 平方形透明 PNG）。游戏原生的
+  `avatars/<key>.png` 覆盖机制直接生效，无需改代码。阵容按用户要求改为
+  泽塔(z)、欧布(orb)、迪迦(tiga)、捷德(geed)、亚刻(arc)、赛罗(zero)：
+  只改 `Data.cpp` 的 key 与显示名，技能数值/文案未动；头像源改为对应的新抠图。
+- `assets/skins/real/`：新皮肤"写实怪獣"，`kaiju/` 含 baltan、baltan_clone（baltan
+  蓝紫染色镜像）、gomora、eleking、redking、zetton（芝顿，用户补充要求）、belial
+  （本地抠图）；由 `tools/make_kaiju.py` 从立绘裁剪成紧贴内容边界的静止帧
+  （长边上限 768，eleking/redking 做了通道调色）。缺图自动回退内置绘制。
+- `Skins.cpp::Load`：未存档皮肤名时默认选 `real`，首启即看到真实图片；"经典"仍可选。
+- 换字后必须重跑 `tools/make_font.py`：字体是字符子集（`charset.txt` 驱动），新中文
+  （泽/欧/德/獣）不在表里会变方块。本次已重生成 Medium/Bold（各 718 字形）。
+  `make_font.py` 现支持回退：无 `NotoSansSC-VF.ttf` 时用本机微软雅黑
+  （`msyh.ttc`/`msyhbd.ttc`，先拆出单 face 再子集，跳过 `--weight`），临时文件用完即删。
+- 本地素材站点（pngegg/duitang 等）单只怪獣透明立绘供给很差，多数为拼图或带水印；
+  Alien_Baltan/OriginalBaltan 取自 Ultra 系列维基，redking 取自圆谷官网。
+
+验证：
+- MSVC Release `xmake build ultra_guard` 通过；实机启动约 10 秒无异常关闭，日志
+  （`%LOCALAPPDATA%\raygame.ultra_guard\logs\game.log`）显示 6 个头像与 6 张怪獣
+  贴图全部加载成功，无 Skin/Portrait 报错。
+- Android arm64-v8a Release APK 构建通过：`bin/android/arm64-v8a/release/ultra_guard.apk`
+  （7.2MB，含全部 assets，arm64-v8a 单 so）。
+- 桌面运行需手动同步资源：镜像 `examples/ultra_guard/assets` 到 `bin/assets/ultra_guard`
+  （xmake 的 phony 资源目标不会因源图更新而自动重跑，robocopy /MIR 在本机也偶发不删旧文件，
+  可用 Python 遍历删旧拷新；Android 打包的 before_build 每次都会重新 stage，不受影响）。
+- 切换构建平台后 `xmake build <target>` 只编当前平台：从 Android 配置切回 Windows 必须重跑
+  `xmake f -p windows ...` 再 build，否则 exe 是旧代码（本次踩过：头像 key 改了但 exe 未重编，
+  表现为新头像不加载、回退内置绘制，日志里看不到对应文件）。
+
+未做 / 下一步：
+- 未构建 armeabi-v7a（老设备需要时再构建）；未真机安装验证。
+- `maps/` 真实地面图可后续补充（缺图自动回退，无风险）。
+- 素材为第三方版权形象，仅限个人使用；如需公开分发需替换为原创素材。
+
 
 ## 目标与约束
 

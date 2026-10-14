@@ -1,2 +1,3 @@
 # 可选皮肤（一行一个 assets/skins 下的目录名，按标题页切换顺序）。每个目录必须有 skin.txt。
 neon
+real
