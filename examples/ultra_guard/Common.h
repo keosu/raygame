@@ -87,20 +87,21 @@ inline float Rand(float a, float b) { return RayGame::Random(a, b); }
 
 inline float RealTime() { return (float)GameTime::UnscaledTime(); }
 
+// UI colors; skins may override any of them by name (see Skins.cpp).
 namespace Palette {
-inline constexpr Color ink = {10, 14, 30, 255};
-inline constexpr Color panel = {16, 24, 46, 238};
-inline constexpr Color panelLight = {30, 44, 78, 255};
-inline constexpr Color line = {82, 112, 170, 150};
-inline constexpr Color text = {232, 238, 250, 255};
-inline constexpr Color muted = {146, 164, 198, 255};
-inline constexpr Color gold = {255, 204, 84, 255};
-inline constexpr Color red = {236, 56, 64, 255};
-inline constexpr Color silver = {214, 222, 232, 255};
-inline constexpr Color timer = {70, 190, 255, 255};
-inline constexpr Color green = {104, 228, 140, 255};
-inline constexpr Color cyan = {110, 220, 255, 255};
-inline constexpr Color purple = {170, 110, 255, 255};
+inline Color ink = {10, 14, 30, 255};
+inline Color panel = {16, 24, 46, 238};
+inline Color panelLight = {30, 44, 78, 255};
+inline Color line = {82, 112, 170, 150};
+inline Color text = {232, 238, 250, 255};
+inline Color muted = {146, 164, 198, 255};
+inline Color gold = {255, 204, 84, 255};
+inline Color red = {236, 56, 64, 255};
+inline Color silver = {214, 222, 232, 255};
+inline Color timer = {70, 190, 255, 255};
+inline Color green = {104, 228, 140, 255};
+inline Color cyan = {110, 220, 255, 255};
+inline Color purple = {170, 110, 255, 255};
 } // namespace Palette
 
 } // namespace UG

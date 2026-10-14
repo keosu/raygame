@@ -1,5 +1,6 @@
 #include "Art.h"
 #include "Draw.h"
+#include "Skins.h"
 
 namespace UG::Art {
 
@@ -247,6 +248,35 @@ float KaijuHeight(EnemyId id) {
 }
 
 void DrawKaiju(EnemyId id, const KaijuPose& pose) {
+    const Skins::KaijuSprite* sprite = Skins::Kaiju(id);
+    if (!sprite) return DrawBuiltinKaiju(id, pose);
+    const Texture2D& tex = sprite->texture;
+    int frame = sprite->frames > 1 ? (int)(std::max(0.0f, pose.time) * sprite->fps) % sprite->frames : 0;
+    float fw = tex.width / (float)sprite->frames, fh = (float)tex.height;
+    float hop = sprite->frames > 1 ? 0 : std::fabs(std::sin(pose.time * 7)) * 2 * pose.scale; // still images hop
+    float h = sprite->size * pose.scale, w = h * fw / fh;
+    Rectangle src{frame * fw, 0, pose.face >= 0 ? fw : -fw, fh};
+    Rectangle dst{pose.feet.x - w / 2, pose.feet.y - h * sprite->feet - hop, w, h};
+    Vector2 center{pose.feet.x, pose.feet.y - h * 0.45f};
+    float alpha = Clamp(pose.alpha, 0.0f, 1.0f);
+    if (pose.enraged || pose.shielded) {
+        Draw::BlendAdd();
+        if (pose.enraged) Draw::Glow(center, h * 0.7f, WithAlpha({255, 60, 40, 255}, 0.35f * alpha));
+        if (pose.shielded) Draw::Glow(center, h * 0.65f, WithAlpha({120, 200, 255, 255}, 0.45f * alpha));
+        Draw::BlendNormal();
+    }
+    Color tint = WHITE;
+    if (pose.chill > 0) tint = Mix(tint, {150, 210, 255, 255}, pose.chill * 0.45f);
+    if (pose.burn > 0) tint = Mix(tint, {255, 150, 90, 255}, pose.burn * 0.3f);
+    DrawTexturePro(tex, src, dst, {0, 0}, 0, WithAlpha(tint, alpha));
+    if (pose.flash > 0) {
+        Draw::BlendAdd();
+        DrawTexturePro(tex, src, dst, {0, 0}, 0, WithAlpha(WHITE, pose.flash * alpha));
+        Draw::BlendNormal();
+    }
+}
+
+void DrawBuiltinKaiju(EnemyId id, const KaijuPose& pose) {
     Frame k{pose.feet, pose.scale, pose.face >= 0 ? 1.0f : -1.0f, pose.flash, pose.alpha, pose.chill, pose.burn};
     switch (id) {
     case EnemyId::Gomora: Gomora(k, pose.time); break;

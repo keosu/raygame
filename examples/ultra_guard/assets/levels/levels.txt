@@ -1,0 +1,5 @@
+# 关卡顺序（一行一个文件名，位于本目录）。新增关卡：复制一个 .level 文件，修改后加到这里。
+# Android 无法列出 APK 内目录，所以用这个索引文件而不是自动扫描。
+01_tokyo.level
+02_fuji.level
+03_nebula.level

@@ -18,7 +18,9 @@ pwsh -NoProfile -File scripts/build-android.ps1 -Game ultra_guard
 ```
 
 存档与日志位于 `raygame.ultra_guard` 用户数据目录。开发参数：`--capture <目录>`
-自动巡览所有页面并导出截图；`--balance <文件>` 无窗口运行平衡机器人（每关 3 次）。
+自动巡览所有页面并导出截图（可加 `--skin <皮肤目录>`）；`--balance <文件>` 无窗口运行
+平衡机器人（每关 3 次，同一版本结果逐字节一致）；`--export-skin <目录>` 把内置画面导出为
+皮肤模板。
 
 ## 玩法与操作
 
@@ -29,6 +31,32 @@ pwsh -NoProfile -File scripts/build-android.ps1 -Game ultra_guard
 - 右键或“取消”按钮退出放置/瞄准；Android 返回键 = Esc，切到后台自动暂停。
 - 怪兽特性：巴尔坦被击倒后分裂、艾雷王抗减速、红王高护甲、杰顿周期护盾并瞬移、
   贝利亚召唤分身并在半血后暴怒加速。
+
+## 关卡配置（assets/levels/）
+
+每关一个 `.level` 文本文件，`levels.txt` 决定顺序（Android 无法列出 APK 内目录）。
+新增关卡：复制一个文件改数值并加入索引，格式说明在 `01_tokyo.level` 文件头：
+
+```text
+theme    city            # city / mountain / nebula
+gold     320
+base     17 9            # 基地格子（20 列 × 12 行）
+path     -1,2 4,2 4,8 9,8 9,3 14,3 14,9 17,9
+wave     redking x6 every 1.5 | baltan x16 every 0.5 after 2 | zetton x1 after 10
+```
+
+多条 `path` 时可用 `path 2` 指定某组走第几条路，否则轮流出怪；含 zetton/belial 的波次
+自动显示 BOSS 警告。出错的关卡会被跳过，`文件:行号` 错误写入日志并显示在关卡页底部。
+关卡页每页 3 关可翻页；星级按关卡 id 存档。
+
+## 皮肤（assets/skins/）
+
+`skins.txt` 列出皮肤目录，标题页“皮肤”按钮即时切换（“经典”为内置画面）。目录内容
+均可选：`skin.txt`（名称、界面调色板、怪兽帧条参数、是否在替换地面上画内置道路/装饰）、
+`avatars/<英雄>.png`、`kaiju/<怪兽>.png`（横向动画帧条）、`maps/<关卡 id 或主题>.png`。
+`--export-skin` 导出的模板带完整注释，可直接复制修改。示例皮肤“霓虹夜”由
+`tools/make_sample_skin.py` 从模板生成（夜色地面、色相旋转的怪兽、霓虹配色）。
+音效与音乐暂不在皮肤范围内（`AudioManager` 尚无卸载/替换接口）。
 
 ## 用到的引擎功能
 
@@ -43,13 +71,14 @@ pwsh -NoProfile -File scripts/build-android.ps1 -Game ultra_guard
 | `UI` | 主题按钮 `ButtonStyle`、`UI::Text` 描边文字、`IsMouseOverUI` 防止点击 HUD 误放置 |
 | `AudioManager` | 多声部音效、冷却节流、音效/音乐音量通道 |
 | `ResourceManager` | `CodepointsFromText` + `SetFontOptions` 加载中文字体子集；`CreateTextureFromImage` 生成柔光与烘焙头像 |
-| `Display` | 地图/背景预渲染后 `PresentOpaque` 绘制 |
+| `Display` | 地图/背景预渲染后 `PresentOpaque` 绘制；窗口比例不符时 `MarginStyle::BlurredCanvas` 用模糊画面填充四周 |
+| `FileSystem` | `ReadAssetText`/`AssetExists` 读取关卡与皮肤（桌面目录与 APK 内通用） |
 
 ## 资源与工具
 
 - 字体：`assets/fonts/UltraSC-*.ttf` 是 Noto Sans SC（SIL OFL，许可见同目录）的子集，
-  修改界面文字后运行 `python examples/ultra_guard/tools/make_font.py` 重新生成。
-- 音频：`tools/make_audio.py` 合成全部音效与两首 BGM（需要 numpy）。
+  修改界面、关卡或皮肤里的中文后运行 `python examples/ultra_guard/tools/make_font.py` 重新生成。
+- 音频：`tools/make_audio.py` 合成全部音效（WAV）与两首 BGM（Ogg Vorbis，需要 numpy、soundfile）。
 - 图标：`tools/make_icon.py` 用 `--capture` 导出的头像生成 Windows ICO 与 Android 启动图标。
-- 头像可替换：把正方形 PNG 放到游戏资源目录 `avatars/<key>.png`
+- 头像可替换：把正方形 PNG 放到皮肤目录或游戏资源目录的 `avatars/<key>.png`
   （key 为 ultraman、seven、tiga、cosmos、taro、zero）即可覆盖代码绘制的头像。

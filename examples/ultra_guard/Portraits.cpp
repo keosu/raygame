@@ -1,6 +1,7 @@
 #include "Art.h"
 #include "Assets.h"
 #include "Draw.h"
+#include "Skins.h"
 #include <rlgl.h>
 
 namespace UG::Art {
@@ -381,17 +382,10 @@ void Finish(int i, Image& image) {
     if (portraits[i]) SetTextureWrap(*portraits[i], TEXTURE_WRAP_CLAMP);
 }
 
-// Baking onto a transparent target needs coverage-correct alpha: standard blending
-// would let translucent highlights make the opaque face underneath see-through.
-void BeginBakeBlend() {
-    rlDrawRenderBatchActive();
-    rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA, RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD,
-                              RL_FUNC_ADD);
-    BeginBlendMode(BLEND_CUSTOM_SEPARATE);
-}
-
 bool LoadCustom(int i) {
-    std::string path = AssetPath(std::string("avatars/") + HeroInfo((HeroId)i).key + ".png");
+    std::string file = std::string("avatars/") + HeroInfo((HeroId)i).key + ".png";
+    std::string path = Skins::Find(file);
+    if (path.empty()) path = AssetPath(file);
     if (!FileSystem::AssetExists(path)) return false;
     Image image = LoadImage(path.c_str());
     if (!IsImageValid(image)) return false;
@@ -404,6 +398,13 @@ bool LoadCustom(int i) {
     return true;
 }
 } // namespace
+
+void BeginBakeBlend() {
+    rlDrawRenderBatchActive();
+    rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA, RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD,
+                              RL_FUNC_ADD);
+    BeginBlendMode(BLEND_CUSTOM_SEPARATE);
+}
 
 void DrawBust(HeroId id) {
     switch (id) {
@@ -441,6 +442,15 @@ void BuildPortraits() {
         UnloadImage(image);
         UnloadRenderTexture(target);
     }
+}
+
+void ReloadPortraits() {
+    for (int i = 0; i < kHeroCount; ++i) {
+        if (!portraits[i]) continue;
+        ResourceManager::UnloadTextureNamed(std::string("portrait-") + HeroInfo((HeroId)i).key);
+        portraits[i] = TextureHandle{};
+    }
+    BuildPortraits();
 }
 
 Texture2D Portrait(HeroId id) {

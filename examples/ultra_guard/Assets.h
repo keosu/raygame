@@ -25,6 +25,7 @@ struct Settings {
     bool sfx = true;
     bool music = true;
     bool fullscreen = false;
+    std::string skin; // folder under assets/skins; empty = built-in look
 };
 
 namespace Progress {

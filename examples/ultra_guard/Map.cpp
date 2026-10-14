@@ -1,5 +1,6 @@
 #include "Map.h"
 #include "Draw.h"
+#include "Skins.h"
 #include <rlgl.h>
 
 namespace UG {
@@ -421,7 +422,7 @@ void Base(const MapData& map, float time, float flash) {
 
 } // namespace
 
-RenderTexture2D RenderMap(const MapData& map, float scale) {
+RenderTexture2D RenderMap(const MapData& map, float scale, bool builtinGroundOnly) {
     RenderTexture2D target = LoadRenderTexture((int)(kMapW * scale), (int)(kMapH * scale));
     SetTextureFilter(target.texture, TEXTURE_FILTER_BILINEAR);
     BeginTextureMode(target);
@@ -429,10 +430,18 @@ RenderTexture2D RenderMap(const MapData& map, float scale) {
     rlPushMatrix();
     rlScalef(scale, scale, 1);
     rlTranslatef(-kMapX, -kMapY, 0);
-    Ground(map);
-    Paths(map);
-    DecorLayer(map);
-    Lighting(map);
+    Texture2D ground = builtinGroundOnly ? Texture2D{} : Skins::MapGround(*map.level);
+    if (ground.id) {
+        DrawTexturePro(ground, {0, 0, (float)ground.width, (float)ground.height}, {kMapX, kMapY, kMapW, kMapH},
+                       {0, 0}, 0, WHITE);
+    } else {
+        Ground(map);
+    }
+    if (!builtinGroundOnly) {
+        if (!ground.id || Skins::MapPaths()) Paths(map);
+        if (!ground.id || Skins::MapDecor()) DecorLayer(map);
+        Lighting(map);
+    }
     rlPopMatrix();
     EndTextureMode();
     return target;

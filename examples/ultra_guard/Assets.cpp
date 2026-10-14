@@ -1,4 +1,5 @@
 #include "Assets.h"
+#include "Data.h"
 
 namespace UG {
 
@@ -65,8 +66,8 @@ void Load() {
         AudioManager::LoadSound(s.name, AssetPath(std::string("audio/") + s.name + ".wav"), s.voices);
         AudioManager::SetSoundCooldown(s.name, 0.06f);
     }
-    AudioManager::LoadMusic("menu", AssetPath("audio/bgm_menu.wav"));
-    AudioManager::LoadMusic("battle", AssetPath("audio/bgm_battle.wav"));
+    AudioManager::LoadMusic("menu", AssetPath("audio/bgm_menu.ogg"));
+    AudioManager::LoadMusic("battle", AssetPath("audio/bgm_battle.ogg"));
     ApplySettings();
 }
 
@@ -114,6 +115,14 @@ void Load() {
     settings.sfx = store.GetBool("sfx", true);
     settings.music = store.GetBool("music", true);
     settings.fullscreen = store.GetBool("fullscreen", false);
+    settings.skin = store.GetString("skin", "");
+    const char* legacy[] = {"tokyo", "fuji", "nebula"}; // saves before level files used indexes
+    for (int i = 0; i < 3; ++i) {
+        std::string old = "stars" + std::to_string(i), key = std::string("stars.") + legacy[i];
+        if (!store.Has(old)) continue;
+        store.SetInt(key, std::max(store.GetInt(key, 0), store.GetInt(old, 0)));
+        store.Remove(old);
+    }
     loaded = true;
 }
 
@@ -121,13 +130,22 @@ void Save() {
     store.SetBool("sfx", settings.sfx);
     store.SetBool("music", settings.music);
     store.SetBool("fullscreen", settings.fullscreen);
+    store.SetString("skin", settings.skin);
     store.Save(SavePath());
 }
 
-int Stars(int level) { return std::clamp(store.GetInt("stars" + std::to_string(level), 0), 0, 3); }
+std::string StarsKey(int level) {
+    const auto& levels = Levels();
+    return level >= 0 && level < (int)levels.size() ? "stars." + levels[level].id : std::string();
+}
+
+int Stars(int level) {
+    std::string key = StarsKey(level);
+    return key.empty() ? 0 : std::clamp(store.GetInt(key, 0), 0, 3);
+}
 
 void RecordStars(int level, int stars) {
-    if (stars > Stars(level)) store.SetInt("stars" + std::to_string(level), stars);
+    if (stars > Stars(level) && !StarsKey(level).empty()) store.SetInt(StarsKey(level), stars);
     Save();
 }
 

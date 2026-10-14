@@ -1,13 +1,15 @@
 """Synthesize every sound effect and both music loops into assets/audio.
 
 Usage: python tools/make_audio.py
-All audio is generated from scratch (no samples), 22.05 kHz mono 16-bit WAV.
-Requires numpy.
+All audio is generated from scratch (no samples), 22.05 kHz mono. Sound effects are 16-bit
+WAV (played from memory, no decoding); the two music loops are Ogg Vorbis to keep the
+package small. Requires numpy and soundfile (pip install soundfile).
 """
 import wave
 from pathlib import Path
 
 import numpy as np
+import soundfile
 
 SR = 22050
 root = Path(__file__).resolve().parents[1]
@@ -99,12 +101,18 @@ def echo(x, delay=0.11, feedback=0.35, taps=4):
     return y
 
 
-def save(name, x, gain=0.9):
+def save(name, x, gain=0.9, music=False):
     x = np.asarray(x, dtype=float)
     peak = np.max(np.abs(x)) or 1.0
     x = np.clip(x / peak * gain, -1, 1)
     fade = min(len(x), int(0.004 * SR))
     x[-fade:] *= np.linspace(1, 0, fade)
+    if music:
+        # libsndfile's Vorbis encoder fails on very large single writes, so feed it in blocks.
+        with soundfile.SoundFile(str(out / f"{name}.ogg"), "w", SR, 1, format="OGG", subtype="VORBIS") as f:
+            for start in range(0, len(x), 8192):
+                f.write(x[start:start + 8192].astype(np.float32))
+        return
     data = (x * 32767).astype("<i2").tobytes()
     with wave.open(str(out / f"{name}.wav"), "wb") as w:
         w.setnchannels(1)
@@ -357,17 +365,17 @@ def make_music():
     phrase_b = [(81, 1.5), (79, 0.5), (77, 1), (79, 1), (81, 1.5), (82, 0.5), (84, 2), (R, 1), (82, 1),
                 (81, 1), (79, 1), (77, 1), (76, 2), (77, 1), (74, 3), (R, 1)]
     melody = [(R, 16)] + (phrase_a + phrase_b) * 3
-    save("bgm_battle", render_song(138, 32, battle_chords, melody, "battle"), 0.8)
+    save("bgm_battle", render_song(138, 32, battle_chords, melody, "battle"), 0.8, music=True)
 
     menu_chords = [(F, ""), (C - 12, ""), (D, "m"), (Bb - 12, ""), (F, ""), (C - 12, ""), (Bb - 12, ""), (C - 12, "")]
     hymn = [(R, 8), (77, 2), (79, 1), (81, 1), (84, 3), (81, 1), (82, 2), (81, 1), (79, 1), (77, 4),
             (74, 2), (76, 1), (77, 1), (79, 3), (77, 1), (76, 2), (72, 2), (74, 4),
             (77, 2), (79, 1), (81, 1), (84, 3), (86, 1), (84, 2), (82, 1), (81, 1), (79, 4),
             (82, 2), (81, 1), (79, 1), (77, 2), (79, 2), (77, 8)]
-    save("bgm_menu", render_song(92, 20, menu_chords, hymn, "menu"), 0.75)
+    save("bgm_menu", render_song(92, 20, menu_chords, hymn, "menu"), 0.75, music=True)
 
 
 if __name__ == "__main__":
     make_effects()
     make_music()
-    print("wrote", len(list(out.glob("*.wav"))), "files to", out)
+    print("wrote", len(list(out.glob("*.wav"))) + len(list(out.glob("*.ogg"))), "files to", out)
