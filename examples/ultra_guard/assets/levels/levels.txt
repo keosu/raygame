@@ -3,3 +3,6 @@
 01_tokyo.level
 02_fuji.level
 03_nebula.level
+04_chimelong.level
+05_ultrapark.level
+06_universal.level

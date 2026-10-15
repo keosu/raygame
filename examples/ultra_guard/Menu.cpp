@@ -9,6 +9,12 @@
 namespace UG {
 
 namespace {
+bool openCodexOnLoad = false;
+} // namespace
+
+void PreviewCodex() { openCodexOnLoad = true; }
+
+namespace {
 constexpr float W = (float)kCanvasW, Hh = (float)kCanvasH;
 
 float EaseOut(float t) {
@@ -40,7 +46,12 @@ void TokyoTower(Vector2 base, float h, Color c) {
 }
 } // namespace
 
-MenuScene::MenuScene(MenuPage start) : Scene("Menu"), page(start) {}
+MenuScene::MenuScene(MenuPage start) : Scene("Menu"), page(start) {
+    if (start == MenuPage::Heroes && openCodexOnLoad) {
+        codex = true;
+        openCodexOnLoad = false;
+    }
+}
 
 void MenuScene::OnLoad() {
     if (!sky.id) {
@@ -72,8 +83,7 @@ void MenuScene::OnLoad() {
         Draw::Ellipse({earth.x + 20, earth.y + 18}, 16, 9, {70, 150, 90, 220}, -0.3f);
         Draw::Ellipse({earth.x + 6, earth.y - 30}, 26, 5, WithAlpha(WHITE, 0.4f), 0.1f);
         for (int i = 0; i < 10; ++i)
-            Draw::Ellipse({earth.x + i * 3.0f, earth.y + i * 2.4f}, 62 - i * 3.9f, 62 - i * 3.9f,
-                          WithAlpha({4, 6, 22, 255}, 0.08f));
+            Draw::Ellipse({earth.x + i * 3.0f, earth.y + i * 2.4f}, 62 - i * 3.9f, 62 - i * 3.9f, WithAlpha({4, 6, 22, 255}, 0.08f));
         // City skyline layers
         Skyline(rng, Hh - 120, 40, 130, {44, 30, 66, 255}, {130, 90, 150, 255}, 0.08f);
         TokyoTower({W * 0.66f, Hh - 100}, 240, {60, 30, 70, 255});
@@ -116,22 +126,27 @@ void MenuScene::Update() {
     Scene::Update();
     float dt = GameTime::UnscaledDeltaTime();
     pageTime += dt;
-    if (GetRandomValue(0, 180) == 0)
-        meteors.push_back({{Rand(200, W + 200), Rand(-20, 160)}, {Rand(-520, -380), Rand(160, 240)}, 1.2f});
+    if (GetRandomValue(0, 180) == 0) meteors.push_back({{Rand(200, W + 200), Rand(-20, 160)}, {Rand(-520, -380), Rand(160, 240)}, 1.2f});
     for (auto& m : meteors) {
         m.p = Add(m.p, Mul(m.v, dt));
         m.life -= dt;
     }
-    meteors.erase(std::remove_if(meteors.begin(), meteors.end(), [](const Meteor& m) { return m.life <= 0; }),
-                  meteors.end());
+    meteors.erase(std::remove_if(meteors.begin(), meteors.end(), [](const Meteor& m) { return m.life <= 0; }), meteors.end());
     if (Input::GetKeyDown(KEY_ESCAPE) || Input::GetKeyDown(KEY_BACK)) {
         if (page == MenuPage::Title) QuitGame();
         else SetPage(MenuPage::Title);
     }
     if (page == MenuPage::Title && (Input::GetKeyDown(KEY_ENTER) || Input::GetKeyDown(KEY_SPACE))) SetPage(MenuPage::Levels);
     if (page == MenuPage::Heroes) {
-        if (Input::GetKeyDown(KEY_DOWN) || Input::GetKeyDown(KEY_S)) heroIndex = (heroIndex + 1) % kHeroCount;
-        if (Input::GetKeyDown(KEY_UP) || Input::GetKeyDown(KEY_W)) heroIndex = (heroIndex + kHeroCount - 1) % kHeroCount;
+        if (Input::GetKeyDown(KEY_C)) codex = !codex;
+        if (codex) {
+            int count = std::max(1, (int)UltraCodex().size());
+            if (Input::GetKeyDown(KEY_DOWN) || Input::GetKeyDown(KEY_S)) codexIndex = (codexIndex + 1) % count;
+            if (Input::GetKeyDown(KEY_UP) || Input::GetKeyDown(KEY_W)) codexIndex = (codexIndex + count - 1) % count;
+        } else {
+            if (Input::GetKeyDown(KEY_DOWN) || Input::GetKeyDown(KEY_S)) heroIndex = (heroIndex + 1) % kHeroCount;
+            if (Input::GetKeyDown(KEY_UP) || Input::GetKeyDown(KEY_W)) heroIndex = (heroIndex + kHeroCount - 1) % kHeroCount;
+        }
     }
     if (page == MenuPage::Levels) {
         int pages = std::max(1, ((int)Levels().size() + kLevelsPerPage - 1) / kLevelsPerPage);
@@ -148,11 +163,21 @@ void MenuScene::Render() {
     Gui::BeginFrame();
     DrawBackground();
     switch (page) {
-    case MenuPage::Title: DrawTitle(); break;
-    case MenuPage::Levels: DrawLevels(); break;
-    case MenuPage::Heroes: DrawHeroes(); break;
-    case MenuPage::Kaiju: DrawKaiju(); break;
-    case MenuPage::Help: DrawHelp(); break;
+    case MenuPage::Title:
+        DrawTitle();
+        break;
+    case MenuPage::Levels:
+        DrawLevels();
+        break;
+    case MenuPage::Heroes:
+        DrawHeroes();
+        break;
+    case MenuPage::Kaiju:
+        DrawKaiju();
+        break;
+    case MenuPage::Help:
+        DrawHelp();
+        break;
     }
 }
 
@@ -199,8 +224,7 @@ void MenuScene::DrawTitle() {
     for (int i = 0; i < 14; ++i) {
         float ang = t * 0.08f + i * PI / 7;
         Vector2 c{W / 2, 130};
-        Draw::Tri(c, Add(c, Mul(Dir(ang - 0.05f), 700)), Add(c, Mul(Dir(ang + 0.05f), 700)),
-                  WithAlpha({255, 220, 160, 255}, 0.035f * a));
+        Draw::Tri(c, Add(c, Mul(Dir(ang - 0.05f), 700)), Add(c, Mul(Dir(ang + 0.05f), 700)), WithAlpha({255, 220, 160, 255}, 0.035f * a));
     }
     Draw::Glow({W / 2, 130}, 320, WithAlpha({255, 200, 120, 255}, 0.18f * a));
     Draw::BlendNormal();
@@ -233,7 +257,10 @@ void MenuScene::DrawTitle() {
 
     float by = 470 + (1 - a) * 30;
     if (Gui::Button({W / 2 - 160, by, 320, 60}, "开始作战", Gui::Style::Gold, true, 26)) SetPage(MenuPage::Levels);
-    if (Gui::Button({W / 2 - 300, by + 76, 190, 46}, "英雄图鉴", Gui::Style::Blue, true, 19)) SetPage(MenuPage::Heroes);
+    if (Gui::Button({W / 2 - 300, by + 76, 190, 46}, "奥特数据库", Gui::Style::Blue, true, 19)) {
+        codex = true;
+        SetPage(MenuPage::Heroes);
+    }
     if (Gui::Button({W / 2 - 95, by + 76, 190, 46}, "怪兽图鉴", Gui::Style::Red, true, 19)) SetPage(MenuPage::Kaiju);
     if (Gui::Button({W / 2 + 110, by + 76, 190, 46}, "操作说明", Gui::Style::Dark, true, 19)) SetPage(MenuPage::Help);
 
@@ -253,24 +280,22 @@ void MenuScene::DrawTitle() {
     Gui::NoteIcon({musicBtn.x + 28, musicBtn.y + 21}, 11, opt.music ? WHITE : Palette::muted, opt.music);
     if (Gui::Button({40, Hh - 64, 130, 44}, "退出游戏", Gui::Style::Dark, true, 17)) QuitGame();
     const auto& skins = Skins::All();
-    if (skins.size() > 1 &&
-        Gui::Button({186, Hh - 64, 210, 44}, "皮肤：" + skins[Skins::Current()].name, Gui::Style::Dark, true, 17)) {
+    if (skins.size() > 1 && Gui::Button({186, Hh - 64, 210, 44}, "皮肤：" + skins[Skins::Current()].name, Gui::Style::Dark, true, 17)) {
         Skins::Select((Skins::Current() + 1) % (int)skins.size());
         GoToMenu(MenuPage::Title); // rebuilds the baked map previews
     }
-    if (!Skins::Errors().empty())
-        Gui::Text("皮肤文件有误：" + Skins::Errors()[0], 40, Hh - 86, 12, Palette::red);
+    if (!Skins::Errors().empty()) Gui::Text("皮肤文件有误：" + Skins::Errors()[0], 40, Hh - 86, 12, Palette::red);
 
     int stars = 0;
     for (int i = 0; i < (int)Levels().size(); ++i) stars += Progress::Stars(i);
-    Gui::Text(TextFormat("已获得星星 %d / %d     累计击败怪兽 %d", stars, (int)Levels().size() * 3, Progress::TotalKills()),
-              W / 2, Hh - 50, 15, Palette::muted, Gui::Align::Center);
+    Gui::Text(TextFormat("已获得星星 %d / %d     累计击败怪兽 %d", stars, (int)Levels().size() * 3, Progress::TotalKills()), W / 2, Hh - 50,
+              15, Palette::muted, Gui::Align::Center);
     Gui::Text("Enter 开始   F11 全屏   Esc 退出", W / 2, Hh - 28, 12, WithAlpha(Palette::muted, 0.7f), Gui::Align::Center);
 }
 
 void MenuScene::DrawLevels() {
     DrawBack();
-    DrawPageTitle("选择关卡", "从东京湾到光之国，击退怪兽大军");
+    DrawPageTitle("选择关卡", "点选缩略图出击");
     const auto& levels = Levels();
     const auto& errors = LevelErrors();
     if (!errors.empty()) {
@@ -289,54 +314,50 @@ void MenuScene::DrawLevels() {
     }
     int first = levelPage * kLevelsPerPage;
     int shown = std::min(kLevelsPerPage, (int)levels.size() - first);
+    constexpr int kColsOnPage = 3;
+    constexpr float kCardW = 390, kCardH = 248, kGapX = 18, kGapY = 14;
+    float gridW = kColsOnPage * kCardW + (kColsOnPage - 1) * kGapX;
+    float x0 = (W - gridW) / 2;
+    float y0 = 124;
     for (int i = first; i < first + shown; ++i) {
         const LevelDef& def = levels[i];
         int slot = i - first;
-        float appear = EaseOut((pageTime - slot * 0.1f) / 0.45f);
-        Rectangle r{W / 2 - (shown * 400.0f - 20) / 2 + slot * 400.0f, 140 + (1 - appear) * 50, 380, 540};
+        int col = slot % kColsOnPage, row = slot / kColsOnPage;
+        float appear = EaseOut((pageTime - slot * 0.06f) / 0.4f);
+        Rectangle r{x0 + col * (kCardW + kGapX), y0 + row * (kCardH + kGapY) + (1 - appear) * 24, kCardW, kCardH};
         bool unlocked = Progress::Unlocked(i);
         bool hover = unlocked && Gui::Hover(r);
-        Color accent = def.theme == Theme::City ? Color{255, 160, 70, 255}
-                       : def.theme == Theme::Mountain ? Color{120, 220, 130, 255}
-                                                      : Color{150, 140, 255, 255};
+        Color accent = ThemeAccent(def.theme);
         if (hover) {
             Draw::BlendAdd();
-            Draw::GlowStretched({r.x + r.width / 2, r.y + r.height / 2}, 240, 320, 0, WithAlpha(accent, 0.18f));
+            Draw::GlowStretched({r.x + r.width / 2, r.y + r.height / 2}, 220, 140, 0, WithAlpha(accent, 0.2f));
             Draw::BlendNormal();
         }
-        Gui::Panel(r, {14, 20, 44, (unsigned char)(240 * appear)}, 16);
-        Rectangle pv{r.x + 10, r.y + 10, 360, 216};
+        Color panel = unlocked ? Color{14, 20, 44, (unsigned char)(235 * appear)} : Color{28, 30, 38, (unsigned char)(230 * appear)};
+        Gui::Panel(r, panel, 14);
+        Rectangle pv{r.x + 10, r.y + 10, r.width - 20, 168};
         DrawMapTexture(previews[i], pv);
-        DrawRectangleLinesEx(pv, 2, WithAlpha(accent, 0.8f));
-        for (const auto& path : maps[i].paths) {
-            Vector2 last = path.points.back();
-            Vector2 p{pv.x + (last.x - kMapX) / 3, pv.y + (last.y - kMapY) / 3};
-            Draw::BlendAdd();
-            Draw::Glow(p, 18, WithAlpha({255, 220, 120, 255}, 0.6f));
-            Draw::BlendNormal();
-        }
-        Gui::Text(def.subtitle, r.x + 20, r.y + 238, 14, accent, Gui::Align::Left, true);
-        Gui::TextShadow(def.name, r.x + 20, r.y + 258, 30, Palette::text);
-        Gui::Paragraph(def.desc, r.x + 20, r.y + 304, r.width - 40, 14.5f, Palette::muted, 1.55f);
-        Gui::Text(TextFormat("波次 %d     初始金币 %d     生命 %d", (int)def.waves.size(), def.gold, def.lives), r.x + 20,
-                  r.y + 392, 14, Palette::text);
-        int stars = Progress::Stars(i);
-        for (int s = 0; s < 3; ++s) Gui::StarIcon({r.x + 150 + s * 40.0f, r.y + 440}, 15, s < stars);
+        if (!unlocked) DrawRectangleRec(pv, {18, 20, 28, 150});
+        DrawRectangleLinesEx(pv, 2, WithAlpha(unlocked ? accent : Palette::muted, 0.85f));
+        Gui::TextShadow(def.name, r.x + r.width / 2, r.y + 186, 26, unlocked ? Palette::text : Palette::muted, Gui::Align::Center);
         if (unlocked) {
-            if (Gui::Button({r.x + 40, r.y + r.height - 76, r.width - 80, 54}, stars > 0 ? "再次出击" : "出击",
-                            Gui::Style::Gold, true, 22))
-                GoToBattle(i);
+            int stars = Progress::Stars(i);
+            for (int s = 0; s < 3; ++s) Gui::StarIcon({r.x + r.width / 2 - 36 + s * 36.0f, r.y + 224}, 12, s < stars);
+            if (Gui::Clicked(r)) GoToBattle(i);
         } else {
-            Draw::RoundedPanel(r, 16, {4, 6, 16, 150}, BLANK, 0);
-            Gui::LockIcon({r.x + r.width / 2, r.y + 120}, 28, Palette::muted);
-            Gui::Text("通关上一关后解锁", r.x + r.width / 2, r.y + r.height - 60, 18, Palette::muted, Gui::Align::Center, true);
+            Gui::LockIcon({pv.x + pv.width / 2, pv.y + pv.height / 2}, 26, {170, 176, 188, 255});
         }
     }
 }
 
 void MenuScene::DrawHeroes() {
     DrawBack();
-    DrawPageTitle("英雄图鉴", "来自 M78 星云与宇宙各地的光之巨人");
+    if (Gui::Button({W - 250, 28, 210, 44}, codex ? "出战英雄" : "光之档案", Gui::Style::Blue, true, 18)) codex = !codex;
+    if (codex) {
+        DrawCodex();
+        return;
+    }
+    DrawPageTitle("出战英雄", "当前可以放置的六位光之巨人");
     for (int i = 0; i < kHeroCount; ++i) {
         const HeroDef& def = HeroInfo((HeroId)i);
         Rectangle r{60, 134 + i * 92.0f, 270, 82};
@@ -344,7 +365,10 @@ void MenuScene::DrawHeroes() {
         if (Gui::Clicked(r)) heroIndex = i;
         bool hover = Gui::Hover(r);
         Draw::RoundedPanel(r, 12, active ? Mix(def.primary, {10, 14, 30, 255}, 0.55f) : Color{14, 20, 44, 230},
-                           active ? Palette::gold : hover ? Lighten(def.primary, 0.3f) : Palette::line, active ? 2.5f : 1.5f);
+                           active  ? Palette::gold
+                           : hover ? Lighten(def.primary, 0.3f)
+                                   : Palette::line,
+                           active ? 2.5f : 1.5f);
         Art::DrawPortrait((HeroId)i, {r.x + 4, r.y - 2, 84, 84});
         Gui::Text(def.name, r.x + 96, r.y + 16, 20, Palette::text, Gui::Align::Left, true);
         Gui::Text(def.role, r.x + 96, r.y + 46, 14, def.beam);
@@ -402,6 +426,63 @@ void MenuScene::DrawHeroes() {
     Gui::Paragraph(def.perk, x + 4, py + 14, w - 8, 15, Palette::gold);
 }
 
+void MenuScene::DrawCodex() {
+    DrawPageTitle("奥特曼数据库", "招式按映像中的常用叫法，供以后的关卡编入防卫队");
+    const auto& entries = UltraCodex();
+    const auto& errors = UltraErrors();
+    if (!errors.empty()) Gui::Text("档案有误：" + errors[0], W / 2, 112, 14, Palette::red, Gui::Align::Center);
+    if (entries.empty()) {
+        Gui::Text("还没有可读的档案", W / 2, 360, 22, Palette::muted, Gui::Align::Center);
+        return;
+    }
+    codexIndex = std::clamp(codexIndex, 0, (int)entries.size() - 1);
+    constexpr int kVisible = 8;
+    int page = codexIndex / kVisible;
+    int first = page * kVisible;
+    for (int i = first; i < std::min(first + kVisible, (int)entries.size()); ++i) {
+        const UltraEntry& entry = entries[i];
+        Rectangle r{48, 132 + (i - first) * 68.0f, 360, 62};
+        bool active = codexIndex == i;
+        if (Gui::Clicked(r)) codexIndex = i;
+        Draw::RoundedPanel(r, 10, active ? Color{46, 28, 48, 235} : Color{14, 20, 44, 220},
+                           active          ? Palette::gold
+                           : Gui::Hover(r) ? Palette::muted
+                                           : Palette::line,
+                           active ? 2.2f : 1.4f);
+        Gui::Text(entry.name, r.x + 14, r.y + 8, 18, Palette::text, Gui::Align::Left, true);
+        Gui::Text(entry.move, r.x + 14, r.y + 34, 14, Palette::gold);
+    }
+    int pages = ((int)entries.size() + kVisible - 1) / kVisible;
+    if (pages > 1) {
+        if (Gui::Button({48, 682, 110, 30}, "上一页", Gui::Style::Dark, page > 0, 15)) codexIndex = (page - 1) * kVisible;
+        if (Gui::Button({168, 682, 110, 30}, "下一页", Gui::Style::Dark, page + 1 < pages, 15))
+            codexIndex = std::min((page + 1) * kVisible, (int)entries.size() - 1);
+    }
+    const UltraEntry& entry = entries[codexIndex];
+    Rectangle panel{430, 132, 800, 540};
+    Gui::Panel(panel, {12, 18, 40, 240}, 18);
+    HeroId hero = HeroId::Count;
+    for (int i = 0; i < kHeroCount; ++i)
+        if (entry.id == HeroInfo((HeroId)i).key) hero = (HeroId)i;
+    if (hero != HeroId::Count) {
+        const HeroDef& def = HeroInfo(hero);
+        Draw::BlendAdd();
+        Draw::Glow({panel.x + 150, panel.y + 210}, 180, WithAlpha(def.primary, 0.4f));
+        Draw::BlendNormal();
+        Art::DrawPortrait(hero, {panel.x + 30, panel.y + 70, 250, 250});
+    }
+    float x = panel.x + (hero != HeroId::Count ? 300 : 36);
+    float w = panel.width - (x - panel.x) - 28;
+    Gui::Text(entry.title, x, panel.y + 28, 16, Palette::cyan, Gui::Align::Left, true);
+    Gui::TextShadow(entry.name, x, panel.y + 52, 40, Palette::text);
+    Gui::Text(TextFormat("必杀 · %s", entry.move.c_str()), x, panel.y + 112, 20, Palette::gold, Gui::Align::Left, true);
+    float py = panel.y + 156;
+    py += Gui::Paragraph(entry.desc, x, py, w, 17, Palette::muted, 1.6f);
+    py += 18;
+    Draw::RoundedPanel({x - 8, py, w + 16, 64}, 10, {36, 28, 12, 210}, WithAlpha(Palette::gold, 0.55f), 1.4f);
+    Gui::Paragraph(entry.note, x, py + 12, w, 15, Palette::gold, 1.45f);
+}
+
 void MenuScene::DrawKaiju() {
     DrawBack();
     DrawPageTitle("怪兽图鉴", "了解敌人的特性，才能制定最佳防守策略");
@@ -414,7 +495,10 @@ void MenuScene::DrawKaiju() {
         bool active = kaijuIndex == i;
         if (Gui::Clicked(r)) kaijuIndex = i;
         Draw::RoundedPanel(r, 12, active ? Color{50, 24, 40, 240} : Color{14, 20, 44, 230},
-                           active ? Palette::red : Gui::Hover(r) ? Palette::muted : Palette::line, active ? 2.5f : 1.5f);
+                           active          ? Palette::red
+                           : Gui::Hover(r) ? Palette::muted
+                                           : Palette::line,
+                           active ? 2.5f : 1.5f);
         Draw::GlowStretched({r.x + cw / 2, r.y + 112}, 46, 10, 0, WithAlpha(BLACK, 0.5f));
         Art::KaijuPose pose;
         pose.feet = {r.x + cw / 2, r.y + 112};
@@ -452,12 +536,9 @@ void MenuScene::DrawKaiju() {
         std::string value;
     };
     Row rows[] = {
-        {"基础生命", TextFormat("%.0f", def.hp)},
-        {"移动速度", speed},
-        {"护甲", TextFormat("%.0f", def.armor)},
-        {"击败奖励", TextFormat("%d 金币", def.reward)},
-        {"突破伤害", TextFormat("%d 生命", def.leak)},
-        {"减速抗性", TextFormat("%.0f%%", def.slowResist * 100)},
+        {"基础生命", TextFormat("%.0f", def.hp)},      {"移动速度", speed},
+        {"护甲", TextFormat("%.0f", def.armor)},       {"击败奖励", TextFormat("%d 金币", def.reward)},
+        {"突破伤害", TextFormat("%d 生命", def.leak)}, {"减速抗性", TextFormat("%.0f%%", def.slowResist * 100)},
     };
     for (int i = 0; i < 6; ++i) {
         float rx = x + (i % 3) * (w / 3), ry = py + (i / 3) * 62;
@@ -477,15 +558,19 @@ void MenuScene::DrawHelp() {
         const char* body;
     };
     Section sections[] = {
-        {"基本玩法", "怪兽会沿着道路冲向基地，每有一只怪兽抵达基地就会损失生命。在道路两侧的空地上放置奥特曼英雄来消灭它们，"
+        {"基本玩法", "怪兽会沿着道路冲向基地，每有一只怪兽抵达基地就会损失生命。在道路两侧的空地上"
+                     "放置奥特曼英雄来消灭它们，"
                      "撑过所有波次即可获胜。剩余生命越多，获得的星星越多。"},
-        {"放置与升级", "点击右侧英雄卡片或按数字键 1-6 选择英雄，再点击地图空地放置；按住 Shift 可连续放置。点击已放置的英雄"
-                       "可升级（最高三级，三级解锁特殊能力）、出售（返还 70%）或切换攻击目标：最前 / 最强 / 最近。"},
+        {"放置与升级", "点击右侧英雄卡片或按数字键 1-6 选择英雄，再点击地图空地放置；按住 Shift "
+                       "可连续放置。点击已放置的英雄"
+                       "可升级（最高三级，三级解锁特殊能力）、出售（返还 70%）或切换攻击目标：最前 "
+                       "/ 最强 / 最近。"},
         {"波次", "按空格或点击「开始进攻」召唤第一波。之后每波结束会自动倒计时，提前召唤可获得额外金币，"
                  "每开启新一波还会获得波次奖励。"},
-        {"必杀技", "Q：奥特兄弟合体光线，对全场怪兽造成巨大伤害。W：喷气甲虫号空中支援，选择区域进行轰炸并眩晕怪兽。"
-                   "必杀技有冷却时间，在关键时刻使用！"},
-        {"快捷键", "F / Tab 切换 1x-3x 倍速    P / Esc 暂停    U 升级    T 切换目标    Delete 出售    右键 取消    F11 全屏"},
+        {"必杀技", "Q：奥特兄弟合体光线，对全场造成伤害。W：喷气甲虫号空中支援，选区轰炸并眩晕。E：究极合体。"
+                   "六位奥特曼全部上场后，右侧「究极合体」才会点亮，伤害极高。"},
+        {"快捷键", "F / Tab 切换 1x-3x 倍速    P / Esc 暂停    U 升级    T 切换目标    Delete 出售 "
+                   "   右键 取消    F11 全屏"},
     };
     float y = panel.y + 28;
     for (const auto& s : sections) {
@@ -495,7 +580,8 @@ void MenuScene::DrawHelp() {
         y += Gui::Paragraph(s.body, panel.x + 58, y, panel.width - 110, 16, Palette::text, 1.55f);
         y += 14;
     }
-    Gui::Paragraph("自定义头像：将正方形 PNG 图片放入游戏目录 assets/avatars/ 下，文件名为 ultraman、seven、tiga、cosmos、"
+    Gui::Paragraph("自定义头像：将正方形 PNG 图片放入游戏目录 assets/avatars/ 下，文件名为 "
+                   "ultraman、seven、tiga、cosmos、"
                    "taro、zero（.png），重启游戏即可替换对应英雄的头像。",
                    panel.x + 58, panel.y + panel.height - 58, panel.width - 110, 13, Palette::muted, 1.5f);
 }

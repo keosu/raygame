@@ -124,12 +124,12 @@ private:
     float outcomeTime = 0;
     int earnedStars = 0;
 
-    int placing = -1;  // hero index being placed
+    int placing = -1; // hero index being placed
     int hoverCard = -1;
     int selected = -1; // tower id
     bool targetingStrike = false;
     bool restartRequested = false;
-    float brothersCooldown = 0, strikeCooldown = 0;
+    float brothersCooldown = 0, strikeCooldown = 0, fusionCooldown = 0;
     float flashScreen = 0, shake = 0, baseFlash = 0;
     float goldPulse = 0, livesPulse = 0;
 
@@ -154,9 +154,12 @@ private:
     void Leak(MonsterActor& e);
     void Fire(HeroActor& t, MonsterActor& target);
     void PierceBeam(HeroActor& t, Vector2 origin, Vector2 toward, float damage, float range, Color glow, bool burn);
-    void Explode(Vector2 at, float radius, float damage, int towerId, bool burn, bool stun);
+    void Explode(Vector2 at, float radius, float damage, int towerId, bool burn, bool stun, Color hue);
     void CastBrothers();
     void CastStrike(Vector2 target);
+    void CastFusion(bool force = false);
+    bool RosterComplete() const;
+    int RosterCount() const;
     std::vector<MonsterActor*> KaijuInCircle(Vector2 center, float radius) const;
     std::vector<Ref<MonsterActor>> Alive() const;
     HeroActor* FindTower(int id);
@@ -197,6 +200,7 @@ private:
     void DrawPanel();
     void DrawHeroCard(int index, Rectangle r);
     void DrawSkills();
+    void DrawFusion();
     void DrawInfo(Rectangle area);
     void DrawBanner();
     void DrawBossBar();

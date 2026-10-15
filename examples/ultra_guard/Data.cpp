@@ -1,57 +1,195 @@
+#include "Assets.h"
 #include "Data.h"
+#include <sstream>
 
 namespace UG {
 
 namespace {
 const HeroDef kHeroes[] = {
-    {"z", "泽塔奥特曼", "泽斯帝姆光线", "穿透光线",
-     "宇宙警备队的新人战士，赛罗的弟子。双臂交叉射出的泽斯帝姆光线可贯穿一整排怪兽。",
-     "三级：光线附带灼烧，2 秒内持续造成伤害", 100, 30, 1.15f, 2.9f, 0, 0, AttackKind::PierceBeam,
-     {214, 40, 48, 255}, {226, 232, 240, 255}, {150, 230, 255, 255}},
-    {"orb", "欧布奥特曼", "欧布圣剑", "回旋穿刺",
-     "融合两位奥特战士之力的流浪战士。掷出的欧布圣剑去而复返，往返两次切割路径上的敌人。",
-     "三级：欧布圣剑击中后破甲 3 秒，护甲降低 60%", 130, 24, 1.45f, 3.1f, 0, 0, AttackKind::Boomerang,
-     {206, 34, 44, 255}, {200, 208, 220, 255}, {240, 248, 255, 255}},
-    {"tiga", "迪迦奥特曼", "哉佩利敖光线", "远程狙击",
-     "超古代的光之巨人。蓄力释放的哉佩利敖光线射程极远，专门对付高血量的强敌。",
-     "三级：25% 几率暴击，造成 2.5 倍伤害", 180, 120, 2.5f, 4.6f, 0, 0, AttackKind::Snipe,
-     {130, 60, 190, 255}, {214, 40, 56, 255}, {255, 214, 120, 255}},
-    {"geed", "捷德奥特曼", "捷德光波", "范围减速",
-     "贝利亚之子，背负黑暗血统的战士。释放的捷德光波让周围怪兽变得迟缓，为队友争取输出时间。",
-     "三级：减速提升至 60%，并使怪兽受到伤害提高 20%", 90, 9, 1.1f, 2.3f, 0, 0.42f, AttackKind::Pulse,
-     {60, 150, 230, 255}, {226, 232, 240, 255}, {140, 210, 255, 255}},
-    {"arc", "亚刻奥特曼", "亚刻终结", "爆炸溅射",
-     "由想象之力诞生的新生代巨人。炽热的终结光弹在怪兽群中爆开，对密集的敌人效果拔群。",
-     "三级：爆炸点燃地面，范围内敌人持续灼烧", 150, 42, 1.65f, 2.8f, 1.15f, 0, AttackKind::Splash,
-     {216, 36, 40, 255}, {255, 196, 60, 255}, {255, 150, 60, 255}},
-    {"zero", "赛罗奥特曼", "双头镖", "高速连击",
-     "赛文之子，年轻的天才战士。双头镖高速连击，单体输出无人能及。",
-     "三级：每第 5 次攻击释放集束光线，贯穿一线敌人", 240, 17, 0.42f, 3.0f, 0, 0, AttackKind::Twin,
-     {40, 92, 210, 255}, {214, 40, 56, 255}, {120, 255, 220, 255}},
+    {"z",
+     "泽塔奥特曼",
+     "杰斯提姆光线",
+     "穿透光线",
+     "新生代战士。双臂交叉，从两腕之间射出青白色杰斯提姆光线，高热光束可贯穿整排怪兽。",
+     "三级：光线残留灼烧，2 秒内持续造成伤害",
+     100,
+     30,
+     1.15f,
+     2.9f,
+     0,
+     0,
+     AttackKind::PierceBeam,
+     {214, 40, 48, 255},
+     {226, 232, 240, 255},
+     {120, 220, 255, 255}},
+    {"orb",
+     "欧布奥特曼",
+     "欧布圣剑",
+     "回旋穿刺",
+     "融合光与暗的流浪战士。起源圣剑掷出后折返，往返两次切开路径上的敌人。",
+     "三级：圣剑破甲 3 秒，护甲降低 60%",
+     130,
+     24,
+     1.45f,
+     3.1f,
+     0,
+     0,
+     AttackKind::Boomerang,
+     {206, 34, 44, 255},
+     {214, 214, 220, 255},
+     {255, 206, 80, 255}},
+    {"tiga",
+     "迪迦奥特曼",
+     "哉佩利敖光线",
+     "终结狙击",
+     "超古代光之巨人，复合型。双手在胸前聚能后推出白金色哉佩利敖光线，专克高体力强敌。",
+     "三级：光线临界，25% 几率造成 2.5 倍伤害",
+     180,
+     120,
+     2.5f,
+     4.6f,
+     0,
+     0,
+     AttackKind::Snipe,
+     {130, 60, 190, 255},
+     {214, 40, 56, 255},
+     {255, 220, 140, 255}},
+    {"geed",
+     "捷德奥特曼",
+     "破坏爆裂",
+     "爆震迟缓",
+     "贝利亚之子。原始形态把体内能量一次爆开，赤红冲击波震慑周围怪兽，为队友争取输出。",
+     "三级：减速提升至 60%，并使怪兽受到伤害提高 20%",
+     90,
+     9,
+     1.1f,
+     2.3f,
+     0,
+     0.42f,
+     AttackKind::Pulse,
+     {168, 28, 42, 255},
+     {230, 232, 238, 255},
+     {255, 78, 48, 255}},
+    {"arc",
+     "亚刻奥特曼",
+     "亚刻终结",
+     "彩色爆破",
+     "以想象之力战斗的新生代巨人。亚刻终结化作光立方轰入敌群，爆开时带出红、金、青、紫多种颜色。",
+     "三级：爆炸点燃地面，范围内敌人持续灼烧",
+     150,
+     42,
+     1.65f,
+     2.8f,
+     1.15f,
+     0,
+     AttackKind::Splash,
+     {210, 36, 48, 255},
+     {220, 230, 240, 255},
+     {255, 236, 170, 255}},
+    {"zero",
+     "赛罗奥特曼",
+     "赛罗双头镖",
+     "高速连击",
+     "赛文之子。银蓝色双头镖连续命中同一目标，熟练后改放绿色的集束赛罗光线。",
+     "三级：每第 5 次攻击释放集束赛罗光线，贯穿一线敌人",
+     240,
+     17,
+     0.42f,
+     3.0f,
+     0,
+     0,
+     AttackKind::Twin,
+     {36, 88, 210, 255},
+     {214, 36, 52, 255},
+     {90, 255, 170, 255}},
 };
 
 const EnemyDef kEnemies[] = {
-    {"baltan", "巴尔坦星人", "宇宙忍者", "身手敏捷的外星人。被击倒后会分裂成两个分身继续前进。", 70, 1.45f, 0, 8, 1, 0.92f,
-     0, false, {70, 78, 120, 255}},
-    {"baltan_clone", "巴尔坦分身", "幻影", "巴尔坦星人的分身，脆弱但移动迅速。", 28, 1.8f, 0, 3, 1, 0.66f, 0, false,
-     {90, 160, 220, 255}},
-    {"gomora", "哥莫拉", "古代怪兽", "生活在地底的远古怪兽，皮糙肉厚，鼻角能撞碎大楼。", 140, 1.0f, 2, 12, 1, 1.0f, 0,
-     false, {140, 92, 58, 255}},
-    {"eleking", "艾雷王", "宇宙怪兽", "全身带电的宇宙怪兽，速度极快，对减速有 50% 抗性。", 95, 1.95f, 0, 11, 1, 0.95f, 0.5f,
-     false, {236, 236, 228, 255}},
-    {"redking", "红王", "怪力怪兽", "力大无穷的暴躁怪兽，厚重的皮肤提供高额护甲。", 480, 0.72f, 9, 26, 2, 1.25f, 0.2f,
-     false, {212, 170, 96, 255}},
-    {"zetton", "芝顿", "宇宙恐龙", "曾击败奥特曼的最强怪兽。会周期性展开光波护盾并瞬间移动。", 2600, 0.55f, 5, 160, 5,
-     1.7f, 0.5f, true, {36, 36, 44, 255}},
-    {"belial", "贝利亚", "黑暗奥特曼", "堕入黑暗的光之国叛徒。持续召唤巴尔坦军团，血量低于一半时会暴怒加速。", 9000,
-     0.42f, 10, 600, 20, 1.9f, 0.6f, true, {28, 22, 30, 255}},
+    {"baltan",
+     "巴尔坦星人",
+     "宇宙忍者",
+     "身手敏捷的外星人。被击倒后会分裂成两个分身继续前进。",
+     70,
+     1.45f,
+     0,
+     8,
+     1,
+     0.92f,
+     0,
+     false,
+     {70, 78, 120, 255}},
+    {"baltan_clone", "巴尔坦分身", "幻影", "巴尔坦星人的分身，脆弱但移动迅速。", 28, 1.8f, 0, 3, 1, 0.66f, 0, false, {90, 160, 220, 255}},
+    {"gomora",
+     "哥莫拉",
+     "古代怪兽",
+     "生活在地底的远古怪兽，皮糙肉厚，鼻角能撞碎大楼。",
+     140,
+     1.0f,
+     2,
+     12,
+     1,
+     1.0f,
+     0,
+     false,
+     {140, 92, 58, 255}},
+    {"eleking",
+     "艾雷王",
+     "宇宙怪兽",
+     "全身带电的宇宙怪兽，速度极快，对减速有 50% 抗性。",
+     95,
+     1.95f,
+     0,
+     11,
+     1,
+     0.95f,
+     0.5f,
+     false,
+     {236, 236, 228, 255}},
+    {"redking",
+     "红王",
+     "怪力怪兽",
+     "力大无穷的暴躁怪兽，厚重的皮肤提供高额护甲。",
+     420,
+     0.72f,
+     5,
+     26,
+     2,
+     1.25f,
+     0.15f,
+     false,
+     {212, 170, 96, 255}},
+    {"zetton",
+     "芝顿",
+     "宇宙恐龙",
+     "曾击败奥特曼的宇宙恐龙。会短时间展开光波护盾，并向前瞬移一段距离。",
+     1500,
+     0.52f,
+     3,
+     140,
+     4,
+     1.7f,
+     0.35f,
+     true,
+     {36, 36, 44, 255}},
+    {"belial",
+     "贝利亚",
+     "黑暗奥特曼",
+     "堕入黑暗的光之国叛徒。会召出巴尔坦分身，血量低于一半时暴怒加速。",
+     4200,
+     0.4f,
+     4,
+     420,
+     8,
+     1.9f,
+     0.4f,
+     true,
+     {28, 22, 30, 255}},
 };
 
 } // namespace
 
 const HeroDef& HeroInfo(HeroId id) { return kHeroes[(int)id]; }
 const EnemyDef& EnemyInfo(EnemyId id) { return kEnemies[(int)id]; }
-
 
 float HeroDamage(HeroId id, int level) { return HeroInfo(id).damage * (1.0f + 0.65f * level); }
 float HeroCooldown(HeroId id, int level) { return HeroInfo(id).cooldown * (1.0f - 0.1f * level); }
@@ -63,10 +201,81 @@ int UpgradeCost(HeroId id, int level) {
     return (int)(std::round(HeroInfo(id).cost * factor / 5.0f) * 5);
 }
 
-float WaveHpScale(const LevelDef& level, int wave) {
-    return level.hpScale * (1.0f + 0.15f * wave + 0.008f * wave * wave);
+float WaveHpScale(const LevelDef& level, int wave) { return level.hpScale * (1.0f + 0.10f * wave + 0.004f * wave * wave); }
+
+float BossHpScale(const LevelDef& level, int wave) { return level.hpScale * (1.0f + 0.04f * wave); }
+
+namespace {
+struct CodexState {
+    std::vector<UltraEntry> entries;
+    std::vector<std::string> errors;
+};
+
+std::string CodexTrim(const std::string& s) {
+    size_t a = 0, b = s.size();
+    while (a < b && (s[a] == ' ' || s[a] == '\t' || s[a] == '\r')) ++a;
+    while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t' || s[b - 1] == '\r')) --b;
+    return s.substr(a, b - a);
 }
 
-float BossHpScale(const LevelDef& level, int wave) { return level.hpScale * (1.0f + 0.08f * wave); }
+CodexState LoadCodex() {
+    CodexState state;
+    std::string text;
+    if (!FileSystem::ReadAssetText(AssetPath("ultras/codex.txt"), text)) {
+        state.errors.push_back("ultras/codex.txt: 无法读取奥特曼数据库");
+        return state;
+    }
+    UltraEntry cur;
+    bool any = false;
+    auto flush = [&]() {
+        if (!any) return;
+        if (cur.id.empty() || cur.name.empty() || cur.move.empty())
+            state.errors.push_back("ultras/codex.txt: 记录缺少 id、name 或 move（" + cur.id + "）");
+        else state.entries.push_back(cur);
+        cur = {};
+        any = false;
+    };
+    std::istringstream lines(text);
+    int number = 0;
+    for (std::string raw; std::getline(lines, raw);) {
+        ++number;
+        if (number == 1 && raw.rfind("\xEF\xBB\xBF", 0) == 0) raw = raw.substr(3);
+        std::string line = CodexTrim(raw);
+        if (line.empty() || line[0] == '#') continue;
+        if (line == "---") {
+            flush();
+            continue;
+        }
+        size_t split = line.find_first_of(" \t");
+        std::string key = line.substr(0, split);
+        std::string value = split == std::string::npos ? "" : CodexTrim(line.substr(split));
+        if (value.empty()) {
+            state.errors.push_back("ultras/codex.txt:" + std::to_string(number) + ": " + key + " 不能为空");
+            continue;
+        }
+        any = true;
+        if (key == "id") cur.id = value;
+        else if (key == "name") cur.name = value;
+        else if (key == "title") cur.title = value;
+        else if (key == "move") cur.move = value;
+        else if (key == "desc") cur.desc = value;
+        else if (key == "note") cur.note = value;
+        else state.errors.push_back("ultras/codex.txt:" + std::to_string(number) + ": 未知字段“" + key + "”");
+    }
+    flush();
+    if (state.entries.empty() && state.errors.empty()) state.errors.push_back("ultras/codex.txt: 没有记录");
+    for (const auto& e : state.errors) Diagnostics::Write(LogLevel::Warning, "Ultra: " + e);
+    Diagnostics::Write(LogLevel::Info, "Loaded " + std::to_string(state.entries.size()) + " ultras");
+    return state;
+}
+
+CodexState& Codex() {
+    static CodexState state = LoadCodex();
+    return state;
+}
+} // namespace
+
+const std::vector<UltraEntry>& UltraCodex() { return Codex().entries; }
+const std::vector<std::string>& UltraErrors() { return Codex().errors; }
 
 } // namespace UG

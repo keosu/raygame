@@ -80,8 +80,7 @@ Loaded Load() {
         }
         LevelDef def;
         if (!ParseLevel(text, file, def, state.errors)) continue;
-        bool duplicate = std::any_of(state.levels.begin(), state.levels.end(),
-                                     [&](const LevelDef& other) { return other.id == def.id; });
+        bool duplicate = std::any_of(state.levels.begin(), state.levels.end(), [&](const LevelDef& other) { return other.id == def.id; });
         if (duplicate) {
             state.errors.push_back(file + ": 关卡 id 重复：" + def.id);
             continue;
@@ -140,7 +139,10 @@ bool ParseLevel(const std::string& text, const std::string& file, LevelDef& out,
             if (value == "city") def.theme = Theme::City;
             else if (value == "mountain") def.theme = Theme::Mountain;
             else if (value == "nebula") def.theme = Theme::Nebula;
-            else fail(number, "未知主题“" + value + "”，可用：city / mountain / nebula");
+            else if (value == "park") def.theme = Theme::Park;
+            else if (value == "plaza") def.theme = Theme::Plaza;
+            else if (value == "studio") def.theme = Theme::Studio;
+            else fail(number, "未知主题“" + value + "”，可用：city / mountain / nebula / park / plaza / studio");
         } else if (key == "gold" || key == "lives") {
             int v = 0;
             if (tokens.size() != 1 || !Integer(tokens[0], v) || v <= 0) fail(number, key + " 需要一个正整数");
@@ -155,10 +157,9 @@ bool ParseLevel(const std::string& text, const std::string& file, LevelDef& out,
             else def.seed = (std::uint32_t)v;
         } else if (key == "base") {
             GridPoint b{};
-            if (tokens.size() != 2 || !Integer(tokens[0], b.col) || !Integer(tokens[1], b.row) || b.col < 0 ||
-                b.row < 0 || b.col >= kCols - 1 || b.row >= kRows)
-                fail(number, "base 需要两个整数“列 行”，列 0-" + std::to_string(kCols - 2) + "，行 0-" +
-                                 std::to_string(kRows - 1));
+            if (tokens.size() != 2 || !Integer(tokens[0], b.col) || !Integer(tokens[1], b.row) || b.col < 0 || b.row < 0 ||
+                b.col >= kCols - 1 || b.row >= kRows)
+                fail(number, "base 需要两个整数“列 行”，列 0-" + std::to_string(kCols - 2) + "，行 0-" + std::to_string(kRows - 1));
             else def.base = b;
         } else if (key == "path") {
             std::vector<GridPoint> path;
@@ -234,8 +235,7 @@ bool ParseLevel(const std::string& text, const std::string& file, LevelDef& out,
     }
     for (const auto& check : groupPaths)
         if (check.path >= (int)def.paths.size())
-            fail(check.line, "path " + std::to_string(check.path + 1) + " 不存在（共 " + std::to_string(def.paths.size()) +
-                                 " 条路径）");
+            fail(check.line, "path " + std::to_string(check.path + 1) + " 不存在（共 " + std::to_string(def.paths.size()) + " 条路径）");
     if (def.seed == 0)
         for (char c : def.id) def.seed = def.seed * 131 + (unsigned char)c;
     if (ok) out = std::move(def);

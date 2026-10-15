@@ -58,7 +58,8 @@ std::string currentMusic;
 constexpr struct { const char* name; int voices; } kSounds[] = {
     {"beam", 3}, {"slugger", 3}, {"snipe", 2}, {"pulse", 2}, {"fire", 3}, {"zero", 3}, {"hit", 4}, {"explode", 4},
     {"coin", 2}, {"build", 1}, {"upgrade", 1}, {"sell", 1}, {"wave", 1}, {"boss", 1}, {"leak", 2}, {"victory", 1},
-    {"defeat", 1}, {"click", 2}, {"skill", 1}, {"jet", 1}, {"error", 1}, {"split", 2}, {"shield", 2}, {"teleport", 2}};
+    {"defeat", 1}, {"click", 2}, {"skill", 1}, {"jet", 1}, {"fusion", 1}, {"error", 1}, {"split", 2}, {"shield", 2},
+    {"teleport", 2}};
 } // namespace
 
 void Load() {
@@ -104,9 +105,7 @@ bool loaded = false;
 std::filesystem::path SavePath() {
     try {
         return FileSystem::UserDataDirectory("raygame.ultra_guard") / "progress.sav";
-    } catch (...) {
-        return std::filesystem::path("progress.sav");
-    }
+    } catch (...) { return std::filesystem::path("progress.sav"); }
 }
 } // namespace
 

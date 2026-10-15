@@ -1,0 +1,26 @@
+# 奥特曼主题乐园：两条巡游路线在广场上交叉，最后汇到计时器纪念碑。
+id       ultrapark
+name     光之乐园
+subtitle 第五章 · 奥特曼主题乐园
+desc     巡游花车改走上下两条交叉路线。要同时照看两侧，芝顿会先后出现两次。
+theme    plaza
+gold     780
+lives    20
+hp       1.60
+seed     2016
+base     18 5
+path     -1,1 5,1 5,8 11,8 11,2 16,2 16,5 18,5
+path     -1,10 5,10 5,3 11,3 11,9 16,9 16,5 18,5
+
+wave     gomora x6 every 1.2 path 1 | baltan x6 every 0.9 after 1 path 2
+wave     baltan x8 every 0.8 path 2 | gomora x6 every 1 after 2 path 1
+wave     eleking x6 every 0.75 path 1 | eleking x6 every 0.75 after 1.5 path 2
+wave     redking x2 every 2.4 | baltan x8 every 0.7 after 2
+wave     gomora x8 every 0.85 path 1 | eleking x6 every 0.7 after 2 path 2
+wave     zetton x1 path 1 | gomora x6 every 0.9 after 2 path 2
+wave     baltan x10 every 0.6 path 2 | redking x2 every 2.2 after 3 path 1
+wave     eleking x10 every 0.6 | gomora x8 every 0.75 after 3
+wave     redking x4 every 1.6 | baltan x10 every 0.6 after 2
+wave     gomora x10 every 0.7 path 1 | eleking x8 every 0.6 after 2 path 2
+wave     zetton x1 path 2 | redking x3 every 1.8 after 3 path 1
+wave     eleking x12 every 0.55 | baltan x10 every 0.55 after 3 | redking x3 every 1.8 after 6

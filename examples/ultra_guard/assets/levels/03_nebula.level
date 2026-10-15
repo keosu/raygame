@@ -1,29 +1,26 @@
 # 格式说明见 01_tokyo.level。两条路在 (6,6) 汇合；未写 path 的组在两路之间轮流出怪。
 id       nebula
 name     光之国保卫战
-subtitle 最终章 · M78 星云
-desc     黑暗奥特曼贝利亚率领怪兽大军从两路进攻光之国！守住等离子火花塔，迎接最终决战。
+subtitle 第三章 · M78 星云
+desc     两条星路在火花塔前汇合。中段有一只芝顿，贝利亚留到最后。
 theme    nebula
-gold     450
+gold     500
 lives    20
-hp       1.6
+hp       1.32
 seed     1968
 base     18 5
 path     -1,2 6,2 6,6 12,6 12,9 17,9 17,5 18,5
 path     -1,10 6,10 6,6 12,6 12,9 17,9 17,5 18,5
 
-wave     gomora x10 every 1.2
-wave     baltan x14 every 0.7
-wave     eleking x10 every 0.7 path 1 | gomora x8 every 1 after 2 path 2
-wave     redking x4 every 2 | baltan x12 every 0.6 after 3
-wave     zetton x1 path 2 | gomora x12 every 0.8 after 2
-wave     eleking x24 every 0.4
-wave     redking x8 every 1.4 | baltan x16 every 0.5 after 3
-wave     gomora x24 every 0.5 | eleking x12 every 0.5 after 4
-wave     redking x12 every 1 | eleking x16 every 0.45 after 3
-wave     zetton x3 every 4 | baltan x20 every 0.45 after 2
-wave     baltan x30 every 0.35 | redking x10 every 1 after 4
-wave     eleking x30 every 0.35 | gomora x20 every 0.5 after 3
-wave     redking x18 every 0.8 | zetton x2 every 5 after 6
-wave     gomora x30 every 0.4 | baltan x30 every 0.35 after 2 | eleking x20 every 0.4 after 6
-wave     belial x1 path 1 | redking x10 every 1.2 after 4 path 2 | zetton x3 every 5 after 10
+wave     gomora x8 every 1.25
+wave     baltan x10 every 0.9
+wave     eleking x6 every 0.85 path 1 | gomora x6 every 1.1 after 2 path 2
+wave     redking x2 every 2.5 | baltan x8 every 0.85 after 3
+wave     gomora x8 every 1 | eleking x6 every 0.8 after 3
+wave     zetton x1 path 1 | gomora x6 every 1 after 2 path 2
+wave     eleking x12 every 0.65
+wave     redking x3 every 2 | baltan x10 every 0.7 after 3
+wave     gomora x10 every 0.8 | eleking x8 every 0.7 after 4
+wave     baltan x12 every 0.6 | redking x3 every 2.1 after 4
+wave     redking x4 every 1.7 | eleking x8 every 0.65 after 3
+wave     belial x1 path 1 | redking x3 every 2 after 4 path 2 | gomora x6 every 1 after 6

@@ -51,8 +51,7 @@ protected:
 
     void OnUnscaledUpdate() override {
         if (!exportDir.empty()) return Quit();
-        if (Input::GetKeyDown(KEY_F11) ||
-            (Input::GetKeyDown(KEY_ENTER) && (Input::GetKey(KEY_LEFT_ALT) || Input::GetKey(KEY_RIGHT_ALT))))
+        if (Input::GetKeyDown(KEY_F11) || (Input::GetKeyDown(KEY_ENTER) && (Input::GetKey(KEY_LEFT_ALT) || Input::GetKey(KEY_RIGHT_ALT))))
             ToggleFullscreenMode();
         if (Input::GetKeyDown(KEY_F1)) ToggleDebug();
         if (!captureDir.empty()) Capture();
@@ -104,29 +103,124 @@ private:
         ++frame;
         int skin = Skins::Current(), skins = (int)Skins::All().size();
         switch (frame) {
-        case 2: Skins::Select((skin + 1) % skins, false); GoToMenu(MenuPage::Title); break; // switch round trip
-        case 4: Skins::Select((skin + skins - 1) % skins, false); GoToMenu(MenuPage::Title); break;
-        case 50: Shot("01_title"); GoToMenu(MenuPage::Levels); break;
-        case 90: Shot("02_levels"); GoToMenu(MenuPage::Heroes); break;
-        case 130: Shot("03_heroes"); GoToMenu(MenuPage::Kaiju); break;
-        case 170: Shot("04_kaiju"); GoToMenu(MenuPage::Help); break;
-        case 200: Shot("05_help"); GoToBattle(0); break;
-        case 240: Shot("06_battle_start"); if (auto* b = Debug()) b->DebugAutoplay(); break;
-        case 330: Shot("07_combat_city"); GoToBattle(1); break;
-        case 370: if (auto* b = Debug()) b->DebugAutoplay(3); break;
-        case 490: Shot("08_combat_mountain"); GoToBattle(2); break;
-        case 530: if (auto* b = Debug()) b->DebugAutoplay(4); break;
-        case 720: Shot("09_boss_nebula"); if (auto* b = Debug()) b->DebugCast(); break;
-        case 732: Shot("10_brothers_beam"); break;
-        case 770: Shot("11_airstrike"); GoToBattle(0); break;
-        case 810: if (auto* b = Debug()) b->DebugFinish(); break;
-        case 950: Shot("12_victory"); GoToBattle(1); break;
-        case 990: if (auto* b = Debug()) b->DebugAutoplay(0); break;
-        case 1100: if (auto* b = Debug()) b->DebugInspect(false); break;
-        case 1104: Shot("13_inspect"); if (auto* b = Debug()) b->DebugInspect(true); break;
-        case 1110: Shot("14_pause"); SetWindowSize(1100, 860); break;
-        case 1125: ShotWindow("15_margins"); Quit(); break;
-        default: break;
+        case 2:
+            Skins::Select((skin + 1) % skins, false);
+            GoToMenu(MenuPage::Title);
+            break; // switch round trip
+        case 4:
+            Skins::Select((skin + skins - 1) % skins, false);
+            GoToMenu(MenuPage::Title);
+            break;
+        case 50:
+            Shot("01_title");
+            GoToMenu(MenuPage::Levels);
+            break;
+        case 90:
+            Shot("02_levels");
+            GoToMenu(MenuPage::Heroes);
+            break;
+        case 130:
+            Shot("03_heroes");
+            GoToMenu(MenuPage::Kaiju);
+            break;
+        case 170:
+            Shot("04_kaiju");
+            GoToMenu(MenuPage::Help);
+            break;
+        case 200:
+            Shot("05_help");
+            GoToBattle(0);
+            break;
+        case 240:
+            Shot("06_battle_start");
+            if (auto* b = Debug()) b->DebugAutoplay();
+            break;
+        case 330:
+            Shot("07_combat_city");
+            GoToBattle(1);
+            break;
+        case 370:
+            if (auto* b = Debug()) b->DebugAutoplay(3);
+            break;
+        case 490:
+            Shot("08_combat_mountain");
+            GoToBattle(2);
+            break;
+        case 530:
+            if (auto* b = Debug()) b->DebugAutoplay(4);
+            break;
+        case 720:
+            Shot("09_boss_nebula");
+            if (auto* b = Debug()) b->DebugCast();
+            break;
+        case 732:
+            Shot("10_brothers_beam");
+            break;
+        case 770:
+            Shot("11_airstrike");
+            GoToBattle(0);
+            break;
+        case 810:
+            if (auto* b = Debug()) b->DebugFinish();
+            break;
+        case 950:
+            Shot("12_victory");
+            GoToBattle(1);
+            break;
+        case 990:
+            if (auto* b = Debug()) b->DebugAutoplay(0);
+            break;
+        case 1100:
+            if (auto* b = Debug()) b->DebugInspect(false);
+            break;
+        case 1104:
+            Shot("13_inspect");
+            if (auto* b = Debug()) b->DebugInspect(true);
+            break;
+        case 1110:
+            Shot("14_pause");
+            SetWindowSize(1100, 860);
+            break;
+        case 1125:
+            ShotWindow("15_margins");
+            GoToMenu(MenuPage::Levels);
+            break;
+        case 1165:
+            Shot("16_levels");
+            PreviewCodex();
+            GoToMenu(MenuPage::Heroes);
+            break;
+        case 1210:
+            Shot("17_codex");
+            GoToBattle(3);
+            break;
+        case 1250:
+            if (auto* b = Debug()) b->DebugAutoplay();
+            break;
+        case 1360:
+            Shot("18_park");
+            GoToBattle(4);
+            break;
+        case 1400:
+            if (auto* b = Debug()) b->DebugAutoplay();
+            break;
+        case 1510:
+            Shot("19_plaza");
+            GoToBattle(5);
+            break;
+        case 1550:
+            if (auto* b = Debug()) b->DebugAutoplay();
+            break;
+        case 1680:
+            Shot("20_studio");
+            if (auto* b = Debug()) b->DebugCast();
+            break;
+        case 1705:
+            Shot("21_fusion");
+            Quit();
+            break;
+        default:
+            break;
         }
     }
 

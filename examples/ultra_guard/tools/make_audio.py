@@ -257,6 +257,29 @@ def make_effects():
     tele = osc("sine", phase(800 + 600 * np.sin(2 * np.pi * 7 * t))) * np.sin(np.pi * t / d)
     save("teleport", tele, 0.6)
 
+    d = 2.6
+    n = int(d * SR)
+    t = t_axis(d)
+    choir = np.zeros(n)
+    for i, midi in enumerate([60, 64, 67, 72, 76, 79, 84]):
+        start = int(i * 0.05 * SR)
+        nn = n - start
+        tone = osc("sine", phase(note(midi) * (1 + 0.01 * np.sin(2 * np.pi * (2 + i) * t[:nn]))))
+        tone += 0.4 * osc("tri", phase(np.full(nn, note(midi + 12))))
+        choir[start:] += tone * np.minimum(1, np.arange(nn) / (0.4 * SR)) * 0.2
+    blast_at = int(1.25 * SR)
+    bl = n - blast_at
+    boom = lowpass(noise_n(bl), np.linspace(4200, 70, bl)) * decay(bl, 2.0)
+    boom += 0.85 * osc("sine", phase(np.linspace(78, 34, bl))) * decay(bl, 2.4)
+    boom += 0.2 * highpass(noise_n(bl), 3500) * decay(bl, 3.5)
+    choir[blast_at:] += boom
+    for i, midi in enumerate([84, 88, 91, 96, 100]):
+        s = blast_at + int(0.05 * SR) + int(i * 0.07 * SR)
+        ln = min(int(0.5 * SR), n - s)
+        if ln > 0:
+            choir[s:s + ln] += 0.16 * osc("sine", phase(np.full(ln, note(midi)))) * decay(ln, 5)
+    save("fusion", echo(choir * env(n, 0.02, 0.8), 0.14, 0.32, 4), 0.92)
+
 
 # ---------------------------------------------------------------- music
 

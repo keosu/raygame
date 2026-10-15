@@ -9,16 +9,16 @@ enum class AttackKind { PierceBeam, Boomerang, Snipe, Pulse, Splash, Twin };
 constexpr int kHeroCount = (int)HeroId::Count;
 
 struct HeroDef {
-    const char* key;   // also the optional avatar override: assets/avatars/<key>.png
+    const char* key; // also the optional avatar override: assets/avatars/<key>.png
     const char* name;
-    const char* move;  // signature technique
+    const char* move; // signature technique
     const char* role;
     const char* desc;
-    const char* perk;  // unlocked at level 3
+    const char* perk; // unlocked at level 3
     int cost;
     float damage;
     float cooldown;
-    float range; // tiles
+    float range;  // tiles
     float splash; // tiles
     float slow;
     AttackKind kind;
@@ -41,7 +41,7 @@ struct EnemyDef {
     float speed; // tiles per second
     float armor;
     int reward;
-    int leak; // lives lost when reaching the base
+    int leak;   // lives lost when reaching the base
     float size; // 1 = ordinary kaiju sprite
     float slowResist;
     bool boss;
@@ -67,7 +67,25 @@ struct WaveDef {
     bool boss = false;
 };
 
-enum class Theme { City, Mountain, Nebula };
+enum class Theme { City, Mountain, Nebula, Park, Plaza, Studio };
+
+inline Color ThemeAccent(Theme theme) {
+    switch (theme) {
+    case Theme::City:
+        return {255, 160, 70, 255};
+    case Theme::Mountain:
+        return {120, 220, 130, 255};
+    case Theme::Nebula:
+        return {170, 140, 255, 255};
+    case Theme::Park:
+        return {255, 136, 48, 255};
+    case Theme::Plaza:
+        return {255, 64, 84, 255};
+    case Theme::Studio:
+        return {70, 168, 255, 255};
+    }
+    return {255, 160, 70, 255};
+}
 
 struct LevelDef {
     std::string id;   // save key; defaults to the file name
@@ -84,6 +102,20 @@ struct LevelDef {
     std::vector<WaveDef> waves;
     std::uint32_t seed;
 };
+
+// Lore catalog in assets/ultras/codex.txt. Playable fighters stay in HeroInfo;
+// extra entries are the roster future levels can promote onto the field.
+struct UltraEntry {
+    std::string id;
+    std::string name;
+    std::string title;
+    std::string move;
+    std::string desc;
+    std::string note;
+};
+
+const std::vector<UltraEntry>& UltraCodex();
+const std::vector<std::string>& UltraErrors();
 
 // Loaded once from assets/levels (levels.txt lists the files in order).
 const std::vector<LevelDef>& Levels();

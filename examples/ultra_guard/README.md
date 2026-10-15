@@ -5,7 +5,8 @@
 > 归其权利人所有。示例不含任何官方图片、音频或字体：英雄与怪兽均为代码绘制的
 > 示意形象，音效与音乐由脚本合成。若权利人提出要求，将移除本示例。
 
-三关塔防：在道路旁放置六位光之巨人，抵御七种怪兽（含两种 BOSS），撑过所有波次。
+六关塔防：在道路旁放置六位光之巨人，抵御七种怪兽（含两种 BOSS），撑过所有波次。
+难度从东京湾逐关升高，后三关是长隆、奥特曼主题乐园和环球影城。
 本示例同时展示 raygame 的 GameObject/Component 架构在完整游戏中的用法。
 
 ## 运行
@@ -28,6 +29,7 @@ pwsh -NoProfile -File scripts/build-android.ps1 -Game ultra_guard
 - 点击已放置的英雄：升级（最高三级，三级解锁特殊能力）、出售（返还 70%）、切换目标（最前/最强/最近）。
 - 空格开始/提前召唤下一波（提前召唤有金币奖励），F 切换 1x-3x 倍速，P/Esc 暂停。
 - Q 合体光线（全场伤害），W 空中支援（选区轰炸并眩晕）。
+- E 究极合体：六位奥特曼都放置在场上后才会点亮，对全场造成很高的真实伤害并眩晕。
 - 右键或“取消”按钮退出放置/瞄准；Android 返回键 = Esc，切到后台自动暂停。
 - 怪兽特性：巴尔坦被击倒后分裂、艾雷王抗减速、红王高护甲、杰顿周期护盾并瞬移、
   贝利亚召唤分身并在半血后暴怒加速。
@@ -38,16 +40,22 @@ pwsh -NoProfile -File scripts/build-android.ps1 -Game ultra_guard
 新增关卡：复制一个文件改数值并加入索引，格式说明在 `01_tokyo.level` 文件头：
 
 ```text
-theme    city            # city / mountain / nebula
-gold     320
+theme    city            # city / mountain / nebula / park / plaza / studio
+gold     340
 base     17 9            # 基地格子（20 列 × 12 行）
 path     -1,2 4,2 4,8 9,8 9,3 14,3 14,9 17,9
-wave     redking x6 every 1.5 | baltan x16 every 0.5 after 2 | zetton x1 after 10
+wave     redking x4 every 1.8 | baltan x10 every 0.7 after 2 | zetton x1 after 8
 ```
 
 多条 `path` 时可用 `path 2` 指定某组走第几条路，否则轮流出怪；含 zetton/belial 的波次
 自动显示 BOSS 警告。出错的关卡会被跳过，`文件:行号` 错误写入日志并显示在关卡页底部。
-关卡页每页 3 关可翻页；星级按关卡 id 存档。
+关卡页只显示缩略图、名字和星级；未解锁的关卡是灰色并带锁。每页最多 6 关，星级按关卡 id 存档。
+
+## 奥特曼数据库（assets/ultras/codex.txt）
+
+标题页「奥特数据库」列出可上阵的六位，以及尚未编入防卫队的档案（初代、赛文、泰罗、戴拿、盖亚、梦比优斯、银河、艾克斯、特利迦、德凯）。
+招式名按映像里的常用叫法。新增一条用 `---` 分隔；`id` 与英雄 key 相同才会显示头像。
+档案本身不会自动变成可放置英雄，接入新关卡时再在 `Data.cpp` 的 `HeroId` 里补战斗数据。
 
 ## 皮肤（assets/skins/）
 

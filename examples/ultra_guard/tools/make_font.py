@@ -21,7 +21,7 @@ root = Path(__file__).resolve().parents[1]
 script = root.parents[1] / "scripts" / "subset-font.py"
 fonts = root / "assets" / "fonts"
 texts = [p for p in sorted(root.glob("*.[ch]*"))]
-texts += [root / folder for folder in ("assets/levels", "assets/skins") if (root / folder).exists()]
+texts += [root / folder for folder in ("assets/levels", "assets/skins", "assets/ultras") if (root / folder).exists()]
 
 VARIABLE = Path(r"C:\Windows\Fonts\NotoSansSC-VF.ttf")
 # (source, wght) pairs: one variable font twice, or a regular/bold pair.
