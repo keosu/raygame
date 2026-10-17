@@ -22,13 +22,13 @@ path     -1,2 4,2 4,8 9,8 9,3 14,3 14,9 17,9
 
 wave     gomora x6 every 1.5
 wave     gomora x6 every 1.3 | baltan x4 every 1.1 after 4
-wave     baltan x10 every 0.9
+wave     baltan x8 every 1.0
 wave     gomora x8 every 1.1 | eleking x5 every 0.9 after 5
-wave     redking x2 every 3 | gomora x8 every 1 after 2
-wave     eleking x14 every 0.6
+wave     redking x1 | gomora x8 every 1 after 2
+wave     eleking x10 every 0.7
 wave     baltan x12 every 0.7 | redking x3 every 2.5 after 4
 wave     gomora x14 every 0.8 | eleking x8 every 0.7 after 6
 wave     redking x6 every 1.8 | baltan x12 every 0.6 after 3
-wave     zetton x1 | gomora x10 every 1 after 2
-wave     eleking x18 every 0.5 | redking x5 every 1.6 after 3
+wave     redking x2 every 2.4 | gomora x10 every 1 after 2
+wave     eleking x12 every 0.6 | redking x4 every 1.7 after 3
 wave     redking x4 every 1.8 | baltan x10 every 0.7 after 2 | zetton x1 after 8

@@ -4,9 +4,9 @@ name     光之国保卫战
 subtitle 第三章 · M78 星云
 desc     两条星路在火花塔前汇合。中段有一只芝顿，贝利亚留到最后。
 theme    nebula
-gold     500
+gold     560
 lives    20
-hp       1.32
+hp       1.48
 seed     1968
 base     18 5
 path     -1,2 6,2 6,6 12,6 12,9 17,9 17,5 18,5

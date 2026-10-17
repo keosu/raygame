@@ -90,7 +90,8 @@ public:
     void DebugCast();
     void DebugFinish();
     void DebugInspect(bool pause);
-    BotResult RunBot();
+    // casual: no skills, slower decisions and one purchase at a time.
+    BotResult RunBot(bool casual = false);
     bool headless = false;
 
 private:
@@ -139,6 +140,7 @@ private:
     bool bannerWarning = false;
 
     int botPurchases = 0;
+    bool botCasual = false;
     std::vector<GridPoint> botTiles;
     std::array<int, kEnemyCount> leakCount{};
     int leakWave = -1;

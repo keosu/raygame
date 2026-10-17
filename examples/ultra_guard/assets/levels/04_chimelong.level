@@ -4,9 +4,9 @@ name     长隆奇遇
 subtitle 第四章 · 欢乐海岸
 desc     观光车改道后，怪兽沿着园内栈道折返。路很长，密集的人群比单只首领更麻烦。
 theme    park
-gold     640
+gold     560
 lives    20
-hp       1.46
+hp       2.20
 seed     2010
 base     17 6
 path     -1,1 4,1 4,10 9,10 9,2 14,2 14,10 17,10 17,6

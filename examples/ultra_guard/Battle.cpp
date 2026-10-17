@@ -13,7 +13,8 @@ constexpr float kStep = 1.0f / 60.0f;
 constexpr float kSpeeds[] = {1.0f, 2.0f, 3.0f};
 constexpr float kBrothersMax = 70;
 constexpr float kStrikeMax = 30;
-constexpr float kFusionMax = 52;
+constexpr float kFusionMax = 75;
+constexpr float kFusionCharge = 25; // first charge after the roster completes
 constexpr float kShieldTaken = 0.42f; // damage share that gets through Zetton's barrier
 constexpr float kWaveGap = 16;
 constexpr unsigned kKaijuMask = 1u << kKaijuLayer;
@@ -902,7 +903,10 @@ bool BattleScene::BuyTower(HeroId hero, int col, int row) {
     int before = RosterCount();
     heroes.push_back(t);
     towerGrid[row][col] = t->id;
-    if (before < kHeroCount && RosterComplete()) Banner("六位奥特曼集结！", "究极合体已就绪，按 E 发动", Palette::gold);
+    if (before < kHeroCount && RosterComplete()) {
+        fusionCooldown = std::max(fusionCooldown, kFusionCharge);
+        Banner("六位奥特曼集结！", "究极合体开始蓄能，完成后按 E 发动", Palette::gold);
+    }
     Burst(Add(at, {0, -10}), def.beam, 26, 150, 5, 0.6f);
     AddRing(at, 6, 46, 0.45f, 4, def.beam);
     AddBeam({at.x, kMapY - 30}, Add(at, {0, -6}), 14, 0.4f, def.beam, WHITE);
@@ -1073,12 +1077,14 @@ void BattleScene::BotAct() {
     const MonsterActor* front = nullptr;
     for (const auto& e : alive)
         if (!front || e->dist > front->dist) front = e.get();
-    if (RosterComplete() && (boss || alive.size() >= 8)) CastFusion();
-    if (alive.size() >= 12 || (boss && alive.size() >= 4)) CastBrothers();
-    if (front && alive.size() >= 5) CastStrike(front->Center());
+    if (!botCasual) {
+        if (RosterComplete() && (boss || alive.size() >= 8)) CastFusion();
+        if (alive.size() >= 12 || (boss && alive.size() >= 4)) CastBrothers();
+        if (front && alive.size() >= 5) CastStrike(front->Center());
+    }
 
     if (botTiles.empty()) botTiles = RankedTiles();
-    for (int guard = 0; guard < 4; ++guard) {
+    for (int guard = 0; guard < (botCasual ? 1 : 4); ++guard) {
         HeroId next = order[botPurchases % 12];
         HeroActor* cheapest = nullptr;
         for (auto& t : heroes) {
@@ -1087,11 +1093,14 @@ void BattleScene::BotAct() {
         }
         bool wantBuild = heroes.size() < 7 || !cheapest || botPurchases % 3 != 2;
         if (wantBuild && gold >= HeroInfo(next).cost) {
+            std::vector<GridPoint> free;
             for (const auto& tile : botTiles)
-                if (towerGrid[tile.row][tile.col] < 0) {
-                    BuyTower(next, tile.col, tile.row);
-                    break;
-                }
+                if (towerGrid[tile.row][tile.col] < 0) free.push_back(tile);
+            if (!free.empty()) {
+                // A casual player knows roughly where towers go but rarely picks the best tile.
+                int pick = botCasual ? GetRandomValue(0, std::max(0, (int)(free.size() * 0.4f) - 1)) : 0;
+                BuyTower(next, free[pick].col, free[pick].row);
+            }
             ++botPurchases;
         } else if (cheapest && gold >= UpgradeCost(cheapest->hero, cheapest->level)) {
             UpgradeTower(*cheapest);
@@ -1102,13 +1111,18 @@ void BattleScene::BotAct() {
     }
 }
 
-BattleScene::BotResult BattleScene::RunBot() {
+BattleScene::BotResult BattleScene::RunBot(bool casual) {
+    botCasual = casual;
     float decide = 0;
     while (Running() && simTime < 3600) {
-        if (waveIndex < 0) StartNextWave(false);
+        if (waveIndex < 0) {
+            if (casual)
+                for (int i = 0; i < 8; ++i) BotAct(); // players spend the opening gold before calling the first wave
+            StartNextWave(false);
+        }
         decide -= kStep;
         if (decide <= 0) {
-            decide = 0.5f;
+            decide = casual ? 2.5f : 0.5f;
             BotAct();
         }
         GameTime::FixedStepScope step(kStep, simTime);
@@ -1154,15 +1168,17 @@ int RunBalanceReport(const std::string& path) {
     std::string report;
     SetTraceLogLevel(LOG_NONE);
     for (int i = 0; i < (int)Levels().size(); ++i) {
-        for (int run = 0; run < 3; ++run) {
+        for (int run = 0; run < 9; ++run) {
+            bool casual = run >= 3;
             SetRandomSeed(1000 + run * 77 + i);
             auto scene = CreateRef<BattleScene>(i);
             scene->headless = true;
             scene->Load();
-            auto r = scene->RunBot();
-            report += TextFormat("level %d run %d: %s lives=%d wave=%d towers=%d gold=%d kills=%d firstLeak=%d "
+            auto r = scene->RunBot(casual);
+            report += TextFormat("level %d %s %d: %s lives=%d wave=%d towers=%d gold=%d kills=%d firstLeak=%d "
                                  "minutes=%.1f leaks:",
-                                 i, run, r.won ? "WIN " : "LOSE", r.lives, r.wave, r.towers, r.gold, r.kills, r.firstLeakWave, r.minutes);
+                                 i, casual ? "casual" : "expert", casual ? run - 3 : run, r.won ? "WIN " : "LOSE", r.lives, r.wave, r.towers, r.gold,
+                                 r.kills, r.firstLeakWave, r.minutes);
             for (int k = 0; k < kEnemyCount; ++k) report += TextFormat(" %d", r.leaks[k]);
             report += "\n";
             scene->Clear();
@@ -1454,11 +1470,11 @@ void BattleScene::DrawFusion() {
         Draw::GlowStretched({r.x + r.width / 2, r.y + r.height / 2}, 100, 22, 0, WithAlpha({255, 180, 80, 255}, 0.28f));
         Draw::BlendNormal();
     }
-    const char* label = "集结完成";
+    std::string label = "集结完成";
     if (ready) label = "究极合体  [E]";
     else if (!assembled) label = TextFormat("集结 %d / %d", have, kHeroCount);
-    else if (fusionCooldown > 0 && waveIndex >= 0) label = "冷却中";
-    if (assembled && fusionCooldown > 0 && waveIndex >= 0 && outcome == Outcome::None) {
+    else if (fusionCooldown > 0) label = "蓄能中";
+    if (assembled && fusionCooldown > 0 && outcome == Outcome::None) {
         float k = Clamp(fusionCooldown / kFusionMax, 0.0f, 1.0f);
         DrawRectangleRec({r.x + 2, r.y + 2, (r.width - 4) * k, r.height - 4}, {4, 6, 14, 150});
         Gui::Text(TextFormat("%d", (int)std::ceil(fusionCooldown)), r.x + r.width - 8, r.y + 12, 13, WHITE, Gui::Align::Right, true);
