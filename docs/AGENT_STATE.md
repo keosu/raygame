@@ -2,6 +2,15 @@
 
 更新时间：2026-10-16。
 
+## 工作包：合并 origin/dev 与 Ultra Guard Android 入口（2026-10-17）
+
+- 合并 `origin/dev`（`112f217`，已推送）：远端 3 个提交是本分支最早三个 Ultra Guard 提交 rebase 后的副本，
+  内容是本地子集；冲突全部取本地，`scripts/build-android.ps1` 保持删除（Android 已迁到 xmake 任务）。
+- Android 入口按现状改：`scripts/android/build.lua` 游戏列表加 `ultra_guard`，`xmake android --help` 写“ten games”，
+  README 改为 `xmake android --game=ultra_guard`。
+- 验证：`xmake android --game=ultra_guard` 通过并校验（`build/android/native/arm64-v8a/release/ultra_guard.apk`，
+  约 10 MB）；之后 Windows `xmake build ultra_guard` 仍正常。未真机安装。
+
 ## 工作包：Ultra Guard 两篇章、档案头像与地标调整（2026-10-16）
 
 已完成：

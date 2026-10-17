@@ -16,7 +16,7 @@
 xmake build ultra_guard
 xmake run ultra_guard
 # Android（ARM64）：
-pwsh -NoProfile -File scripts/build-android.ps1 -Game ultra_guard
+xmake android --game=ultra_guard
 ```
 
 存档与日志位于 `raygame.ultra_guard` 用户数据目录。开发参数：`--capture <目录>`
