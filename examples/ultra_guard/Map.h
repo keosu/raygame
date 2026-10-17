@@ -22,7 +22,7 @@ struct Decor {
 };
 
 // Big theme set pieces that make the park stages recognisable; they reserve their cells.
-enum class Landmark { FerrisWheel, Safari, WhaleShark, UltraStatue, KaijuPlinth, Castle, Dinosaur, Soundstage };
+enum class Landmark { FerrisWheel, Safari, WhaleShark, BetaCapsule, JetBeetle, Castle, Dinosaur, Soundstage };
 
 struct LandmarkSpot {
     Landmark kind;

@@ -132,9 +132,14 @@ bool ParseLevel(const std::string& text, const std::string& file, LevelDef& out,
         std::string key = line.substr(0, split);
         std::string value = split == std::string::npos ? "" : Trim(line.substr(split));
         auto tokens = Tokens(value);
-        if (key == "id" || key == "name" || key == "subtitle" || key == "desc") {
+        if (key == "id" || key == "name" || key == "subtitle" || key == "desc" || key == "arc") {
             if (value.empty()) fail(number, key + " 不能为空");
-            else (key == "id" ? def.id : key == "name" ? def.name : key == "subtitle" ? def.subtitle : def.desc) = value;
+            else
+                (key == "id"         ? def.id
+                 : key == "name"     ? def.name
+                 : key == "subtitle" ? def.subtitle
+                 : key == "arc"      ? def.arc
+                                     : def.desc) = value;
         } else if (key == "theme") {
             if (value == "city") def.theme = Theme::City;
             else if (value == "mountain") def.theme = Theme::Mountain;

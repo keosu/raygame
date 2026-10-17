@@ -2,6 +2,7 @@
 #include "Assets.h"
 #include "Draw.h"
 #include "Skins.h"
+#include <map>
 #include <rlgl.h>
 
 namespace UG::Art {
@@ -552,6 +553,25 @@ void DrawPortrait(HeroId id, Rectangle dest, Color tint) {
     Texture2D t = Portrait(id);
     if (!t.id) return;
     DrawTexturePro(t, {0, 0, (float)t.width, (float)t.height}, dest, {0, 0}, 0, tint);
+}
+
+Texture2D CodexPortrait(const std::string& id) {
+    HeroId hero{};
+    if (HeroByKey(id, hero)) return Portrait(hero);
+    static std::map<std::string, TextureHandle> loaded;
+    auto it = loaded.find(id);
+    if (it == loaded.end()) {
+        TextureHandle handle;
+        std::string path = AssetPath("avatars/" + id + ".png");
+        Image image = FileSystem::AssetExists(path) ? LoadImage(path.c_str()) : Image{};
+        if (IsImageValid(image)) {
+            ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+            handle = ResourceManager::CreateTextureFromImage("codex-" + id, image, true);
+        }
+        UnloadImage(image);
+        it = loaded.emplace(id, handle).first;
+    }
+    return it->second ? *it->second : Texture2D{};
 }
 
 Vector2 EyePoint(HeroId id, int side) {

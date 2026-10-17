@@ -95,6 +95,7 @@ struct LevelDef {
     std::string file; // source, for error messages
     std::string name;
     std::string subtitle;
+    std::string arc; // story arc the level page groups by
     std::string desc;
     Theme theme;
     std::vector<std::vector<GridPoint>> paths; // waypoints, first point may be off-grid

@@ -17,6 +17,8 @@ void ReloadPortraits();
 Texture2D Portrait(HeroId id);
 bool HasCustomAvatar(HeroId id);
 void DrawPortrait(HeroId id, Rectangle dest, Color tint = WHITE);
+// Database portrait by codex id: a hero's portrait, else assets/avatars/<id>.png; empty if neither.
+Texture2D CodexPortrait(const std::string& id);
 // Eye positions in portrait space, used for attack flashes.
 Vector2 EyePoint(HeroId id, int side);
 // Vector bust in portrait space (center 128,108); exposed for previews.
@@ -33,7 +35,6 @@ struct KaijuPose {
     float burn = 0;
     bool shielded = false;
     bool enraged = false;
-    bool statue = false; // bronze monument, e.g. on the theme-park plinth
 };
 
 // Uses the current skin's sprite when it has one.

@@ -29,12 +29,20 @@ SOURCES = {
     "trigger": "trigger.png",
     "decker": "decker.png",
     "blazar": "blazar.png",
+    # Codex-only entries: shown in the Ultra database, not placeable.
+    "man": "man.png",
+    "seven": "seven.png",
+    "taro": "taro.png",
+    "taiga": "taiga.png",
+    "omega": "omega.png",
+    "teo": "teo.png",
 }
 
 # Hand-measured (centre x, top y, head height) in source pixels for poses that fool
 # head_window, e.g. Trigger's raised arm reaching above the head.
 WINDOWS = {
     "trigger": (528, 20, 456),
+    "taiga": (627, 0, 480),  # the horns are wider than his shoulders
 }
 
 # Head share of the final square, and where the head starts vertically.

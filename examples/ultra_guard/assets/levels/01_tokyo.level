@@ -4,6 +4,7 @@
 # theme     地图主题：city / mountain / nebula / park / plaza / studio
 # gold      初始金币      lives  生命      hp  怪兽血量倍率      seed  装饰随机种子
 # base      基地所在格子：列 行（地图 20 列 × 12 行，从 0 开始）
+# arc       关卡页上分组的篇章名（可省略）
 # heroes    本关可放置的英雄（最多 6 位，按卡片顺序）；省略时为 z orb tiga geed arc zero。
 #           可用：z orb tiga geed arc zero trigger decker blazar
 # path      路径拐点“列,行”，按行进顺序书写；起点可在地图外（列 -1）。可写多条 path。
@@ -12,7 +13,8 @@
 #           含 zetton/belial 的波次自动显示 BOSS 警告。修改中文文字后需重新生成字体子集。
 id       tokyo
 name     东京湾防线
-subtitle 第一章 · 黄昏都市
+subtitle 守护地球篇 · 黄昏都市
+arc      守护地球篇
 desc     怪兽从海湾登陆，沿着环城公路冲向科学特搜队基地。熟悉英雄的能力，守住城市！
 theme    city
 gold     340
@@ -31,4 +33,6 @@ wave     eleking x10 every 0.7
 wave     baltan x12 every 0.7 | redking x3 every 2.5 after 4
 wave     gomora x14 every 0.8 | eleking x8 every 0.7 after 6
 wave     redking x4 every 2 | baltan x10 every 0.7 after 3
+wave     redking x5 every 1.8 | baltan x12 every 0.6 after 3
+wave     eleking x12 every 0.6 | redking x3 every 1.7 after 3
 wave     redking x3 every 1.8 | baltan x8 every 0.7 after 2 | zetton x1 after 8

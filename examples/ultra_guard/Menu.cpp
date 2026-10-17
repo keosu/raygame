@@ -10,9 +10,13 @@ namespace UG {
 
 namespace {
 bool openCodexOnLoad = false;
+int codexIndexOnLoad = 0;
 } // namespace
 
-void PreviewCodex() { openCodexOnLoad = true; }
+void PreviewCodex(int index) {
+    openCodexOnLoad = true;
+    codexIndexOnLoad = index;
+}
 
 namespace {
 constexpr float W = (float)kCanvasW, Hh = (float)kCanvasH;
@@ -49,6 +53,7 @@ void TokyoTower(Vector2 base, float h, Color c) {
 MenuScene::MenuScene(MenuPage start) : Scene("Menu"), page(start) {
     if (start == MenuPage::Heroes && openCodexOnLoad) {
         codex = true;
+        codexIndex = codexIndexOnLoad;
         openCodexOnLoad = false;
     }
 }
@@ -316,14 +321,21 @@ void MenuScene::DrawLevels() {
     int first = levelPage * kLevelsPerPage;
     int shown = std::min(kLevelsPerPage, (int)levels.size() - first);
     constexpr int kColsOnPage = 3;
-    constexpr float kCardW = 390, kCardH = 248, kGapX = 18, kGapY = 14;
+    constexpr float kCardW = 390, kCardH = 240, kGapX = 18, kGapY = 34;
     float gridW = kColsOnPage * kCardW + (kColsOnPage - 1) * kGapX;
     float x0 = (W - gridW) / 2;
-    float y0 = 124;
+    float y0 = 140;
     for (int i = first; i < first + shown; ++i) {
         const LevelDef& def = levels[i];
         int slot = i - first;
         int col = slot % kColsOnPage, row = slot / kColsOnPage;
+        if (!def.arc.empty() && (col == 0 || levels[i - 1].arc != def.arc)) {
+            // Arc header over the row (or from the card where a new arc starts mid-row).
+            float hx = x0 + col * (kCardW + kGapX), hy = y0 + row * (kCardH + kGapY) - 26;
+            Draw::Diamond({hx + 6, hy + 10}, 5, 7, Palette::gold);
+            Gui::Text(def.arc, hx + 18, hy, 18, Palette::gold, Gui::Align::Left, true);
+            DrawRectangleRec({hx + 120, hy + 10, x0 + gridW - hx - 120, 1.5f}, WithAlpha(Palette::gold, 0.35f));
+        }
         float appear = EaseOut((pageTime - slot * 0.06f) / 0.4f);
         Rectangle r{x0 + col * (kCardW + kGapX), y0 + row * (kCardH + kGapY) + (1 - appear) * 24, kCardW, kCardH};
         bool unlocked = Progress::Unlocked(i);
@@ -343,7 +355,7 @@ void MenuScene::DrawLevels() {
         Gui::TextShadow(def.name, r.x + r.width / 2, r.y + 186, 26, unlocked ? Palette::text : Palette::muted, Gui::Align::Center);
         if (unlocked) {
             int stars = Progress::Stars(i);
-            for (int s = 0; s < 3; ++s) Gui::StarIcon({r.x + r.width / 2 - 36 + s * 36.0f, r.y + 224}, 12, s < stars);
+            for (int s = 0; s < 3; ++s) Gui::StarIcon({r.x + r.width / 2 - 36 + s * 36.0f, r.y + 220}, 12, s < stars);
             if (Gui::Clicked(r)) GoToBattle(i);
         } else {
             Gui::LockIcon({pv.x + pv.width / 2, pv.y + pv.height / 2}, 26, {170, 176, 188, 255});
@@ -452,8 +464,14 @@ void MenuScene::DrawCodex() {
                            : Gui::Hover(r) ? Palette::muted
                                            : Palette::line,
                            active ? 2.2f : 1.4f);
-        Gui::Text(entry.name, r.x + 14, r.y + 8, 18, Palette::text, Gui::Align::Left, true);
-        Gui::Text(entry.move, r.x + 14, r.y + 34, 14, Palette::gold);
+        Texture2D face = Art::CodexPortrait(entry.id);
+        float tx = r.x + 14;
+        if (face.id) {
+            DrawTexturePro(face, {0, 0, (float)face.width, (float)face.height}, {r.x + 6, r.y + 1, 60, 60}, {0, 0}, 0, WHITE);
+            tx = r.x + 74;
+        }
+        Gui::Text(entry.name, tx, r.y + 8, 18, Palette::text, Gui::Align::Left, true);
+        Gui::Text(entry.move, tx, r.y + 34, 14, Palette::gold);
     }
     int pages = ((int)entries.size() + kVisible - 1) / kVisible;
     if (pages > 1) {
@@ -464,17 +482,17 @@ void MenuScene::DrawCodex() {
     const UltraEntry& entry = entries[codexIndex];
     Rectangle panel{430, 132, 800, 540};
     Gui::Panel(panel, {12, 18, 40, 240}, 18);
-    HeroId hero = HeroId::Count;
-    for (int i = 0; i < kHeroCount; ++i)
-        if (entry.id == HeroInfo((HeroId)i).key) hero = (HeroId)i;
-    if (hero != HeroId::Count) {
-        const HeroDef& def = HeroInfo(hero);
+    HeroId hero{};
+    bool playable = HeroByKey(entry.id, hero);
+    Texture2D face = Art::CodexPortrait(entry.id);
+    if (face.id) {
+        Color aura = playable ? HeroInfo(hero).primary : Color{120, 160, 255, 255};
         Draw::BlendAdd();
-        Draw::Glow({panel.x + 150, panel.y + 210}, 180, WithAlpha(def.primary, 0.4f));
+        Draw::Glow({panel.x + 150, panel.y + 210}, 180, WithAlpha(aura, 0.4f));
         Draw::BlendNormal();
-        Art::DrawPortrait(hero, {panel.x + 30, panel.y + 70, 250, 250});
+        DrawTexturePro(face, {0, 0, (float)face.width, (float)face.height}, {panel.x + 30, panel.y + 70, 250, 250}, {0, 0}, 0, WHITE);
     }
-    float x = panel.x + (hero != HeroId::Count ? 300 : 36);
+    float x = panel.x + (face.id ? 300 : 36);
     float w = panel.width - (x - panel.x) - 28;
     Gui::Text(entry.title, x, panel.y + 28, 16, Palette::cyan, Gui::Align::Left, true);
     Gui::TextShadow(entry.name, x, panel.y + 52, 40, Palette::text);

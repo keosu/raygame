@@ -1,12 +1,13 @@
 # 环球影城：片场三条参观路线最后汇到地球仪前。初始金币够放齐六位奥特曼。
 id       universal
 name     环球影城
-subtitle 终章 · 片场决战
+subtitle 乐园奇遇篇 · 片场决战
+arc      乐园奇遇篇
 desc     三座片场大门同时失守。先把六位奥特曼集结到路线两侧，再用究极合体压住贝利亚。
 theme    studio
 gold     880
 lives    20
-hp       1.28
+hp       1.12
 seed     2021
 base     18 6
 heroes   z blazar trigger geed arc decker
@@ -16,7 +17,6 @@ path     -1,11 5,11 5,8 10,8 10,10 15,10 15,6 18,6
 
 wave     gomora x5 every 1.2 path 1 | gomora x5 every 1.2 after 0.6 path 3
 wave     baltan x6 every 0.85 path 2 | baltan x6 every 0.85 after 1 path 1
-wave     eleking x4 every 0.85 path 1 | gomora x4 every 1.1 after 1.5 path 3
 wave     redking x1 path 2 | baltan x6 every 0.8 after 2
 wave     gomora x5 every 1 path 1 | eleking x5 every 0.75 after 1 path 3
 wave     metron x2 every 2 path 2 | baltan x8 every 0.65 after 2 path 1
@@ -26,7 +26,6 @@ wave     eleking x8 every 0.6 path 1 | eleking x8 every 0.6 after 1 path 3 | bal
 wave     redking x3 every 1.7 path 2 | gomora x8 every 0.75 after 2 path 1 | metron x2 every 2 after 3 path 3
 wave     tregear x1 path 1 | baltan x8 every 0.6 after 3 path 2
 wave     kingjoe x2 every 2.5 path 3 | eleking x8 every 0.6 after 2 path 1
-wave     baltan x10 every 0.55 path 3 | eleking x8 every 0.6 after 2 path 1 | redking x2 every 2 after 4 path 2
 wave     belial x1 path 2 | metron x3 every 2 after 3 path 1
 wave     redking x4 every 1.5 | eleking x8 every 0.6 after 3 | kingjoe x2 every 3 after 4
 wave     zetton x1 path 1 | redking x3 every 1.6 after 3 path 3 | baltan x8 every 0.6 after 2 path 2

@@ -187,7 +187,7 @@ private:
             break;
         case 1165:
             Shot("16_levels");
-            PreviewCodex();
+            PreviewCodex(10); // an archive entry on the second page
             GoToMenu(MenuPage::Heroes);
             break;
         case 1210:

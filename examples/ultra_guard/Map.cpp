@@ -2,6 +2,7 @@
 #include "Art.h"
 #include "Assets.h"
 #include "Draw.h"
+#include "Gui.h"
 #include "Skins.h"
 #include <rlgl.h>
 
@@ -26,7 +27,7 @@ void MapData::PlaceLandmarks() {
     std::vector<Want> wants;
     switch (level->theme) {
     case Theme::Park: wants = {{Landmark::FerrisWheel, 3, 3}, {Landmark::Safari, 3, 2}, {Landmark::WhaleShark, 2, 2}}; break;
-    case Theme::Plaza: wants = {{Landmark::UltraStatue, 2, 3}, {Landmark::KaijuPlinth, 3, 2}}; break;
+    case Theme::Plaza: wants = {{Landmark::BetaCapsule, 2, 3}, {Landmark::JetBeetle, 3, 2}}; break;
     case Theme::Studio: wants = {{Landmark::Castle, 3, 3}, {Landmark::Dinosaur, 3, 2}, {Landmark::Soundstage, 3, 2}}; break;
     default: return;
     }
@@ -307,15 +308,16 @@ void BalloonCart(Vector2 p, float s, std::uint32_t seed) {
     }
 }
 
-void UltraStatue(Vector2 p, float s) {
-    Draw::GlowStretched(Add(p, {2, 16}), 16 * s, 6 * s, 0, WithAlpha(BLACK, 0.45f));
-    Color silver{188, 196, 210, 255};
-    Draw::Quad({p.x - 8 * s, p.y + 14 * s}, {p.x + 8 * s, p.y + 14 * s}, {p.x + 5 * s, p.y - 6 * s}, {p.x - 5 * s, p.y - 6 * s}, silver);
-    DrawCircleV({p.x, p.y - 12 * s}, 5.5f * s, Lighten(silver, 0.15f));
-    DrawCircleV({p.x, p.y}, 3.2f * s, {220, 36, 48, 255});
-    DrawRectangleRec({p.x - 11 * s, p.y + 14 * s, 22 * s, 4 * s}, {130, 138, 152, 255});
+void TimerLamp(Vector2 p, float s) {
+    Draw::GlowStretched(Add(p, {2, 14}), 10 * s, 4 * s, 0, WithAlpha(BLACK, 0.4f));
+    DrawRectangleRec({p.x - 1.6f * s, p.y - 12 * s, 3.2f * s, 26 * s}, {150, 156, 170, 255});
+    DrawRectangleRec({p.x - 6 * s, p.y + 12 * s, 12 * s, 3 * s}, {120, 126, 140, 255});
+    Vector2 c{p.x, p.y - 16 * s};
+    DrawCircleV(c, 6.5f * s, {200, 206, 218, 255});
+    DrawCircleV(c, 4.6f * s, {40, 120, 220, 255});
+    DrawCircleV(Add(c, {-1.4f * s, -1.4f * s}), 1.6f * s, {220, 246, 255, 255});
     Draw::BlendAdd();
-    Draw::Glow({p.x, p.y}, 8 * s, WithAlpha({255, 60, 70, 255}, 0.5f));
+    Draw::Glow(c, 14 * s, WithAlpha({90, 190, 255, 255}, 0.5f));
     Draw::BlendNormal();
 }
 
@@ -370,22 +372,6 @@ void PathEmblems(const MapData& map, float spacing) {
 }
 
 // ---------------------------------------------------------------- landmarks
-
-Texture2D StatueTexture() {
-    static TextureHandle handle;
-    static bool tried = false;
-    if (!tried) {
-        tried = true;
-        std::string path = AssetPath("landmarks/ultra_statue.png");
-        Image image = FileSystem::AssetExists(path) ? LoadImage(path.c_str()) : Image{};
-        if (IsImageValid(image)) {
-            ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-            handle = ResourceManager::CreateTextureFromImage("landmark-ultra-statue", image, true);
-        }
-        UnloadImage(image);
-    }
-    return handle ? *handle : Texture2D{};
-}
 
 void FerrisWheel(Rectangle a, float time) {
     Vector2 hub{a.x + a.width / 2, a.y + a.height * 0.42f};
@@ -491,48 +477,54 @@ void WhaleShark(Rectangle a, float time) {
     Draw::BlendNormal();
 }
 
-void UltraStatueLandmark(Rectangle a, float time) {
+// Giant replica of Hayata's Beta Capsule, flash head lit, on a museum pedestal.
+void BetaCapsule(Rectangle a, float time) {
     float cx = a.x + a.width / 2;
-    Rectangle step{a.x + 6, a.y + a.height - 16, a.width - 12, 10};
-    Rectangle ped{a.x + 16, a.y + a.height - 34, a.width - 32, 20};
+    Rectangle step{a.x + 8, a.y + a.height - 16, a.width - 16, 10};
+    Rectangle ped{a.x + 20, a.y + a.height - 32, a.width - 40, 18};
     Draw::GlowStretched({cx + 4, step.y + 10}, a.width * 0.5f, 10, 0, WithAlpha(BLACK, 0.45f));
-    Draw::BlendAdd();
-    Draw::Glow({cx, a.y + a.height * 0.45f}, a.width * 0.75f, WithAlpha({255, 214, 150, 255}, 0.28f + 0.08f * std::sin(time * 2)));
-    for (float side : {-1.0f, 1.0f}) {
-        float sway = std::sin(time * 0.8f + side) * 10;
-        Vector2 base{cx + side * a.width * 0.42f, step.y};
-        Draw::Tri(base, {cx + sway - 18, a.y + 6}, {cx + sway + 18, a.y + 6}, WithAlpha({255, 240, 200, 255}, 0.12f));
-    }
-    Draw::BlendNormal();
     Draw::RoundedPanel(step, 3, {150, 150, 160, 255}, {100, 100, 112, 255}, 1);
     Draw::RoundedPanel(ped, 3, {188, 188, 198, 255}, {120, 120, 132, 255}, 1);
-    DrawRectangleRec({cx - 12, ped.y + 6, 24, 7}, {214, 172, 70, 255});
-    Texture2D tex = StatueTexture();
-    float h = a.height - 30;
-    if (tex.id) {
-        float w = h * tex.width / tex.height;
-        DrawTexturePro(tex, {0, 0, (float)tex.width, (float)tex.height}, {cx - w / 2, ped.y - h + 4, w, h}, {0, 0}, 0, WHITE);
-    } else {
-        Draw::Capsule({cx, ped.y - 20}, {cx, ped.y - h + 30}, 12, {200, 206, 220, 255});
-        DrawCircleV({cx, ped.y - h + 18}, 12, {210, 216, 228, 255});
-        DrawCircleV({cx, ped.y - h * 0.6f}, 5, {120, 220, 255, 255});
+    DrawRectangleRec({cx - 12, ped.y + 6, 24, 6}, {214, 172, 70, 255});
+    float top = a.y + 26, bottom = ped.y;
+    Rectangle body{cx - 11, top, 22, bottom - top};
+    DrawRectangleRounded({body.x - 1.5f, body.y - 1.5f, body.width + 3, body.height + 3}, 0.5f, 8, {40, 42, 52, 255});
+    DrawRectangleGradientH((int)body.x, (int)body.y, (int)body.width, (int)body.height, {150, 156, 170, 255}, {236, 240, 248, 255});
+    DrawRectangle((int)(body.x + body.width * 0.62f), (int)body.y, (int)(body.width * 0.38f), (int)body.height, {170, 176, 190, 255});
+    for (float y : {bottom - 30, bottom - 22}) DrawRectangleRec({body.x, y, body.width, 4}, {36, 38, 46, 255});
+    DrawRectangleRec({body.x + body.width - 4, top + 24, 6, 10}, {214, 40, 50, 255});
+    Vector2 head{cx, top};
+    Draw::Ellipse(head, 13, 6, {206, 212, 224, 255}, 0);
+    float pulse = 0.6f + 0.4f * std::sin(time * 3);
+    Draw::BlendAdd();
+    Draw::Glow(head, 34 * pulse + 14, WithAlpha({255, 244, 210, 255}, 0.55f));
+    for (int i = 0; i < 8; ++i) {
+        float ang = time * 0.6f + i * PI / 4;
+        Draw::Tri(head, Add(head, Mul(Dir(ang - 0.06f), 36 + 8 * pulse)), Add(head, Mul(Dir(ang + 0.06f), 36 + 8 * pulse)),
+                  WithAlpha({255, 236, 180, 255}, 0.22f));
     }
+    Draw::BlendNormal();
+    DrawCircleV(head, 5, {255, 252, 236, 255});
 }
 
-void KaijuPlinth(Rectangle a, float time) {
-    Rectangle plinth{a.x + 6, a.y + a.height - 24, a.width - 12, 16};
-    Draw::GlowStretched({plinth.x + plinth.width / 2 + 4, plinth.y + 16}, plinth.width * 0.55f, 8, 0, WithAlpha(BLACK, 0.4f));
-    Draw::RoundedPanel(plinth, 4, {170, 166, 160, 255}, {110, 106, 100, 255}, 1.2f);
-    static const EnemyId kinds[] = {EnemyId::Gomora, EnemyId::Zetton, EnemyId::Baltan};
-    for (int i = 0; i < 3; ++i) {
-        Art::KaijuPose pose;
-        pose.feet = {plinth.x + plinth.width * (0.2f + 0.3f * i), plinth.y + 4};
-        pose.scale = i == 1 ? 1.15f : 1.0f;
-        pose.face = i == 2 ? -1.0f : 1.0f;
-        pose.statue = true;
-        Art::DrawKaiju(kinds[i], pose);
-        DrawRectangleRec({pose.feet.x - 8, plinth.y + 8, 16, 4}, {214, 172, 70, 255});
-    }
+// The Science Patrol's Jet Beetle on a display pylon, same plane as the air-support skill.
+void JetBeetle(Rectangle a, float time) {
+    Vector2 c{a.x + a.width / 2, a.y + a.height * 0.42f + std::sin(time * 1.2f) * 1.5f};
+    Draw::GlowStretched({c.x + 6, a.y + a.height - 8}, a.width * 0.42f, 9, 0, WithAlpha(BLACK, 0.4f));
+    DrawRectangleRec({c.x - 3, c.y + 6, 6, a.y + a.height - c.y - 14}, {120, 126, 140, 255});
+    Draw::RoundedPanel({c.x - 30, a.y + a.height - 14, 60, 8}, 3, {150, 154, 166, 255}, {100, 104, 116, 255}, 1);
+    Color silver{214, 220, 232, 255}, shade{160, 166, 180, 255}, red{214, 46, 46, 255};
+    Draw::Quad({c.x - 6, c.y}, {c.x + 6, c.y}, {c.x + 26, c.y + 14}, {c.x - 26, c.y + 14}, shade);
+    Draw::Quad({c.x - 4, c.y - 2}, {c.x + 4, c.y - 2}, {c.x + 38, c.y + 8}, {c.x - 38, c.y + 8}, silver);
+    DrawRectangleRounded({c.x - 52, c.y - 9, 104, 16}, 1, 12, silver);
+    DrawRectangleRec({c.x - 50, c.y - 3, 100, 3}, red);
+    Draw::Tri({c.x + 52, c.y - 1}, {c.x + 44, c.y - 9}, {c.x + 44, c.y + 7}, shade);
+    Draw::Ellipse({c.x + 26, c.y - 6}, 11, 5, {70, 140, 200, 255}, 0);
+    for (float side : {-1.0f, 1.0f}) Draw::Tri({c.x - 40, c.y - 6}, {c.x - 52, c.y - 22 * side + (side < 0 ? 0 : 2)}, {c.x - 30, c.y - 6}, shade);
+    DrawCircleV({c.x - 6, c.y - 1}, 4, {255, 140, 40, 255});
+    Draw::BlendAdd();
+    Draw::Glow({c.x - 56, c.y - 1}, 10 + 3 * std::sin(time * 9), WithAlpha({255, 160, 60, 255}, 0.6f));
+    Draw::BlendNormal();
 }
 
 void Castle(Rectangle a, float time) {
@@ -618,8 +610,8 @@ void DrawLandmark(const LandmarkSpot& spot, float time, bool live) {
     case Landmark::FerrisWheel: FerrisWheel(a, time); break;
     case Landmark::Safari: Safari(a, time); break;
     case Landmark::WhaleShark: WhaleShark(a, time); break;
-    case Landmark::UltraStatue: UltraStatueLandmark(a, time); break;
-    case Landmark::KaijuPlinth: KaijuPlinth(a, time); break;
+    case Landmark::BetaCapsule: BetaCapsule(a, time); break;
+    case Landmark::JetBeetle: JetBeetle(a, time); break;
     case Landmark::Castle: Castle(a, time); break;
     case Landmark::Dinosaur: Dinosaur(a, time); break;
     case Landmark::Soundstage: Soundstage(a, time, live); break;
@@ -672,17 +664,55 @@ void TimerMonument(Vector2 p, float time, float flash) {
     Draw::BlendNormal();
 }
 
+// The Universal globe: a spinning blue Earth in a fountain, ringed by the studio's name.
 void StudioGlobe(Vector2 p, float time, float flash) {
-    Draw::GlowStretched(Add(p, {2, 42}), 64, 16, 0, WithAlpha(BLACK, 0.45f));
-    Draw::RoundedPanel({p.x - 28, p.y + 16, 56, 22}, 4, {64, 72, 92, 255}, {28, 32, 46, 255}, 2);
-    DrawRectangleRec({p.x - 4, p.y - 4, 8, 24}, {186, 148, 52, 255});
-    Vector2 g{p.x, p.y - 26};
-    DrawCircleV(g, 22, {214, 168, 48, 255});
-    DrawRing(g, 20, 22.5f, 0, 360, 36, {120, 82, 22, 255});
-    Draw::Ellipse(g, 8, 20, {150, 100, 28, 200}, time * 0.15f);
-    Draw::Ellipse(g, 20, 7, {150, 100, 28, 180}, 0.15f);
+    Draw::GlowStretched(Add(p, {2, 44}), 70, 16, 0, WithAlpha(BLACK, 0.45f));
+    Vector2 pool{p.x, p.y + 30};
+    Draw::Ellipse(pool, 50, 14, {150, 156, 170, 255}, 0);
+    Draw::Ellipse(pool, 44, 11, {50, 130, 200, 255}, 0);
     Draw::BlendAdd();
-    Draw::Glow(g, 32, WithAlpha({255, 200, 80, 255}, 0.45f));
+    for (int i = 0; i < 6; ++i) {
+        float a = i * PI / 3 + time * 0.4f;
+        Vector2 jet{pool.x + std::cos(a) * 34, pool.y + std::sin(a) * 8};
+        Draw::Line(jet, Add(jet, {0, -10 - 3 * std::sin(time * 6 + i)}), 2, WithAlpha({200, 236, 255, 255}, 0.5f));
+    }
+    Draw::BlendNormal();
+    DrawRectangleRec({p.x - 5, p.y - 2, 10, 32}, {170, 176, 190, 255});
+    Vector2 g{p.x, p.y - 28};
+    const float R = 30, ringX = 48, ringY = 13, tilt = -0.18f;
+    auto ringPoint = [&](float a) { return Add(g, Rotate({std::cos(a) * ringX, std::sin(a) * ringY}, tilt)); };
+    std::vector<Vector2> back, front;
+    for (int i = 0; i <= 24; ++i) {
+        back.push_back(ringPoint(PI + PI * i / 24));
+        front.push_back(ringPoint(PI * i / 24));
+    }
+    Draw::PolyLine(back, 6, {150, 158, 176, 255}, false);
+    DrawCircleV(g, R + 1.5f, {20, 40, 80, 255});
+    Draw::GradientEllipse(g, R, R, {22, 70, 150, 255}, {90, 170, 240, 255}, {g.x - 10, g.y - 12}, 12);
+    // Continents slide across the face; squash toward the limb to read as a sphere.
+    static const float lon[] = {0.0f, 1.3f, 2.4f, 3.6f, 4.7f, 5.6f};
+    static const float lat[] = {-10, 6, -4, 12, -14, 2};
+    static const float size[] = {9, 7, 11, 6, 8, 10};
+    for (int i = 0; i < 6; ++i) {
+        float a = std::fmod(lon[i] + time * 0.35f, 2 * PI);
+        float x = std::sin(a);
+        if (std::cos(a) < 0.15f) continue; // far side
+        float squash = std::cos(a);
+        Draw::Ellipse({g.x + x * (R - size[i] * 0.6f), g.y + lat[i]}, size[i] * squash, size[i] * 0.6f, {70, 160, 90, 230}, 0);
+    }
+    Draw::Ellipse({g.x - 10, g.y - 13}, 9, 5, WithAlpha(WHITE, 0.35f), -0.5f);
+    Draw::PolyLine(front, 6, {220, 226, 238, 255}, false);
+    Draw::PolyLine(front, 2, {250, 252, 255, 255}, false);
+    static const char* kLetters = "UNIVERSAL";
+    for (int i = 0; i < 9; ++i) {
+        float a = -time * 0.5f - i * 0.3f; // letters run left to right across the front
+        if (std::sin(a) < 0.25f) continue;   // only the front arc
+        Vector2 at = ringPoint(a);
+        char letter[2] = {kLetters[i], 0};
+        Gui::Text(letter, at.x, at.y - 7, 11, {24, 34, 70, 255}, Gui::Align::Center, true);
+    }
+    Draw::BlendAdd();
+    Draw::Glow(g, 46, WithAlpha({120, 190, 255, 255}, 0.3f));
     if (flash > 0) Draw::Glow(p, 90, WithAlpha({255, 60, 60, 255}, flash * 0.8f));
     Draw::BlendNormal();
 }
@@ -869,7 +899,7 @@ void DecorLayer(const MapData& map) {
             else Tree(d.pos, d.size * 0.9f, {36, 150, 72, 255}, d.seed);
             break;
         case Theme::Plaza:
-            if (d.kind == 0) UltraStatue(d.pos, d.size);
+            if (d.kind == 0) TimerLamp(d.pos, d.size);
             else if (d.kind == 1) Pylon(d.pos, d.size, (d.seed & 1) ? Color{255, 64, 72, 255} : Color{80, 170, 255, 255});
             else Crystal(d.pos, d.size * 0.85f, {255, 80, 90, 255}, d.seed);
             break;

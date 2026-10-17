@@ -1,7 +1,8 @@
 # 格式说明见 01_tokyo.level。两条路在 (6,6) 汇合；未写 path 的组在两路之间轮流出怪。
 id       nebula
 name     光之国保卫战
-subtitle 第三章 · M78 星云
+subtitle 守护地球篇 · M78 星云
+arc      守护地球篇
 desc     两条星路在火花塔前汇合。中段有一只芝顿，贝利亚留到最后。
 theme    nebula
 gold     560
@@ -25,4 +26,6 @@ wave     gomora x10 every 0.8 | eleking x8 every 0.7 after 4
 wave     kingjoe x2 every 3 | gomora x8 every 0.9 after 2
 wave     baltan x12 every 0.6 | redking x3 every 2.1 after 4
 wave     redking x4 every 1.7 | eleking x8 every 0.65 after 3
+wave     eleking x10 every 0.6 path 1 | gomora x8 every 0.8 after 2 path 2
+wave     kingjoe x2 every 3 path 2 | baltan x10 every 0.6 after 2 path 1
 wave     belial x1 path 1 | redking x3 every 2 after 4 path 2 | gomora x6 every 1 after 6
