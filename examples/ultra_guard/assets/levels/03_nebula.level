@@ -19,8 +19,10 @@ wave     redking x2 every 2.5 | baltan x8 every 0.85 after 3
 wave     gomora x8 every 1 | eleking x6 every 0.8 after 3
 wave     zetton x1 path 1 | gomora x6 every 1 after 2 path 2
 wave     eleking x12 every 0.65
+wave     kingjoe x1 path 1 | baltan x10 every 0.7 after 2 path 2
 wave     redking x3 every 2 | baltan x10 every 0.7 after 3
 wave     gomora x10 every 0.8 | eleking x8 every 0.7 after 4
+wave     kingjoe x2 every 3 | gomora x8 every 0.9 after 2
 wave     baltan x12 every 0.6 | redking x3 every 2.1 after 4
 wave     redking x4 every 1.7 | eleking x8 every 0.65 after 3
 wave     belial x1 path 1 | redking x3 every 2 after 4 path 2 | gomora x6 every 1 after 6

@@ -16,12 +16,16 @@ path     -1,10 4,10 4,4 10,4 10,10 16,10 16,5 18,5
 wave     gomora x6 every 1.2 path 1 | baltan x6 every 0.9 after 1 path 2
 wave     baltan x8 every 0.8 path 2 | gomora x6 every 1 after 2 path 1
 wave     eleking x6 every 0.75 path 1 | eleking x6 every 0.75 after 1.5 path 2
+wave     metron x2 every 2 path 1 | metron x2 every 2 after 1 path 2 | gomora x6 every 0.9 after 2
 wave     redking x2 every 2.4 | baltan x8 every 0.7 after 2
-wave     gomora x8 every 0.85 path 1 | eleking x6 every 0.7 after 2 path 2
+wave     kingjoe x1 path 1 | kingjoe x1 after 2 path 2 | eleking x6 every 0.7 after 3
 wave     zetton x1 path 1 | gomora x6 every 0.9 after 2 path 2
 wave     baltan x10 every 0.6 path 2 | redking x2 every 2.2 after 3 path 1
-wave     eleking x10 every 0.6 | gomora x8 every 0.75 after 3
+wave     eleking x10 every 0.6 | gomora x8 every 0.75 after 3 | metron x2 every 2 after 4
 wave     redking x4 every 1.6 | baltan x10 every 0.6 after 2
+wave     kingjoe x2 every 2.5 path 1 | kingjoe x2 every 2.5 after 1 path 2
 wave     gomora x10 every 0.7 path 1 | eleking x8 every 0.6 after 2 path 2
-wave     zetton x1 path 2 | redking x3 every 1.8 after 3 path 1
+wave     tregear x1 path 2 | metron x3 every 2 after 3 path 1
 wave     eleking x12 every 0.55 | baltan x10 every 0.55 after 3 | redking x3 every 1.8 after 6
+wave     kingjoe x3 every 2 | metron x3 every 2 after 2 | gomora x8 every 0.8 after 4
+wave     zetton x1 path 1 | tregear x1 after 6 path 2 | redking x3 every 1.8 after 3

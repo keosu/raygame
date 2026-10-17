@@ -60,7 +60,9 @@ void MonsterActor::FixedUpdate() {
     anim += dt;
     appear = std::min(1.0f, appear + dt * 2.5f);
     flash = std::max(0.0f, flash - dt * 6);
-    for (float* timer : {&slowTime, &burnTime, &breakTime, &vulnTime, &stunTime, &shieldTime}) *timer = std::max(0.0f, *timer - dt);
+    bool phased = phaseTime > 0;
+    for (float* timer : {&slowTime, &burnTime, &breakTime, &vulnTime, &stunTime, &shieldTime, &phaseTime, &buffTime})
+        *timer = std::max(0.0f, *timer - dt);
     if (burnTime > 0) {
         b.DamageEnemy(*this, burnDps * dt, -1, true);
         if (GetRandomValue(0, 5) == 0) b.Emit(BattleScene::Fx::Ember, Center(), {255, 140, 40, 255}, 1, 40, 5, 0.5f);
@@ -105,10 +107,73 @@ void MonsterActor::FixedUpdate() {
             b.Banner("贝利亚暴怒了！", "移动速度大幅提升，集中火力！", Palette::red, true);
             Sfx::Play("boss", 0.8f, 0);
         }
+    } else if (type == EnemyId::Metron) {
+        abilityA -= dt;
+        if (abilityA <= 0) {
+            abilityA = 6.0f;
+            if (HeroActor* h = b.NearestHero(Center(), kTile * 2.4f)) {
+                b.DisableHero(*h, HeroActor::Disable::Confused, 2.2f, Center());
+                b.Text(Add(h->Pos(), {0, -46}), "幻觉！", {255, 120, 110, 255}, 14);
+            }
+        }
+    } else if (type == EnemyId::Tregear) {
+        const Color violet{140, 100, 255, 255};
+        abilityA -= dt;
+        if (abilityA <= 0 && !phased) {
+            abilityA = 10.0f;
+            phaseTime = 1.4f;
+            b.AddRing(Center(), 46, 6, 0.4f, 4, violet);
+            b.Burst(Center(), violet, 20, 150, 5, 0.45f);
+            b.Text(Add(Center(), {0, -50}), "异次元之门", {190, 170, 255, 255}, 14);
+            Sfx::Play("teleport", 0.6f);
+        }
+        if (phased && phaseTime <= 0) {
+            if (dist < line.length - 200) dist += 30;
+            gameObject->transform->position = line.Sample(dist, &dir);
+            b.AddRing(Center(), 6, 50, 0.45f, 4, violet);
+            b.Burst(Center(), violet, 20, 160, 5, 0.45f);
+        }
+        abilityB -= dt;
+        if (abilityB <= 0 && !phased) {
+            abilityB = 12.0f;
+            for (MonsterActor* e : b.KaijuInCircle(Center(), kTile * 2.6f)) {
+                if (e == this || e->Def().boss) continue;
+                e->buffTime = 4.5f;
+                b.AddBeam(Center(), e->Center(), 2.5f, 0.3f, violet, WHITE);
+            }
+            b.AddRing(Center(), 10, kTile * 2.6f, 0.5f, 4, violet);
+            b.Text(Add(Center(), {0, -50}), "狂暴光线", {190, 170, 255, 255}, 14);
+            Sfx::Play("split", 0.5f);
+        }
+    } else if (type == EnemyId::Gatanothor) {
+        if (!enraged && hp < maxHp * 0.5f) {
+            enraged = true; // shell cracked
+            armor *= 0.25f;
+            b.shake = std::max(b.shake, 1.0f);
+            b.Banner("外壳碎裂！", "加坦杰厄的护甲大幅下降，全力进攻！", Palette::gold, true);
+            Sfx::Play("explode", 0.8f, 0);
+        }
+        abilityA -= dt;
+        if (abilityA <= 0) {
+            abilityA = 13.0f;
+            b.fogTime = 4.0f;
+            b.Text(Add(Center(), {0, -70}), "黑雾", {200, 180, 255, 255}, 18);
+            Sfx::Play("boss", 0.6f, 0);
+        }
+        abilityB -= dt;
+        if (abilityB <= 0) {
+            abilityB = 9.0f;
+            if (HeroActor* h = b.NearestHero(Center(), kTile * 4.2f)) {
+                b.DisableHero(*h, HeroActor::Disable::Petrified, 3.0f, Center());
+                b.Text(Add(h->Pos(), {0, -46}), "石化！", {210, 210, 200, 255}, 14);
+            }
+        }
     }
 
     float slow = slowTime > 0 ? slowAmount * (1 - def.slowResist) : 0;
     float v = stunTime > 0 ? 0 : def.speed * kTile * speedMul * (1 - slow);
+    if (buffTime > 0) v *= 1.4f;
+    if (phaseTime > 0) v *= 1.3f;
     dist += v * dt;
     gameObject->transform->position = line.Sample(dist, &dir);
     if (dir.x > 0.2f) face = 1;
@@ -124,11 +189,16 @@ void MonsterActor::Render() {
     pose.time = anim;
     pose.face = face;
     pose.flash = flash;
-    pose.alpha = appear;
+    pose.alpha = appear * (phaseTime > 0 ? 0.28f : 1.0f);
     pose.chill = slowTime > 0 ? std::min(1.0f, slowTime) : 0;
     pose.burn = burnTime > 0 ? 1.0f : 0.0f;
     pose.shielded = shieldTime > 0;
-    pose.enraged = enraged;
+    pose.enraged = enraged || buffTime > 0;
+    if (phaseTime > 0 || buffTime > 0) {
+        Draw::BlendAdd();
+        Draw::Glow(Center(), 26 * Scale(), WithAlpha({140, 90, 255, 255}, phaseTime > 0 ? 0.5f : 0.3f));
+        Draw::BlendNormal();
+    }
     Art::DrawKaiju(type, pose);
     Vector2 top = Add(Feet(), {0, -Height() - 4});
     if (stunTime > 0)
@@ -146,12 +216,17 @@ void HeroActor::FixedUpdate() {
     build = std::min(1.0f, build + dt * 3);
     recoil = std::max(0.0f, recoil - dt * 5);
     flash = std::max(0.0f, flash - dt * 4);
-    cooldown -= dt;
+    if (disabledTime > 0) {
+        disabledTime = std::max(0.0f, disabledTime - dt);
+        if (disabledTime <= 0) disabled = Disable::None;
+        return;
+    }
+    cooldown -= battle->fogTime > 0 ? dt * 0.5f : dt;
     if (cooldown > 0) return;
     MonsterActor* best = nullptr;
     float bestScore = -1e30f;
     for (MonsterActor* e : battle->KaijuInCircle(Pos(), HeroRange(hero, level))) {
-        if (e->appear < 0.3f) continue;
+        if (e->appear < 0.3f || e->phaseTime > 0) continue;
         float score = mode == 0 ? e->dist - battle->map.paths[e->path].length : mode == 1 ? e->hp : -Len(Sub(e->Feet(), Pos()));
         if (score > bestScore) {
             bestScore = score;
@@ -185,8 +260,22 @@ void HeroActor::Render() {
     }
     float bob = std::sin(time * 2.2f + id * 1.7f) * 1.3f;
     float size = (58 + level * 3.0f) * EaseOut(build) * (1 + 0.07f * recoil);
+    bool stone = disabled == Disable::Petrified && disabledTime > 0;
+    bool confused = disabled == Disable::Confused && disabledTime > 0;
+    if (stone) bob = 0;
     Rectangle dest{p.x - size / 2, p.y + 10 - size * 0.92f + bob, size, size};
-    Art::DrawPortrait(hero, dest);
+    Art::DrawPortrait(hero, dest, stone ? Color{120, 116, 106, 255} : WHITE);
+    if (stone) {
+        Draw::BlendAdd();
+        Draw::Glow(Add(p, {0, -24}), 26, WithAlpha({200, 196, 180, 255}, 0.25f));
+        Draw::BlendNormal();
+    }
+    if (confused) {
+        for (int i = 0; i < 3; ++i) {
+            Vector2 c = Add(Add(p, {0, -size * 0.95f}), Mul(Dir(time * 4 + i * 2.1f), 12));
+            Draw::Star(c, 4, 1.6f, time * 3, {255, 90, 80, 255});
+        }
+    }
     if (flash > 0) {
         Draw::BlendAdd();
         for (int side : {-1, 1}) {
@@ -237,6 +326,7 @@ void BattleScene::OnLoad() {
     brothersCooldown = 35;
     strikeCooldown = 12;
     fusionCooldown = 0;
+    fogTime = 0;
     flashScreen = shake = baseFlash = goldPulse = livesPulse = 0;
     ApplySpeed();
     Banner(level->name, level->subtitle, Palette::gold);
@@ -414,6 +504,7 @@ void BattleScene::FixedUpdate() {
             strikeCooldown = std::max(0.0f, strikeCooldown - dt);
             fusionCooldown = std::max(0.0f, fusionCooldown - dt);
         }
+        fogTime = std::max(0.0f, fogTime - dt);
         for (auto& s : strikes) {
             s.time += dt;
             float jetX = Lerp(kMapX - 140, kMapX + kMapW + 140, s.time / 1.8f);
@@ -492,8 +583,8 @@ void BattleScene::SpawnEnemy(EnemyId type, int path, float dist) {
     e->maxHp = e->hp = def.hp * (def.boss ? BossHpScale(*level, wave) : WaveHpScale(*level, wave));
     e->armor = def.armor * (1 + 0.05f * wave);
     e->speedMul = def.boss ? 1.0f : Rand(0.94f, 1.06f);
-    e->abilityA = type == EnemyId::Belial ? 6.0f : 4.0f;
-    e->abilityB = 6.5f;
+    e->abilityA = type == EnemyId::Belial ? 6.0f : type == EnemyId::Metron ? Rand(2, 5) : type == EnemyId::Gatanothor ? 8.0f : 4.0f;
+    e->abilityB = type == EnemyId::Tregear ? 8.0f : type == EnemyId::Gatanothor ? 5.0f : 6.5f;
     e->anim = Rand(0, 10);
     e->ySort = true;
     object->transform->position = map.paths[path].Sample(dist, &e->dir);
@@ -855,8 +946,8 @@ void BattleScene::Explode(Vector2 at, float radius, float damage, int towerId, b
 }
 
 void BattleScene::DamageEnemy(MonsterActor& e, float amount, int towerId, bool ignoreArmor) {
-    if (e.dead || amount <= 0) return;
-    float armor = e.breakTime > 0 ? e.armor * 0.4f : e.armor;
+    if (e.dead || amount <= 0 || e.phaseTime > 0) return;
+    float armor = (e.breakTime > 0 ? e.armor * 0.4f : e.armor) + (e.buffTime > 0 ? 4.0f : 0.0f);
     float dmg = ignoreArmor ? amount : std::max(amount * 0.25f, amount - armor);
     if (e.vulnTime > 0) dmg *= 1.2f;
     if (e.shieldTime > 0) dmg *= kShieldTaken;
@@ -1070,6 +1161,30 @@ HeroActor* BattleScene::FindTower(int id) {
     for (auto& t : heroes)
         if (t->id == id) return t.get();
     return nullptr;
+}
+
+HeroActor* BattleScene::NearestHero(Vector2 at, float radius, bool skipDisabled) {
+    HeroActor* best = nullptr;
+    float bestDist = radius;
+    for (auto& t : heroes) {
+        if (skipDisabled && t->disabledTime > 0) continue;
+        float d = Len(Sub(t->Pos(), at));
+        if (d <= bestDist) {
+            bestDist = d;
+            best = t.get();
+        }
+    }
+    return best;
+}
+
+void BattleScene::DisableHero(HeroActor& hero, HeroActor::Disable kind, float seconds, Vector2 from) {
+    hero.disabledTime = std::max(hero.disabledTime, seconds);
+    hero.disabled = kind;
+    bool stone = kind == HeroActor::Disable::Petrified;
+    Color tone = stone ? Color{200, 196, 180, 255} : Color{255, 70, 60, 255};
+    AddBeam(from, Add(hero.Pos(), {0, -20}), stone ? 6.0f : 3.0f, 0.4f, tone, WHITE);
+    Burst(Add(hero.Pos(), {0, -20}), tone, 14, 120, 5, 0.4f);
+    Sfx::Play(stone ? "shield" : "teleport", 0.45f);
 }
 
 // ================================================================ helpers
@@ -1342,6 +1457,18 @@ void BattleScene::DrawWorld() {
         if (!e->dead) Draw::Shadow(Add(e->Feet(), {2, 1}), 15 * e->Scale(), 5 * e->Scale(), 0.45f * e->appear);
 
     Scene::Render(); // corpses, heroes and kaiju in depth order, then particle emitters
+
+    if (fogTime > 0) {
+        float a = Clamp(fogTime, 0.0f, 1.0f) * Clamp((4.0f - fogTime) * 3, 0.0f, 1.0f);
+        DrawRectangleRec(MapRect(), WithAlpha({20, 10, 34, 255}, 0.42f * a));
+        Rng mist(7);
+        for (int i = 0; i < 14; ++i) {
+            Vector2 c{kMapX + mist.Float() * kMapW + std::sin(simTime * 0.6f + i) * 30, kMapY + mist.Float() * kMapH};
+            Draw::GlowStretched(c, mist.Range(90, 170), mist.Range(30, 60), 0, WithAlpha({70, 40, 90, 255}, 0.35f * a));
+        }
+        Gui::TextOutline("黑雾笼罩：英雄攻速减半", kMapX + kMapW / 2, kMapY + kMapH - 40, 18, WithAlpha({220, 200, 255, 255}, a),
+                         WithAlpha(BLACK, a), 1.4f);
+    }
 
     for (const auto& e : monsters) DrawHealthBar(*e);
 
@@ -1750,9 +1877,11 @@ void BattleScene::DrawBossBar() {
     Rectangle r{kMapX + kMapW / 2 - 260, kMapY + 8, 520, 40};
     Draw::RoundedPanel(r, 10, {14, 6, 16, 225}, WithAlpha(Palette::red, 0.8f), 1.5f);
     Gui::Text(TextFormat("%s · %s", def.title, def.name), r.x + 12, r.y + 4, 14, Palette::text, Gui::Align::Left, true);
-    std::string status = boss->shieldTime > 0 ? TextFormat("护盾展开！伤害 -%d%%", (int)std::lround((1 - kShieldTaken) * 100))
-                         : boss->enraged      ? "暴怒"
-                                              : "";
+    std::string status;
+    if (boss->shieldTime > 0) status = TextFormat("护盾展开！伤害 -%d%%", (int)std::lround((1 - kShieldTaken) * 100));
+    else if (boss->phaseTime > 0) status = "穿越异次元，无法攻击";
+    else if (boss->type == EnemyId::Gatanothor) status = boss->enraged ? "外壳碎裂" : "外壳坚硬，护甲极高";
+    else if (boss->enraged) status = "暴怒";
     if (!status.empty())
         Gui::Text(status, r.x + r.width - 12, r.y + 4, 13, boss->shieldTime > 0 ? Palette::gold : Palette::red, Gui::Align::Right, true);
     float ratio = Clamp(boss->hp / boss->maxHp, 0.0f, 1.0f);

@@ -205,8 +205,9 @@ bool ParseLevel(const std::string& text, const std::string& file, LevelDef& out,
                 auto words = Tokens(rest.substr(0, bar));
                 SpawnGroup g{EnemyId::Gomora, 1, 1, 0, -1};
                 if (words.empty() || !EnemyByKey(words[0], g.enemy)) {
-                    fail(number, "未知怪兽“" + (words.empty() ? std::string("") : words[0]) +
-                                     "”，可用：gomora baltan baltan_clone eleking redking zetton belial");
+                    std::string keys;
+                    for (int i = 0; i < kEnemyCount; ++i) keys += std::string(i ? " " : "") + EnemyInfo((EnemyId)i).key;
+                    fail(number, "未知怪兽“" + (words.empty() ? std::string("") : words[0]) + "”，可用：" + keys);
                 } else {
                     for (size_t i = 1; i < words.size(); ++i) {
                         const std::string& w = words[i];

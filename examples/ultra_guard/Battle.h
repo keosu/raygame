@@ -20,6 +20,8 @@ public:
     float hp = 1, maxHp = 1, armor = 0, speedMul = 1;
     float slowTime = 0, slowAmount = 0, burnTime = 0, burnDps = 0;
     float breakTime = 0, vulnTime = 0, stunTime = 0, shieldTime = 0;
+    float phaseTime = 0; // Tregear inside a dimension gate: untargetable and immune
+    float buffTime = 0;  // driven berserk by Tregear: faster and tougher
     float abilityA = 0, abilityB = 0;
     float flash = 0, face = 1, anim = 0, appear = 0;
     bool dead = false, enraged = false;
@@ -43,6 +45,8 @@ public:
     int col = 0, row = 0, level = 0, mode = 0, invested = 0, shots = 0, kills = 0;
     float cooldown = 0.35f, recoil = 0, flash = 0, build = 0, dealt = 0;
     float nextCooldownScale = 1; // set by Fire for one shot, e.g. Trigger's rapid Sky Type
+    float disabledTime = 0;
+    enum class Disable { None, Confused, Petrified } disabled = Disable::None; // Metron / Gatanothor
 
     Vector2 Pos() const { return gameObject->transform->position; }
     float RenderDepth() const override { return Pos().y + 10; } // pedestal base
@@ -133,6 +137,7 @@ private:
     bool restartRequested = false;
     float brothersCooldown = 0, strikeCooldown = 0, fusionCooldown = 0;
     float flashScreen = 0, shake = 0, baseFlash = 0;
+    float fogTime = 0; // Gatanothor's dark fog: heroes reload at half speed
     float goldPulse = 0, livesPulse = 0;
 
     std::string bannerTitle, bannerSub;
@@ -166,6 +171,8 @@ private:
     std::vector<MonsterActor*> KaijuInCircle(Vector2 center, float radius) const;
     std::vector<Ref<MonsterActor>> Alive() const;
     HeroActor* FindTower(int id);
+    HeroActor* NearestHero(Vector2 at, float radius, bool skipDisabled = true);
+    void DisableHero(HeroActor& hero, HeroActor::Disable kind, float seconds, Vector2 from);
     void Banner(const std::string& title, const std::string& sub, Color color, bool warning = false);
     void SetOutcome(Outcome value);
     void Restart();

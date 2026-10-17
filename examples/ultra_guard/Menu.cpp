@@ -490,7 +490,8 @@ void MenuScene::DrawKaiju() {
     DrawBack();
     DrawPageTitle("怪兽图鉴", "了解敌人的特性，才能制定最佳防守策略");
     float t = RealTime();
-    float cw = 150, gap = 12;
+    float gap = 10;
+    float cw = std::min(150.0f, (W - 60 - (kEnemyCount - 1) * gap) / kEnemyCount);
     float start = W / 2 - (kEnemyCount * cw + (kEnemyCount - 1) * gap) / 2;
     for (int i = 0; i < kEnemyCount; ++i) {
         const EnemyDef& def = EnemyInfo((EnemyId)i);
@@ -505,11 +506,11 @@ void MenuScene::DrawKaiju() {
         Draw::GlowStretched({r.x + cw / 2, r.y + 112}, 46, 10, 0, WithAlpha(BLACK, 0.5f));
         Art::KaijuPose pose;
         pose.feet = {r.x + cw / 2, r.y + 112};
-        pose.scale = 1.7f / std::max(1.0f, def.size * 0.85f);
+        pose.scale = 1.7f / std::max(1.0f, def.size * 0.85f) * std::min(1.0f, cw / 120);
         pose.time = t + i;
         Art::DrawKaiju((EnemyId)i, pose);
-        Gui::Text(def.name, r.x + cw / 2, r.y + 124, 16, Palette::text, Gui::Align::Center, true);
-        if (def.boss) Gui::Text("BOSS", r.x + cw - 10, r.y + 8, 12, Palette::red, Gui::Align::Right, true);
+        Gui::Text(def.name, r.x + cw / 2, r.y + 124, cw < 120 ? 13.0f : 16.0f, Palette::text, Gui::Align::Center, true);
+        if (def.boss) Gui::Text("BOSS", r.x + cw - 8, r.y + 8, 11, Palette::red, Gui::Align::Right, true);
     }
     const EnemyDef& def = EnemyInfo((EnemyId)kaijuIndex);
     Rectangle panel{50, 306, W - 100, 384};

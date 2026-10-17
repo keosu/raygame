@@ -6,7 +6,7 @@ desc     观光车改道后，怪兽沿着园内栈道折返。路很长，密�
 theme    park
 gold     560
 lives    20
-hp       2.20
+hp       2.05
 seed     2010
 base     17 6
 heroes   z orb trigger geed arc zero
@@ -16,11 +16,14 @@ wave     gomora x6 every 1.3
 wave     baltan x8 every 0.9
 wave     gomora x6 every 1.05 | baltan x6 every 0.85 after 3
 wave     eleking x6 every 0.8
-wave     gomora x8 every 0.95 | eleking x5 every 0.75 after 3
+wave     metron x3 every 2 | gomora x6 every 1 after 1
 wave     redking x2 every 2.4 | baltan x8 every 0.75 after 2
 wave     eleking x10 every 0.65 | gomora x6 every 0.9 after 4
+wave     kingjoe x2 every 3 | metron x2 every 2 after 3
 wave     baltan x12 every 0.6 | redking x2 every 2.2 after 3
 wave     gomora x10 every 0.75 | eleking x8 every 0.65 after 4
+wave     zetton x1 | metron x3 every 2 after 3
 wave     redking x4 every 1.7 | baltan x10 every 0.65 after 2
-wave     eleking x12 every 0.6 | gomora x8 every 0.75 after 3
-wave     zetton x1 | baltan x8 every 0.7 after 2 | eleking x6 every 0.7 after 5
+wave     kingjoe x3 every 2.5 | eleking x8 every 0.65 after 3
+wave     eleking x12 every 0.6 | gomora x8 every 0.75 after 3 | metron x2 every 2.5 after 5
+wave     tregear x1 | baltan x8 every 0.7 after 3 | gomora x6 every 0.9 after 6

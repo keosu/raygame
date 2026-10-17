@@ -23,6 +23,12 @@ SOURCES = {
     "redking": (r"E:\works\raygame\build\kaiju_dl\redking\04.png", {"r": 40, "b": -46}),
     "zetton": (r"E:\works\raygame\build\kaiju_dl4\zetton\full.png", None),
     "belial": (r"E:\works\ultralman\public\img\cutout\belial.png", None),
+    # Ultra series wiki renders (ultra.fandom.com, fetched with a Referer header): Ultraseven
+    # King Joe render, Alien MetronI, TregearRender, Gatanothor render.
+    "kingjoe": ("kingjoe.png", None),
+    "metron": ("metron.png", None),
+    "tregear": ("tregear.png", None),
+    "gatanothor": ("gatanothor.png", None),
 }
 
 # Sprites are drawn at ~48 world pixels, so a long edge of 768 is plenty.
@@ -70,19 +76,25 @@ def main():
     here = os.path.dirname(os.path.abspath(__file__))
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", default=os.path.join(here, "..", "assets", "skins", "real", "kaiju"))
+    parser.add_argument("--source", default=".", help="directory for sources given as bare file names")
     args = parser.parse_args()
 
     out = os.path.normpath(args.out)
     os.makedirs(out, exist_ok=True)
 
     for key, (source, shift) in SOURCES.items():
-        image = shift_channels(fit(cut(source)), shift)
+        path = source if os.path.isabs(source) else os.path.join(args.source, source)
+        if not os.path.isfile(path):
+            print(f"skip {key}: {path} not found")
+            continue
+        image = shift_channels(fit(cut(path)), shift)
         image.save(os.path.join(out, key + ".png"), "PNG", optimize=True)
         print(f"{key}: {image.size}")
 
-    clone = clone_of_tint(SOURCES["baltan"][0], 70, flip=True)
-    clone.save(os.path.join(out, "baltan_clone.png"), "PNG", optimize=True)
-    print(f"baltan_clone: {clone.size} (blue tint, mirrored)")
+    if os.path.isfile(SOURCES["baltan"][0]):
+        clone = clone_of_tint(SOURCES["baltan"][0], 70, flip=True)
+        clone.save(os.path.join(out, "baltan_clone.png"), "PNG", optimize=True)
+        print(f"baltan_clone: {clone.size} (blue tint, mirrored)")
 
 
 if __name__ == "__main__":

@@ -32,7 +32,7 @@ struct HeroDef {
 const HeroDef& HeroInfo(HeroId id);
 bool HeroByKey(const std::string& key, HeroId& out);
 
-enum class EnemyId { Baltan, BaltanClone, Gomora, Eleking, RedKing, Zetton, Belial, Count };
+enum class EnemyId { Baltan, BaltanClone, Gomora, Eleking, RedKing, Zetton, Belial, KingJoe, Metron, Tregear, Gatanothor, Count };
 constexpr int kEnemyCount = (int)EnemyId::Count;
 
 struct EnemyDef {

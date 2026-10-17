@@ -236,6 +236,79 @@ void Belial(const Frame& k, float t, bool enraged) {
     PolyK(k, {{6, -53 + hover}, {1.5f, -50 + hover}, {2, -48 + hover}, {6.5f, -50 + hover}}, eye);
     Draw::Line(k.P(-7, -56 + hover), k.P(-2, -45 + hover), k.R(0.7f), k.C(red));
 }
+void KingJoe(const Frame& k, float t) {
+    const Color metal{206, 194, 160, 255}, dark{120, 110, 88, 255}, lens{120, 220, 255, 255};
+    float step = std::sin(t * 4);
+    Limb(k, -6, -16, -7 - step * 2, -1, 5.5f, dark);
+    Limb(k, 6, -16, 7 + step * 2, -1, 5.5f, metal);
+    PolyK(k, {{-13, -40}, {13, -40}, {11, -16}, {-11, -16}}, kInk);
+    PolyK(k, {{-12, -39}, {12, -39}, {10, -17}, {-10, -17}}, metal);
+    for (int i = 0; i < 3; ++i) Draw::Line(k.P(-9, -34 + i * 6.0f), k.P(9, -34 + i * 6.0f), k.R(0.9f), k.C(dark));
+    for (float side : {-1.0f, 1.0f}) {
+        Limb(k, side * 13, -37, side * 19, -26, 3.8f, metal);
+        Limb(k, side * 19, -26, side * 18, -17, 3.4f, dark);
+    }
+    Body(k, 0, -47, 9, 7.5f, metal);
+    Body(k, -3.5f, -47, 3, 4, lens, 0, 0.8f);
+    Body(k, 3.5f, -47, 3, 4, lens, 0, 0.8f);
+    Draw::Line(k.P(0, -54), k.P(0, -60), k.R(1), k.C(dark));
+    DrawCircleV(k.P(0, -61), k.R(1.6f), k.C({255, 90, 70, 255}));
+}
+
+void Metron(const Frame& k, float t) {
+    const Color head{226, 74, 40, 255}, spot{255, 210, 70, 255}, limb{70, 110, 200, 255};
+    float step = std::sin(t * 7);
+    Limb(k, -4, -14, -5 - step * 2, -1, 3.2f, limb);
+    Limb(k, 4, -14, 5 + step * 2, -1, 3.2f, limb);
+    for (float side : {-1.0f, 1.0f}) Limb(k, side * 7, -30, side * 15, -22 + step * side, 2.4f, limb);
+    auto shape = Draw::EggPoints(k.P(0, -34), k.R(10), k.R(22), -0.25f, 32);
+    Draw::Poly(Draw::Transform(shape, k.P(0, -34), k.P(0, -34), 1.08f), k.C(kInk));
+    Draw::Poly(shape, k.C(head));
+    for (int i = 0; i < 6; ++i) Body(k, (i % 2 ? 4.0f : -4.0f), -48 + i * 5.0f, 2, 1.4f, spot, 0, 0.5f);
+    Eye(k, 7, -44, 1.6f, {255, 240, 120, 255});
+}
+
+void Tregear(const Frame& k, float t) {
+    const Color blue{38, 56, 140, 255}, black{22, 22, 34, 255}, silver{196, 204, 222, 255}, orange{255, 150, 40, 255};
+    float step = std::sin(t * 5);
+    Limb(k, -5, -16, -6 - step * 2, -1, 4.2f, black);
+    Limb(k, 5, -16, 6 + step * 2, -1, 4.2f, blue);
+    Body(k, 0, -29, 11, 15, blue);
+    PolyK(k, {{0, -40}, {7, -33}, {0, -24}, {-7, -33}}, orange);
+    DrawCircleV(k.P(0, -32), k.R(2.2f), k.C({255, 230, 160, 255}));
+    for (float side : {-1.0f, 1.0f}) {
+        Limb(k, side * 10, -38, side * 16, -27, 3.2f, black);
+        Limb(k, side * 16, -27, side * 15, -18, 2.8f, blue);
+        TriK(k, {side * 8, -42}, {side * 15, -40}, {side * 20, -48}, silver);
+    }
+    Body(k, 0, -49, 7, 8, silver);
+    TriK(k, {-3, -55}, {3, -55}, {0, -64}, blue);
+    PolyK(k, {{-6, -51}, {-1.5f, -48}, {-2, -46}, {-6.5f, -48}}, {255, 230, 120, 255});
+    PolyK(k, {{6, -51}, {1.5f, -48}, {2, -46}, {6.5f, -48}}, {255, 230, 120, 255});
+}
+
+void Gatanothor(const Frame& k, float t, bool cracked) {
+    const Color shell{92, 84, 70, 255}, ridge{150, 140, 116, 255}, flesh{64, 54, 60, 255};
+    float sway = std::sin(t * 2);
+    for (int i = 0; i < 6; ++i) {
+        float x = -16 + i * 6.5f;
+        Draw::Capsule(k.P(x, -6), k.P(x + std::sin(t * 3 + i) * 4, 0), k.R(2.2f), k.C(flesh));
+    }
+    Body(k, 0, -24, 22, 18, shell);
+    for (int i = 0; i < 4; ++i)
+        Draw::Arc(k.P(-4, -27), k.R(5 + i * 4.5f), k.R(1.2f), PI * 0.2f + i * 0.4f, PI * 1.6f + i * 0.4f, k.C(ridge), 16);
+    for (int i = 0; i < 7; ++i) TriK(k, {-18 + i * 6.0f, -38}, {-14 + i * 6.0f, -38}, {-16 + i * 6.0f, -48.0f - (i % 2) * 4}, ridge);
+    for (float side : {-1.0f, 1.0f}) {
+        Limb(k, side * 18, -22, side * 28, -16 + sway * side, 3.6f, flesh);
+        TriK(k, {side * 26, -20}, {side * 34, -22}, {side * 30, -12}, ridge);
+    }
+    Body(k, 8, -14, 8, 6, flesh);
+    Eye(k, 6, -11, 1.8f, {255, 220, 90, 255});
+    Eye(k, 11, -11, 1.8f, {255, 220, 90, 255});
+    if (cracked)
+        for (int i = 0; i < 3; ++i)
+            Draw::Line(k.P(-10 + i * 8.0f, -38), k.P(-6 + i * 7.0f, -20), k.R(0.9f), k.C({255, 120, 60, 255}));
+}
 } // namespace
 
 float KaijuHeight(EnemyId id) {
@@ -243,6 +316,10 @@ float KaijuHeight(EnemyId id) {
     case EnemyId::Zetton: return 62;
     case EnemyId::Belial: return 66;
     case EnemyId::RedKing: return 54;
+    case EnemyId::KingJoe: return 60;
+    case EnemyId::Metron: return 56;
+    case EnemyId::Tregear: return 64;
+    case EnemyId::Gatanothor: return 50;
     default: return 48;
     }
 }
@@ -286,6 +363,10 @@ void DrawBuiltinKaiju(EnemyId id, const KaijuPose& pose) {
     case EnemyId::BaltanClone: Baltan(k, pose.time, true); break;
     case EnemyId::Zetton: Zetton(k, pose.time, pose.shielded); break;
     case EnemyId::Belial: Belial(k, pose.time, pose.enraged); break;
+    case EnemyId::KingJoe: KingJoe(k, pose.time); break;
+    case EnemyId::Metron: Metron(k, pose.time); break;
+    case EnemyId::Tregear: Tregear(k, pose.time); break;
+    case EnemyId::Gatanothor: Gatanothor(k, pose.time, pose.enraged); break;
     default: break;
     }
 }

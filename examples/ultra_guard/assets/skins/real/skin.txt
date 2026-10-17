@@ -12,6 +12,10 @@ kaiju eleking      frames 1 fps 1 size 48 feet 1
 kaiju redking      frames 1 fps 1 size 54 feet 1
 kaiju zetton       frames 1 fps 1 size 62 feet 1
 kaiju belial       frames 1 fps 1 size 66 feet 1
+kaiju kingjoe      frames 1 fps 1 size 54 feet 1
+kaiju metron       frames 1 fps 1 size 50 feet 1
+kaiju tregear      frames 1 fps 1 size 62 feet 1
+kaiju gatanothor   frames 1 fps 1 size 54 feet 1
 
 map_paths on
 map_decor on

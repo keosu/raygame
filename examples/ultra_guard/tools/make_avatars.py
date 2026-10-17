@@ -31,6 +31,12 @@ SOURCES = {
     "blazar": "blazar.png",
 }
 
+# Hand-measured (centre x, top y, head height) in source pixels for poses that fool
+# head_window, e.g. Trigger's raised arm reaching above the head.
+WINDOWS = {
+    "trigger": (528, 20, 456),
+}
+
 # Head share of the final square, and where the head starts vertically.
 HEAD_SHARE = 0.46
 HEAD_TOP = 0.12
@@ -81,9 +87,9 @@ def head_window(image):
     return centre, top, head_height
 
 
-def build(source, target, size, pad_x, alpha_floor):
+def build(source, target, size, pad_x, alpha_floor, window=None):
     image = Image.open(source).convert("RGBA")
-    centre, top, head_height = head_window(image)
+    centre, top, head_height = window or head_window(image)
     side = head_height / HEAD_SHARE
     left = centre - side / 2
     upper = top - side * HEAD_TOP
@@ -133,7 +139,7 @@ def main():
             missing += 1
             continue
         target = os.path.join(out, key + ".png")
-        side, head = build(source, target, args.size, args.pad_x, args.alpha_floor)
+        side, head = build(source, target, args.size, args.pad_x, args.alpha_floor, WINDOWS.get(key))
         print(f"{key}: window {side:.0f}px, head {head:.0f}px -> {target}")
     return 1 if missing == len(SOURCES) else 0
 
