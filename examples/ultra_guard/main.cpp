@@ -215,8 +215,10 @@ private:
             Shot("20_studio");
             if (auto* b = Debug()) b->DebugCast();
             break;
-        case 1705:
+        case 1686: // 3x speed: the beams fade within a few frames
             Shot("21_fusion");
+            break;
+        case 1700:
             Quit();
             break;
         default:
@@ -265,6 +267,8 @@ void SetGameSpeed(float scale) {
 void QuitGame() {
     if (game) game->Quit();
 }
+
+bool ScriptedCapture() { return !captureDir.empty(); }
 
 int RunBalanceReport(const std::string& path);
 

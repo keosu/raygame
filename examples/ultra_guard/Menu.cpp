@@ -436,7 +436,7 @@ void MenuScene::DrawCodex() {
         return;
     }
     codexIndex = std::clamp(codexIndex, 0, (int)entries.size() - 1);
-    constexpr int kVisible = 8;
+    constexpr int kVisible = 7;
     int page = codexIndex / kVisible;
     int first = page * kVisible;
     for (int i = first; i < std::min(first + kVisible, (int)entries.size()); ++i) {
@@ -454,8 +454,8 @@ void MenuScene::DrawCodex() {
     }
     int pages = ((int)entries.size() + kVisible - 1) / kVisible;
     if (pages > 1) {
-        if (Gui::Button({48, 682, 110, 30}, "上一页", Gui::Style::Dark, page > 0, 15)) codexIndex = (page - 1) * kVisible;
-        if (Gui::Button({168, 682, 110, 30}, "下一页", Gui::Style::Dark, page + 1 < pages, 15))
+        if (Gui::Button({48, 626, 175, 46}, "上一页", Gui::Style::Dark, page > 0, 17)) codexIndex = (page - 1) * kVisible;
+        if (Gui::Button({233, 626, 175, 46}, "下一页", Gui::Style::Dark, page + 1 < pages, 17))
             codexIndex = std::min((page + 1) * kVisible, (int)entries.size() - 1);
     }
     const UltraEntry& entry = entries[codexIndex];

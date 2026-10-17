@@ -272,7 +272,8 @@ void BattleScene::CreateEmitters() {
     for (const auto& s : setups) {
         auto emitter = CreateGameObject("fx")->AddComponent<ParticleEmitter>();
         emitter->emitting = false;
-        emitter->maxParticles = 900;
+        // Skills burst hundreds of sparks at once; leave headroom over a busy wave.
+        emitter->maxParticles = s.kind == Fx::Spark || s.kind == Fx::Glow ? 1800 : 900;
         emitter->texture = Draw::GlowHandle();
         emitter->blend = s.blend;
         emitter->drag = s.drag;
@@ -326,7 +327,7 @@ bool BattleScene::CanStartWave() const {
 
 void BattleScene::HandleInput() {
     if (!Running()) return;
-    if (!Input::GetFrame().focused && !paused) SetPaused(true); // e.g. app sent to background
+    if (!Input::GetFrame().focused && !paused && !ScriptedCapture()) SetPaused(true); // e.g. app sent to background
     if (Input::GetKeyDown(KEY_ESCAPE) || Input::GetKeyDown(KEY_BACK)) {
         if (placing >= 0 || targetingStrike) {
             placing = -1;
@@ -729,7 +730,7 @@ void BattleScene::Explode(Vector2 at, float radius, float damage, int towerId, b
     AddRing(at, 4, radius * 0.7f, 0.55f, 3, hot);
     AddRing(at, 12, radius * 1.15f, 0.7f, 4, alt);
     Sfx::Play("explode", 0.5f);
-    shake = std::max(shake, 0.35f);
+    if (stun) shake = std::max(shake, 0.35f); // airstrikes only; Arc fires too often to shake every hit
 }
 
 void BattleScene::DamageEnemy(MonsterActor& e, float amount, int towerId, bool ignoreArmor) {

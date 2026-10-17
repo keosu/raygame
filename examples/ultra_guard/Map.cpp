@@ -105,6 +105,19 @@ void PathDashes(const MapData& map, float dash, float gap, float width, Color co
     }
 }
 
+void PathArrows(const MapData& map, float spacing, Color color) {
+    for (const auto& path : map.paths) {
+        for (float d = kTile; d < path.length - kTile * 0.5f; d += spacing) {
+            Vector2 dir;
+            Vector2 p = path.Sample(d, &dir);
+            Vector2 n{-dir.y, dir.x};
+            Vector2 tip = Add(p, Mul(dir, 5));
+            Draw::Line(tip, Add(Sub(p, Mul(dir, 4)), Mul(n, 7)), 2.4f, color);
+            Draw::Line(tip, Sub(Sub(p, Mul(dir, 4)), Mul(n, 7)), 2.4f, color);
+        }
+    }
+}
+
 void PathPebbles(const MapData& map, Rng& rng, int perTile, Color a, Color b) {
     for (const auto& path : map.paths) {
         for (float d = 0; d < path.length; d += kTile / perTile) {
@@ -451,34 +464,25 @@ void Paths(const MapData& map) {
         PathStroke(map, kTile * 0.94f, {120, 200, 255, 255});
         PathStroke(map, kTile * 0.86f, {40, 56, 126, 255});
         PathStroke(map, kTile * 0.62f, {56, 80, 160, 255});
-        for (const auto& path : map.paths) {
-            for (float d = kTile; d < path.length - kTile * 0.5f; d += kTile * 0.75f) {
-                Vector2 dir;
-                Vector2 p = path.Sample(d, &dir);
-                Vector2 n{-dir.y, dir.x};
-                Vector2 tip = Add(p, Mul(dir, 5));
-                Color c{170, 220, 255, 150};
-                Draw::Line(tip, Add(Sub(p, Mul(dir, 4)), Mul(n, 7)), 2.4f, c);
-                Draw::Line(tip, Sub(Sub(p, Mul(dir, 4)), Mul(n, 7)), 2.4f, c);
-            }
-        }
+        PathArrows(map, kTile * 0.75f, {170, 220, 255, 150});
         break;
     case Theme::Park:
         PathStroke(map, kTile * 1.02f, {92, 64, 36, 255});
         PathStroke(map, kTile * 0.9f, {196, 150, 88, 255});
         PathStroke(map, kTile * 0.72f, {222, 184, 120, 255});
-        PathDashes(map, 8, 6, 2.2f, {140, 96, 52, 255});
+        PathArrows(map, kTile * 1.5f, {120, 78, 40, 170});
         break;
     case Theme::Plaza:
         PathStroke(map, kTile * 1.0f, {120, 78, 36, 255});
         PathStroke(map, kTile * 0.86f, {186, 36, 52, 255});
         PathStroke(map, kTile * 0.62f, {214, 54, 68, 255});
-        PathDashes(map, 10, 14, 2.0f, {255, 214, 120, 255});
+        PathArrows(map, kTile * 1.5f, {255, 214, 120, 190});
         break;
     case Theme::Studio:
         PathStroke(map, kTile * 0.92f, {48, 52, 64, 255});
         PathStroke(map, kTile * 0.78f, {28, 30, 40, 255});
         PathDashes(map, 14, 10, 3.0f, {255, 214, 60, 255});
+        PathArrows(map, kTile * 2.0f, {255, 214, 60, 200});
         break;
     }
 }
