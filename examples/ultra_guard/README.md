@@ -5,8 +5,9 @@
 > 归其权利人所有。示例不含任何官方图片、音频或字体：英雄与怪兽均为代码绘制的
 > 示意形象，音效与音乐由脚本合成。若权利人提出要求，将移除本示例。
 
-六关塔防：在道路旁放置六位光之巨人，抵御七种怪兽（含两种 BOSS），撑过所有波次。
-难度从东京湾逐关升高，后三关是长隆、奥特曼主题乐园和环球影城。
+六关塔防：每关在道路旁放置六位光之巨人，抵御七种怪兽（含两种 BOSS），撑过所有波次。
+难度从东京湾逐关升高，后三关是长隆、奥特曼主题乐园和环球影城。前三关是泽塔、欧布、迪迦、
+捷德、亚刻、赛罗；后三关逐关换入新生代的特利迦（三型轮换）、德凯（黑洞牵引）和布莱泽（贯穿光矛）。
 本示例同时展示 raygame 的 GameObject/Component 架构在完整游戏中的用法。
 
 ## 运行
@@ -41,6 +42,7 @@ pwsh -NoProfile -File scripts/build-android.ps1 -Game ultra_guard
 
 ```text
 theme    city            # city / mountain / nebula / park / plaza / studio
+heroes   z orb trigger geed arc zero   # 可选，最多 6 位，按卡片顺序；省略时为前六位
 gold     340
 base     17 9            # 基地格子（20 列 × 12 行）
 path     -1,2 4,2 4,8 9,8 9,3 14,3 14,9 17,9
@@ -53,10 +55,11 @@ wave     redking x4 every 1.8 | baltan x10 every 0.7 after 2 | zetton x1 after 8
 
 ## 奥特曼数据库（assets/ultras/codex.txt）
 
-标题页「奥特数据库」列出可上阵的英雄，以及尚未编入防卫队的档案（特利迦、德凯、布莱泽、泰迦，
-另收初代、赛文、泰罗三位经典战士）。招式名按中文常用译名；游戏里的攻击方式是改编，`note` 会写明。
+标题页「奥特数据库」列出九位可上阵的英雄，以及尚未编入防卫队的档案（泰迦，另收初代、赛文、
+泰罗三位经典战士）。招式名按中文常用译名；游戏里的攻击方式是改编，`note` 会写明。
 新增一条用 `---` 分隔；`id` 与英雄 key 相同才会显示头像。
-档案本身不会自动变成可放置英雄，接入新关卡时再在 `Data.cpp` 的 `HeroId` 里补战斗数据。
+档案本身不会自动变成可放置英雄：要在 `Data.h` 的 `HeroId` 和 `Data.cpp` 的 `kHeroes` 里补战斗数据，
+在 `Portraits.cpp` 画半身像（或放 `avatars/<key>.png`），再写进关卡的 `heroes`。
 
 ## 皮肤（assets/skins/）
 
@@ -94,7 +97,8 @@ wave     redking x4 every 1.8 | baltan x10 every 0.7 after 2 | zetton x1 after 8
 - 音频：`tools/make_audio.py` 合成全部音效（WAV）与两首 BGM（Ogg Vorbis，需要 numpy、soundfile）。
 - 图标：`tools/make_icon.py` 用 `--capture` 导出的头像生成 Windows ICO 与 Android 启动图标。
 - 头像可替换：把正方形 PNG 放到皮肤目录或游戏资源目录的 `avatars/<key>.png`
-  （key 为 z、orb、tiga、geed、arc、zero）即可覆盖代码绘制的头像。
+  （key 为 z、orb、tiga、geed、arc、zero、trigger、decker、blazar）即可覆盖代码绘制的头像。
+  特利迦、德凯、布莱泽目前用代码绘制的半身像；有全身抠图时可用 `tools/make_avatars.py` 生成同风格的真人头像。
 - 现成的真人头像：`assets/avatars/` 由 `tools/make_avatars.py` 从立绘抠图裁剪生成
   （正方形、头部居中偏上、透明背景），源图可来自任意全身抠图；怪兽贴图见
   `assets/skins/real/`，由 `tools/make_kaiju.py` 生成（紧贴内容边界、静止帧，脚底贴图片底边）。

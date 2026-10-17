@@ -9,6 +9,7 @@ lives    20
 hp       2.20
 seed     2010
 base     17 6
+heroes   z orb trigger geed arc zero
 path     -1,1 4,1 4,10 9,10 9,2 14,2 14,10 17,10 17,6
 
 wave     gomora x6 every 1.3

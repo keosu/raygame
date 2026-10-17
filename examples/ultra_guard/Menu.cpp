@@ -236,13 +236,14 @@ void MenuScene::DrawTitle() {
     Gui::Text("奥特曼塔防  ·  集结光之巨人，守护地球", W / 2, 174, 21, WithAlpha(Palette::text, a), Gui::Align::Center);
 
     // Hero lineup
-    float size = 150, gap = 22;
+    float gap = 22;
+    float size = std::min(150.0f, (W - 80 - (kHeroCount - 1) * gap) / kHeroCount);
     float total = kHeroCount * size + (kHeroCount - 1) * gap;
     for (int i = 0; i < kHeroCount; ++i) {
         const HeroDef& def = HeroInfo((HeroId)i);
         float appear = EaseOut((pageTime - 0.15f - i * 0.08f) / 0.5f);
         if (appear <= 0) continue;
-        float arc = std::fabs(i - 2.5f);
+        float arc = std::fabs(i - (kHeroCount - 1) * 0.5f) * 5.0f / (kHeroCount - 1);
         float x = W / 2 - total / 2 + i * (size + gap);
         float y = 222 + arc * arc * 6 + std::sin(t * 1.6f + i) * 5 + (1 - appear) * 60;
         Vector2 c{x + size / 2, y + size * 0.62f};
@@ -252,7 +253,7 @@ void MenuScene::DrawTitle() {
         Draw::BlendNormal();
         Draw::GlowStretched({c.x, y + size + 4}, size * 0.5f, 12, 0, WithAlpha(BLACK, 0.5f * appear));
         Art::DrawPortrait((HeroId)i, {x, y, size, size}, WithAlpha(WHITE, appear));
-        Gui::TextShadow(def.name, c.x, y + size + 6, 17, WithAlpha(Palette::text, appear), Gui::Align::Center);
+        Gui::TextShadow(def.name, c.x, y + size + 6, size < 130 ? 15.0f : 17.0f, WithAlpha(Palette::text, appear), Gui::Align::Center);
     }
 
     float by = 470 + (1 - a) * 30;
@@ -357,10 +358,11 @@ void MenuScene::DrawHeroes() {
         DrawCodex();
         return;
     }
-    DrawPageTitle("出战英雄", "当前可以放置的六位光之巨人");
+    DrawPageTitle("出战英雄", "可上阵的光之巨人，每关阵容不同");
+    float rowH = std::min(92.0f, 566.0f / kHeroCount);
     for (int i = 0; i < kHeroCount; ++i) {
         const HeroDef& def = HeroInfo((HeroId)i);
-        Rectangle r{60, 134 + i * 92.0f, 270, 82};
+        Rectangle r{60, 134 + i * rowH, 270, rowH - 6};
         bool active = heroIndex == i;
         if (Gui::Clicked(r)) heroIndex = i;
         bool hover = Gui::Hover(r);
@@ -369,11 +371,12 @@ void MenuScene::DrawHeroes() {
                            : hover ? Lighten(def.primary, 0.3f)
                                    : Palette::line,
                            active ? 2.5f : 1.5f);
-        Art::DrawPortrait((HeroId)i, {r.x + 4, r.y - 2, 84, 84});
-        Gui::Text(def.name, r.x + 96, r.y + 16, 20, Palette::text, Gui::Align::Left, true);
-        Gui::Text(def.role, r.x + 96, r.y + 46, 14, def.beam);
-        Gui::Coin({r.x + r.width - 52, r.y + 26}, 7);
-        Gui::Text(TextFormat("%d", def.cost), r.x + r.width - 40, r.y + 17, 16, Palette::gold, Gui::Align::Left, true);
+        float s = r.height + 2;
+        Art::DrawPortrait((HeroId)i, {r.x + 4, r.y - 2, s, s});
+        Gui::Text(def.name, r.x + s + 12, r.y + r.height * 0.5f - 19, 18, Palette::text, Gui::Align::Left, true);
+        Gui::Text(def.role, r.x + s + 12, r.y + r.height * 0.5f + 3, 13, def.beam);
+        Gui::Coin({r.x + r.width - 52, r.y + r.height * 0.5f}, 7);
+        Gui::Text(TextFormat("%d", def.cost), r.x + r.width - 40, r.y + r.height * 0.5f - 9, 16, Palette::gold, Gui::Align::Left, true);
     }
     const HeroDef& def = HeroInfo((HeroId)heroIndex);
     Rectangle panel{360, 130, 870, 560};

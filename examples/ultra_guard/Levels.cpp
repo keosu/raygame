@@ -161,6 +161,23 @@ bool ParseLevel(const std::string& text, const std::string& file, LevelDef& out,
                 b.col >= kCols - 1 || b.row >= kRows)
                 fail(number, "base 需要两个整数“列 行”，列 0-" + std::to_string(kCols - 2) + "，行 0-" + std::to_string(kRows - 1));
             else def.base = b;
+        } else if (key == "heroes") {
+            std::vector<HeroId> roster;
+            for (const auto& t : tokens) {
+                HeroId id{};
+                if (!HeroByKey(t, id)) {
+                    std::string keys;
+                    for (int i = 0; i < kHeroCount; ++i) keys += std::string(i ? " " : "") + HeroInfo((HeroId)i).key;
+                    fail(number, "未知英雄“" + t + "”，可用：" + keys);
+                } else if (std::find(roster.begin(), roster.end(), id) != roster.end()) {
+                    fail(number, "英雄“" + t + "”重复");
+                } else {
+                    roster.push_back(id);
+                }
+            }
+            if (tokens.empty() || (int)tokens.size() > kRosterMax)
+                fail(number, "heroes 需要 1 到 " + std::to_string(kRosterMax) + " 位英雄");
+            else def.heroes = roster;
         } else if (key == "path") {
             std::vector<GridPoint> path;
             bool valid = tokens.size() >= 2;
@@ -238,6 +255,8 @@ bool ParseLevel(const std::string& text, const std::string& file, LevelDef& out,
             fail(check.line, "path " + std::to_string(check.path + 1) + " 不存在（共 " + std::to_string(def.paths.size()) + " 条路径）");
     if (def.seed == 0)
         for (char c : def.id) def.seed = def.seed * 131 + (unsigned char)c;
+    if (def.heroes.empty())
+        for (int i = 0; i < kRosterMax; ++i) def.heroes.push_back((HeroId)i);
     if (ok) out = std::move(def);
     return ok;
 }

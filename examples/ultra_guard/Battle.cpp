@@ -163,7 +163,8 @@ void HeroActor::FixedUpdate() {
         return;
     }
     battle->Fire(*this, *best);
-    cooldown = HeroCooldown(hero, level);
+    cooldown = HeroCooldown(hero, level) * nextCooldownScale;
+    nextCooldownScale = 1;
 }
 
 void HeroActor::Render() {
@@ -341,9 +342,10 @@ void BattleScene::HandleInput() {
     if (Input::GetKeyDown(KEY_P)) SetPaused(!paused);
     if (paused) return;
 
-    for (int i = 0; i < kHeroCount; ++i) {
+    for (int i = 0; i < (int)level->heroes.size(); ++i) {
         if (Input::GetKeyDown(KEY_ONE + i)) {
-            placing = placing == i ? -1 : i;
+            int hero = (int)level->heroes[i];
+            placing = placing == hero ? -1 : hero;
             selected = -1;
             targetingStrike = false;
         }
@@ -685,6 +687,125 @@ void BattleScene::Fire(HeroActor& t, MonsterActor& target) {
         Sfx::Play("zero", 0.3f);
         break;
     }
+    case AttackKind::Multi: {
+        // Three shots per type: Multi (piercing Zeperion Ray), Power (Delacium Light Flux), Sky (Runboldt bolts).
+        int sky = t.level >= 2 ? 5 : 3;
+        int step = (t.shots - 1) % (6 + sky);
+        int form = step < 3 ? 0 : step < 6 ? 1 : 2;
+        static const char* kForms[] = {"复合型", "强力型", "空中型"};
+        static const Color kTones[] = {{200, 150, 255, 255}, {255, 96, 40, 255}, {80, 170, 255, 255}};
+        Color tone = kTones[form];
+        if (step == 0 || step == 3 || step == 6) Text(Add(origin, {0, -30}), kForms[form], tone, 13);
+        if (form == 0) {
+            PierceBeam(t, origin, aim, dmg, range * 1.1f, tone, false);
+            Sfx::Play("beam", 0.4f);
+        } else if (form == 1) {
+            AddBeam(origin, aim, 13, 0.36f, tone, {255, 230, 170, 255});
+            DamageEnemy(target, dmg * 2.2f, t.id);
+            if (!target.dead) target.breakTime = std::max(target.breakTime, 2.5f);
+            Burst(aim, tone, 18, 190, 6, 0.45f);
+            Burst(aim, {255, 220, 120, 255}, 8, 100, 7, 0.3f);
+            AddRing(aim, 6, 38, 0.38f, 4, tone);
+            Sfx::Play("snipe", 0.4f);
+        } else {
+            AddBeam(origin, aim, 4, 0.18f, tone, WHITE);
+            DamageEnemy(target, dmg * 0.75f, t.id);
+            Sparks(aim, tone, 6, 170);
+            t.nextCooldownScale = 0.45f;
+            Sfx::Play("hit", 0.3f);
+        }
+        break;
+    }
+    case AttackKind::Vortex: {
+        auto p = Launch(ProjectileMotion::Homing, origin);
+        p->follow = Follow(target);
+        p->followOffset = {0, -target.Height() * 0.45f};
+        p->target = aim;
+        p->speed = 560;
+        p->maxLife = 3;
+        float radius = def.splash * kTile * (t.level >= 2 ? 1.3f : 1.0f);
+        float pull = kTile * (t.level >= 2 ? 0.82f : 0.55f);
+        int tower = t.id;
+        p->onArrive = [this, dmg, radius, pull, tower](Projectile&, Vector2 at) {
+            if (!Running()) return;
+            Color blue{110, 170, 255, 255}, violet{150, 90, 255, 255};
+            for (MonsterActor* e : KaijuInCircle(at, radius)) {
+                Vector2 from = e->Center();
+                DamageEnemy(*e, dmg, tower);
+                if (e->dead) continue;
+                e->dist = std::max(0.0f, e->dist - pull * (e->Def().boss ? 0.3f : 1.0f));
+                e->GetGameObject()->transform->position = map.paths[e->path].Sample(e->dist);
+                e->stunTime = std::max(e->stunTime, 0.25f);
+                AddBeam(from, at, 2.5f, 0.25f, violet, WHITE);
+            }
+            AddRing(at, radius, 6, 0.4f, 5, violet);
+            AddRing(at, radius * 0.7f, 4, 0.3f, 3, blue);
+            Burst(at, blue, 16, 150, 5, 0.4f);
+            Burst(at, WHITE, 6, 60, 7, 0.25f);
+            Sfx::Play("teleport", 0.35f);
+        };
+        p->onStep = [this](Projectile& self) { Emit(Fx::Glow, self.Position(), {110, 170, 255, 255}, 1, 0, 14, 0.2f); };
+        p->onDraw = [](const Projectile& self) {
+            Vector2 at = self.RenderPosition();
+            Draw::BlendAdd();
+            Draw::Glow(at, 22, WithAlpha({90, 150, 255, 255}, 0.7f));
+            Draw::Glow(at, 9, WithAlpha(WHITE, 0.9f));
+            Draw::BlendNormal();
+        };
+        Sfx::Play("pulse", 0.25f);
+        break;
+    }
+    case AttackKind::Spear: {
+        Vector2 d = Normalize(Sub(aim, origin));
+        constexpr float kSpeed = 820;
+        auto p = Launch(ProjectileMotion::Straight, origin);
+        p->velocity = Mul(d, kSpeed);
+        p->hitRadius = 12;
+        p->pierce = true;
+        p->maxLife = range * 1.3f / kSpeed;
+        int tower = t.id;
+        float splash = def.splash * kTile;
+        auto burst = std::make_shared<bool>(t.level >= 2);
+        p->onHit = [this, dmg, tower, splash, burst](Projectile& self, Collider* c) {
+            MonsterActor* e = KaijuOf(c);
+            if (!e || !Running()) return;
+            DamageEnemy(*e, dmg, tower);
+            Sparks(self.Position(), {255, 80, 80, 255}, 4, 160);
+            Sparks(self.Position(), {90, 170, 255, 255}, 4, 160);
+            if (*burst) {
+                *burst = false;
+                Explode(self.Position(), splash, dmg * 0.6f, tower, false, false, {200, 80, 255, 255});
+            }
+            Sfx::Play("hit", 0.25f);
+        };
+        p->onStep = [this](Projectile& self) {
+            bool red = std::fmod(self.Age() * 20, 1.0f) < 0.5f;
+            Emit(Fx::Glow, self.Position(), red ? Color{255, 80, 80, 255} : Color{80, 160, 255, 255}, 1, 0, 10, 0.2f);
+        };
+        p->onDraw = [d](const Projectile& self) {
+            Vector2 at = self.RenderPosition();
+            Vector2 n{-d.y, d.x};
+            Vector2 tail = Sub(at, Mul(d, 34)), tip = Add(at, Mul(d, 10));
+            Draw::BlendAdd();
+            Draw::Glow(at, 18, WithAlpha({200, 200, 255, 255}, 0.4f));
+            Draw::BlendNormal();
+            for (int strand = 0; strand < 2; ++strand) {
+                Color c = strand ? Color{90, 170, 255, 255} : Color{255, 70, 70, 255};
+                Vector2 prev{};
+                for (int k = 0; k <= 8; ++k) {
+                    float u = k / 8.0f;
+                    float wave = std::sin(u * 3 * PI + self.Age() * 30 + strand * PI) * 4;
+                    Vector2 q = Add(Lerp(tail, tip, u), Mul(n, wave));
+                    if (k) Draw::Line(prev, q, 2.2f, c);
+                    prev = q;
+                }
+            }
+            Draw::Line(tail, tip, 1.6f, WHITE);
+            Draw::Tri(Add(tip, Mul(d, 8)), Add(tip, Mul(n, 5)), Sub(tip, Mul(n, 5)), WHITE);
+        };
+        Sfx::Play("slugger", 0.35f);
+        break;
+    }
     }
 }
 
@@ -800,7 +921,7 @@ void BattleScene::CastBrothers() {
     float dmg = 260 + 55.0f * std::max(0, waveIndex);
     int i = 0;
     for (const auto& e : Alive()) {
-        Color c = HeroInfo((HeroId)(i++ % kHeroCount)).beam;
+        Color c = HeroInfo(level->heroes[i++ % level->heroes.size()]).beam;
         Vector2 cc = e->Center();
         AddBeam({cc.x + Rand(-30, 30), kMapY - 20}, cc, 13, 0.75f, c, WHITE);
         Burst(cc, c, 10, 160, 5, 0.5f);
@@ -820,17 +941,13 @@ void BattleScene::CastStrike(Vector2 target) {
 }
 
 int BattleScene::RosterCount() const {
-    std::array<bool, kHeroCount> seen{};
     int count = 0;
-    for (const auto& hero : heroes)
-        if (!seen[(int)hero->hero]) {
-            seen[(int)hero->hero] = true;
-            ++count;
-        }
+    for (HeroId id : level->heroes)
+        if (std::any_of(heroes.begin(), heroes.end(), [id](const Ref<HeroActor>& h) { return h->hero == id; })) ++count;
     return count;
 }
 
-bool BattleScene::RosterComplete() const { return RosterCount() >= kHeroCount; }
+bool BattleScene::RosterComplete() const { return RosterCount() >= (int)level->heroes.size(); }
 
 void BattleScene::CastFusion(bool force) {
     if (fusionCooldown > 0 || !Running() || waveIndex < 0) return;
@@ -865,7 +982,7 @@ void BattleScene::CastFusion(bool force) {
     Burst(center, WHITE, 22, 140, 10, 0.35f);
     flashScreen = 1.4f;
     shake = 1.8f;
-    Banner("究极合体 · 新世代闪光", "六位奥特曼同时放出必杀光线！", Palette::gold);
+    Banner("究极合体 · 新世代闪光", "全员同时放出必杀光线！", Palette::gold);
     Sfx::Play("fusion", 1.0f, 0);
 }
 
@@ -904,9 +1021,9 @@ bool BattleScene::BuyTower(HeroId hero, int col, int row) {
     int before = RosterCount();
     heroes.push_back(t);
     towerGrid[row][col] = t->id;
-    if (before < kHeroCount && RosterComplete()) {
+    if (before < (int)level->heroes.size() && RosterComplete()) {
         fusionCooldown = std::max(fusionCooldown, kFusionCharge);
-        Banner("六位奥特曼集结！", "究极合体开始蓄能，完成后按 E 发动", Palette::gold);
+        Banner("光之巨人全员集结！", "究极合体开始蓄能，完成后按 E 发动", Palette::gold);
     }
     Burst(Add(at, {0, -10}), def.beam, 26, 150, 5, 0.6f);
     AddRing(at, 6, 46, 0.45f, 4, def.beam);
@@ -1071,8 +1188,9 @@ std::vector<GridPoint> BattleScene::RankedTiles() const {
 }
 
 void BattleScene::BotAct() {
-    static const HeroId order[] = {HeroId::Ultraman, HeroId::Taro, HeroId::Cosmos, HeroId::Seven, HeroId::Tiga, HeroId::Zero,
-                                   HeroId::Ultraman, HeroId::Taro, HeroId::Tiga,   HeroId::Seven, HeroId::Zero, HeroId::Cosmos};
+    // Card slots, not heroes: each level's roster keeps the cheap opener first and the premium pick last.
+    static const int order[] = {0, 4, 3, 1, 2, 5, 0, 4, 2, 1, 5, 3};
+    const auto& roster = level->heroes;
     auto alive = Alive();
     bool boss = std::any_of(alive.begin(), alive.end(), [](const auto& e) { return e->Def().boss; });
     const MonsterActor* front = nullptr;
@@ -1086,7 +1204,7 @@ void BattleScene::BotAct() {
 
     if (botTiles.empty()) botTiles = RankedTiles();
     for (int guard = 0; guard < (botCasual ? 1 : 4); ++guard) {
-        HeroId next = order[botPurchases % 12];
+        HeroId next = roster[order[botPurchases % 12] % roster.size()];
         HeroActor* cheapest = nullptr;
         for (auto& t : heroes) {
             int cost = UpgradeCost(t->hero, t->level);
@@ -1408,9 +1526,9 @@ void BattleScene::DrawPanel() {
     Gui::Header({kPanelX + 8, kMapY + 6, kPanelW - 16, 26}, "光之巨人", Palette::gold);
     Gui::Text("按 1-6 快速选择", kPanelX + kPanelW - 10, kMapY + 12, 11, Palette::muted, Gui::Align::Right);
     hoverCard = -1;
-    for (int i = 0; i < kHeroCount; ++i) {
+    for (int i = 0; i < (int)level->heroes.size(); ++i) {
         Rectangle r = CardRect(i);
-        if (Gui::Hover(r)) hoverCard = i;
+        if (Gui::Hover(r)) hoverCard = (int)level->heroes[i];
         DrawHeroCard(i, r);
     }
     DrawSkills();
@@ -1418,11 +1536,12 @@ void BattleScene::DrawPanel() {
     DrawInfo(InfoRect());
 }
 
-void BattleScene::DrawHeroCard(int index, Rectangle r) {
-    const HeroDef& def = HeroInfo((HeroId)index);
+void BattleScene::DrawHeroCard(int slot, Rectangle r) {
+    HeroId id = level->heroes[slot];
+    const HeroDef& def = HeroInfo(id);
     bool afford = gold >= def.cost;
-    bool active = placing == index;
-    bool hover = hoverCard == index && outcome == Outcome::None && !paused;
+    bool active = placing == (int)id;
+    bool hover = hoverCard == (int)id && outcome == Outcome::None && !paused;
     float lift = hover ? -2.0f : 0.0f;
     Rectangle body{r.x, r.y + lift, r.width, r.height};
     Draw::RoundedPanel({r.x + 1, r.y + 4, r.width, r.height}, 10, WithAlpha(BLACK, 0.4f), BLANK, 0);
@@ -1430,7 +1549,7 @@ void BattleScene::DrawHeroCard(int index, Rectangle r) {
     Draw::RoundedPanel(body, 10, bottom, BLANK, 0);
     DrawRectangleGradientV((int)body.x + 2, (int)body.y + 2, (int)body.width - 4, 56, top, WithAlpha(bottom, 0));
     Draw::Glow({body.x + body.width / 2, body.y + 36}, 40, WithAlpha(Lighten(def.primary, 0.3f), 0.35f));
-    Art::DrawPortrait((HeroId)index, {body.x + 12, body.y + 1, 68, 68});
+    Art::DrawPortrait(id, {body.x + 12, body.y + 1, 68, 68});
     Draw::RoundedPanel({body.x + 4, body.y + 66, body.width - 8, 28}, 6, {6, 8, 20, 210}, BLANK, 0);
     Gui::Text(def.name, body.x + body.width / 2, body.y + 66, 12, Palette::text, Gui::Align::Center, true);
     Gui::Coin({body.x + 28, body.y + 86}, 5);
@@ -1438,7 +1557,7 @@ void BattleScene::DrawHeroCard(int index, Rectangle r) {
     Color border = active ? Palette::gold : hover ? Lighten(def.primary, 0.5f) : WithAlpha(Palette::line, 0.9f);
     Draw::RoundedPanel(body, 10, BLANK, border, active ? 2.6f : 1.5f);
     Draw::RoundedPanel({body.x + 4, body.y + 4, 18, 18}, 5, {6, 8, 20, 220}, WithAlpha(Palette::line, 0.8f), 1);
-    Gui::Text(TextFormat("%d", index + 1), body.x + 13, body.y + 5, 13, Palette::muted, Gui::Align::Center, true);
+    Gui::Text(TextFormat("%d", slot + 1), body.x + 13, body.y + 5, 13, Palette::muted, Gui::Align::Center, true);
     if (!afford) Draw::RoundedPanel(body, 10, {4, 6, 14, 120}, BLANK, 0);
     if (active) {
         Draw::BlendAdd();
@@ -1448,7 +1567,7 @@ void BattleScene::DrawHeroCard(int index, Rectangle r) {
     }
     if (outcome == Outcome::None && !paused && Gui::Clicked(r)) {
         if (afford) {
-            placing = placing == index ? -1 : index;
+            placing = placing == (int)id ? -1 : (int)id;
             selected = -1;
             targetingStrike = false;
         } else {
@@ -1460,7 +1579,8 @@ void BattleScene::DrawHeroCard(int index, Rectangle r) {
 void BattleScene::DrawFusion() {
     Rectangle r = FusionRect();
     int have = RosterCount();
-    bool assembled = have >= kHeroCount;
+    int need = (int)level->heroes.size();
+    bool assembled = have >= need;
     bool ready = assembled && fusionCooldown <= 0 && waveIndex >= 0 && outcome == Outcome::None;
     bool hover = ready && !paused && Gui::Hover(r);
     Color tone = ready ? Color{255, 210, 80, 255} : Palette::muted;
@@ -1473,7 +1593,7 @@ void BattleScene::DrawFusion() {
     }
     std::string label = "集结完成";
     if (ready) label = "究极合体  [E]";
-    else if (!assembled) label = TextFormat("集结 %d / %d", have, kHeroCount);
+    else if (!assembled) label = TextFormat("集结 %d / %d", have, need);
     else if (fusionCooldown > 0) label = "蓄能中";
     if (assembled && fusionCooldown > 0 && outcome == Outcome::None) {
         float k = Clamp(fusionCooldown / kFusionMax, 0.0f, 1.0f);
@@ -1582,7 +1702,7 @@ void BattleScene::DrawInfo(Rectangle area) {
         "提前召唤下一波可以获得额外金币奖励。",
         "芝顿会展开护盾，护盾期间受到的伤害降低，可等护盾消失再集火。",
         "巴尔坦星人被击倒后会分裂，记得在后方保留火力。",
-        "六位英雄都上场后，右侧「究极合体」开始蓄能，按 E 发动。",
+        "本关英雄全员上场后，右侧「究极合体」开始蓄能，按 E 发动。",
     };
     constexpr int kTips = (int)(sizeof(tips) / sizeof(tips[0]));
     int tip = ((int)(RealTime() / 6)) % kTips;

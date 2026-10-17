@@ -30,7 +30,20 @@ const HeroDef kHeroes[] = {
      "赛文之子。两把赛罗头镖由脑波遥控连续飞斩，熟练后从额头光束灯射出翡翠色的艾梅利姆切割。",
      "三级：每第 5 次攻击放出艾梅利姆切割，贯穿一线敌人", 240, 17, 0.42f, 3.0f, 0, 0, AttackKind::Twin,
      {36, 88, 210, 255}, {214, 36, 52, 255}, {90, 255, 170, 255}},
+    {"trigger", "特利迦奥特曼", "哉佩利敖光线", "三型轮换",
+     "真中剑悟变身的光之巨人。轮流切换三型：复合型的哉佩利敖光线贯穿一线，强力型的迪拉修姆光流重击破甲，空中型的兰帕尔特光弹快速连射。",
+     "三级：空中型连射由 3 发增至 5 发", 190, 40, 1.25f, 3.5f, 0, 0, AttackKind::Multi,
+     {124, 52, 190, 255}, {206, 38, 52, 255}, {236, 226, 255, 255}},
+    {"decker", "德凯奥特曼", "雷亚留特光波", "黑洞牵引",
+     "与明日见奏大融合的光之巨人，奇迹型。把空间能量压进右手投出雷亚留特光波，落点形成小型黑洞，把周围怪兽往回拽。",
+     "三级：黑洞更大，拉回距离增加 50%", 170, 34, 2.1f, 3.0f, 0.95f, 0, AttackKind::Vortex,
+     {40, 96, 210, 255}, {210, 40, 52, 255}, {110, 170, 255, 255}},
+    {"blazar", "布莱泽奥特曼", "螺旋光矛", "贯穿光矛",
+     "与比留间弦人一同战斗的野性巨人。在掌心生成虫洞，抽出红蓝双螺旋的光之长矛投出，笔直贯穿一线怪兽。",
+     "三级：光矛命中第一只怪兽时从内部炸开", 220, 64, 1.7f, 3.6f, 0.9f, 0, AttackKind::Spear,
+     {70, 74, 92, 255}, {220, 40, 52, 255}, {90, 170, 255, 255}},
 };
+static_assert(sizeof(kHeroes) / sizeof(kHeroes[0]) == kHeroCount, "one HeroDef per HeroId");
 
 const EnemyDef kEnemies[] = {
     {"baltan",
@@ -117,6 +130,15 @@ const EnemyDef kEnemies[] = {
 } // namespace
 
 const HeroDef& HeroInfo(HeroId id) { return kHeroes[(int)id]; }
+
+bool HeroByKey(const std::string& key, HeroId& out) {
+    for (int i = 0; i < kHeroCount; ++i)
+        if (key == kHeroes[i].key) {
+            out = (HeroId)i;
+            return true;
+        }
+    return false;
+}
 const EnemyDef& EnemyInfo(EnemyId id) { return kEnemies[(int)id]; }
 
 float HeroDamage(HeroId id, int level) { return HeroInfo(id).damage * (1.0f + 0.65f * level); }

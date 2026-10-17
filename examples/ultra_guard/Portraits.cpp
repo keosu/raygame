@@ -352,6 +352,92 @@ void DrawZero() {
     Mouth(H.y + 42, 10);
 }
 
+void DrawTrigger() {
+    const Color red{206, 38, 52, 255}, purple{124, 52, 190, 255};
+    auto sh = Shoulders();
+    Silver(sh, {96, 214});
+    Paint({{6, 264}, {12, 226}, {46, 202}, {94, 192}, {100, 264}}, purple, {40, 220}, 2);
+    Paint(Mirror({{6, 264}, {12, 226}, {46, 202}, {94, 192}, {100, 264}}), red, {200, 220}, 2);
+    std::vector<Vector2> plate = {{40, 206}, {90, 194}, {128, 220}, {166, 194}, {216, 206}, {196, 246}, {128, 262}, {60, 246}};
+    Silver(plate, {90, 206}, 2.4f);
+    Draw::PolyLine(plate, 3.5f, kGold, true);
+    for (float side : {-1.0f, 1.0f}) Draw::Line({128 + side * 10, 222}, {128 + side * 52, 204}, 3, kGold);
+    ColorTimer({128, 234}, 11);
+    Neck(kSilver);
+    auto head = HeadShape(49, 60);
+    Silver(head, {H.x - 16, H.y - 30}, 3);
+    for (float side : {-1.0f, 1.0f}) {
+        Color stripe = side < 0 ? purple : red;
+        Draw::Quad({H.x + side * 14, 50}, {H.x + side * 22, 52}, {H.x + side * 40, 96}, {H.x + side * 32, 98}, stripe);
+        Draw::Line({H.x + side * 23, 52}, {H.x + side * 41, 96}, 1.4f, WithAlpha(WHITE, 0.7f));
+    }
+    Crest(36, 86, 13, 6, kSilverHi, kSilver);
+    Draw::Diamond({128, 90}, 8, 11, kOutline);
+    Draw::Glow({128, 90}, 18, WithAlpha({220, 150, 255, 255}, 0.55f));
+    Draw::Diamond({128, 90}, 6, 9, {170, 90, 230, 255});
+    Draw::Diamond({126.5f, 88}, 3, 5, {245, 225, 255, 255});
+    Ears(H.y + 4, 49, kSilver);
+    CheekShade();
+    Eyes(22, H.y + 4, 17, 10.5f, 0.42f, 0.32f, {224, 186, 90, 255}, {255, 252, 232, 255});
+    NoseRidge(H.y + 12, H.y + 30);
+    Mouth(H.y + 40);
+}
+
+void DrawDecker() {
+    const Color red{206, 36, 48, 255}, blue{40, 96, 210, 255}, navy{22, 30, 72, 255};
+    auto sh = Shoulders();
+    Silver(sh, {96, 214});
+    Paint({{6, 264}, {12, 226}, {40, 204}, {78, 194}, {86, 264}}, red, {40, 220}, 2);
+    Paint(Mirror({{6, 264}, {12, 226}, {40, 204}, {78, 194}, {86, 264}}), blue, {200, 220}, 2);
+    std::vector<Vector2> plate = {{70, 200}, {128, 192}, {186, 200}, {178, 250}, {128, 262}, {78, 250}};
+    Paint(plate, navy, {110, 206}, 2.4f);
+    Draw::PolyLine(plate, 3, kGold, true);
+    static const Vector2 stars[] = {{96, 210}, {86, 228}, {108, 240}, {90, 248}, {128, 214}, {120, 252}, {160, 250}};
+    for (Vector2 s : stars) Draw::Star(s, 3.2f, 1.3f, 0, {235, 240, 255, 255});
+    ColorTimer({154, 226}, 10); // on Decker's left chest, i.e. the viewer's right
+    Neck(kSilver);
+    auto head = HeadShape(50, 60);
+    Silver(head, {H.x - 16, H.y - 30}, 3);
+    Draw::Crescent(H, 47, 9, PI * 1.08f, PI * 1.40f, red, 16);
+    Draw::Crescent(H, 47, 9, PI * 1.60f, PI * 1.92f, blue, 16);
+    Crest(40, 90, 9, 4, kSilverHi, kSilver);
+    Draw::Line({H.x - 3, 46}, {H.x - 3, 86}, 2, red);
+    Draw::Line({H.x + 3, 46}, {H.x + 3, 86}, 2, blue);
+    Lamp({128, 90}, 6, 4.2f, {90, 170, 255, 255});
+    Ears(H.y + 4, 50, kSilver);
+    CheekShade();
+    Eyes(23, H.y + 4, 18, 11.5f, 0.34f, 0.3f, {230, 190, 70, 255}, {255, 253, 230, 255});
+    NoseRidge(H.y + 12, H.y + 30);
+    Mouth(H.y + 41);
+}
+
+void DrawBlazar() {
+    const Color red{214, 40, 52, 255}, blue{50, 120, 230, 255}, dark{46, 48, 62, 255};
+    auto sh = Shoulders();
+    Paint(sh, dark, {96, 210});
+    SilverBoth({{70, 198}, {112, 196}, {116, 232}, {106, 262}, {66, 262}, {62, 226}});
+    // Asymmetric red/blue streaks down the right shoulder only.
+    Paint({{150, 196}, {176, 192}, {236, 230}, {250, 264}, {226, 264}, {170, 214}}, red, {190, 210}, 2);
+    Paint({{162, 214}, {178, 208}, {226, 240}, {236, 264}, {214, 264}, {176, 230}}, blue, {200, 230}, 2);
+    DrawCircleV({128, 232}, 14, kOutline);
+    Draw::GradientEllipse({128, 232}, 11, 11, {150, 30, 50, 255}, {255, 200, 160, 255}, {124, 228}, 10);
+    Neck(dark);
+    auto head = HeadShape(50, 60);
+    Silver(head, {H.x - 16, H.y - 30}, 3);
+    // Single swept fin and paint on one side of the head.
+    std::vector<Vector2> fin = {{H.x + 2, 46}, {H.x + 16, 26}, {H.x + 38, 14}, {H.x + 50, 36},
+                                {H.x + 46, 66}, {H.x + 30, 86}, {H.x + 8, 92}};
+    Paint(fin, red, {H.x + 24, 34}, 2.4f);
+    std::vector<Vector2> stripe = {{H.x + 14, 52}, {H.x + 30, 34}, {H.x + 42, 40}, {H.x + 38, 64}, {H.x + 22, 82}, {H.x + 12, 84}};
+    Draw::Poly(stripe, blue);
+    Draw::Line({H.x + 18, 30}, {H.x + 44, 40}, 1.4f, WithAlpha(WHITE, 0.7f));
+    Ears(H.y + 4, 50, kSilver);
+    CheekShade();
+    Eyes(22, H.y + 6, 19, 10, 0.5f, 0.42f, {236, 200, 80, 255}, {255, 255, 238, 255});
+    NoseRidge(H.y + 12, H.y + 30);
+    Mouth(H.y + 41);
+}
+
 void Dilate(Image& image) {
     auto* px = (Color*)image.data;
     int w = image.width, h = image.height;
@@ -414,6 +500,9 @@ void DrawBust(HeroId id) {
     case HeroId::Cosmos: DrawCosmos(); break;
     case HeroId::Taro: DrawTaro(); break;
     case HeroId::Zero: DrawZero(); break;
+    case HeroId::Trigger: DrawTrigger(); break;
+    case HeroId::Decker: DrawDecker(); break;
+    case HeroId::Blazar: DrawBlazar(); break;
     default: break;
     }
 }

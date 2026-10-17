@@ -4,9 +4,11 @@
 
 namespace UG {
 
-enum class HeroId { Ultraman, Seven, Tiga, Cosmos, Taro, Zero, Count };
-enum class AttackKind { PierceBeam, Boomerang, Snipe, Pulse, Splash, Twin };
+// The first six ids are the original roster (keys z orb tiga geed arc zero); levels pick up to six.
+enum class HeroId { Ultraman, Seven, Tiga, Cosmos, Taro, Zero, Trigger, Decker, Blazar, Count };
+enum class AttackKind { PierceBeam, Boomerang, Snipe, Pulse, Splash, Twin, Multi, Vortex, Spear };
 constexpr int kHeroCount = (int)HeroId::Count;
+constexpr int kRosterMax = 6; // hero cards that fit the battle panel
 
 struct HeroDef {
     const char* key; // also the optional avatar override: assets/avatars/<key>.png
@@ -28,6 +30,7 @@ struct HeroDef {
 };
 
 const HeroDef& HeroInfo(HeroId id);
+bool HeroByKey(const std::string& key, HeroId& out);
 
 enum class EnemyId { Baltan, BaltanClone, Gomora, Eleking, RedKing, Zetton, Belial, Count };
 constexpr int kEnemyCount = (int)EnemyId::Count;
@@ -101,6 +104,7 @@ struct LevelDef {
     float hpScale;
     std::vector<WaveDef> waves;
     std::uint32_t seed;
+    std::vector<HeroId> heroes; // battle cards in order; defaults to the original six
 };
 
 // Lore catalog in assets/ultras/codex.txt. Playable fighters stay in HeroInfo;

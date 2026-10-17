@@ -4,6 +4,8 @@
 # theme     地图主题：city / mountain / nebula / park / plaza / studio
 # gold      初始金币      lives  生命      hp  怪兽血量倍率      seed  装饰随机种子
 # base      基地所在格子：列 行（地图 20 列 × 12 行，从 0 开始）
+# heroes    本关可放置的英雄（最多 6 位，按卡片顺序）；省略时为 z orb tiga geed arc zero。
+#           可用：z orb tiga geed arc zero trigger decker blazar
 # path      路径拐点“列,行”，按行进顺序书写；起点可在地图外（列 -1）。可写多条 path。
 # wave      一波怪兽，多组用 | 分隔。每组：怪兽 x数量 [every 间隔秒] [after 延迟秒] [path 第几条|all]
 #           怪兽：gomora baltan baltan_clone eleking redking zetton belial

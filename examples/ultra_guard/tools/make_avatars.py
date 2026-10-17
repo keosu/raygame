@@ -26,6 +26,9 @@ SOURCES = {
     "geed": "geed.png",
     "arc": "arc.png",
     "zero": "zero.png",
+    "trigger": "trigger.png",
+    "decker": "decker.png",
+    "blazar": "blazar.png",
 }
 
 # Head share of the final square, and where the head starts vertically.

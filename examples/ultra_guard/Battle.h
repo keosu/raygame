@@ -42,6 +42,7 @@ public:
     HeroId hero = HeroId::Ultraman;
     int col = 0, row = 0, level = 0, mode = 0, invested = 0, shots = 0, kills = 0;
     float cooldown = 0.35f, recoil = 0, flash = 0, build = 0, dealt = 0;
+    float nextCooldownScale = 1; // set by Fire for one shot, e.g. Trigger's rapid Sky Type
 
     Vector2 Pos() const { return gameObject->transform->position; }
     float RenderDepth() const override { return Pos().y + 10; } // pedestal base
