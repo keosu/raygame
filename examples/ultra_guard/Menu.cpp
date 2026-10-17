@@ -427,7 +427,7 @@ void MenuScene::DrawHeroes() {
 }
 
 void MenuScene::DrawCodex() {
-    DrawPageTitle("奥特曼数据库", "招式按映像中的常用叫法，供以后的关卡编入防卫队");
+    DrawPageTitle("奥特曼数据库", "招式名按中文常用译名，游戏里的攻击方式是改编");
     const auto& entries = UltraCodex();
     const auto& errors = UltraErrors();
     if (!errors.empty()) Gui::Text("档案有误：" + errors[0], W / 2, 112, 14, Palette::red, Gui::Align::Center);
@@ -580,9 +580,10 @@ void MenuScene::DrawHelp() {
         y += Gui::Paragraph(s.body, panel.x + 58, y, panel.width - 110, 16, Palette::text, 1.55f);
         y += 14;
     }
-    Gui::Paragraph("自定义头像：将正方形 PNG 图片放入游戏目录 assets/avatars/ 下，文件名为 "
-                   "ultraman、seven、tiga、cosmos、"
-                   "taro、zero（.png），重启游戏即可替换对应英雄的头像。",
+    std::string keys;
+    for (int i = 0; i < kHeroCount; ++i) keys += std::string(i ? "、" : "") + HeroInfo((HeroId)i).key;
+    Gui::Paragraph("自定义头像：将正方形 PNG 图片放入游戏目录 assets/avatars/ 下，文件名为 " + keys +
+                       "（.png），重启游戏即可替换对应英雄的头像。",
                    panel.x + 58, panel.y + panel.height - 58, panel.width - 110, 13, Palette::muted, 1.5f);
 }
 

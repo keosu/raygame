@@ -14,6 +14,7 @@ constexpr float kSpeeds[] = {1.0f, 2.0f, 3.0f};
 constexpr float kBrothersMax = 70;
 constexpr float kStrikeMax = 30;
 constexpr float kFusionMax = 52;
+constexpr float kShieldTaken = 0.42f; // damage share that gets through Zetton's barrier
 constexpr float kWaveGap = 16;
 constexpr unsigned kKaijuMask = 1u << kKaijuLayer;
 constexpr const char* kModeNames[] = {"最前", "最强", "最近"};
@@ -591,25 +592,27 @@ void BattleScene::Fire(HeroActor& t, MonsterActor& target) {
         break;
     }
     case AttackKind::Pulse: {
+        // Wrecking Burst: charging throws off a red-black force field, then a blue-white beam fires.
         float slow = t.level >= 2 ? 0.6f : def.slow;
+        Color field{230, 40, 52, 255}, dark{96, 16, 42, 255};
         for (MonsterActor* e : KaijuInCircle(t.Pos(), range)) {
             DamageEnemy(*e, dmg, t.id);
             if (e->dead) continue;
             e->slowAmount = e->slowTime > 0 ? std::max(e->slowAmount, slow) : slow;
             e->slowTime = 1.8f;
             if (t.level >= 2) e->vulnTime = 2.0f;
-            Sparks(e->Center(), def.beam, 3, 90);
+            Sparks(e->Center(), field, 3, 90);
         }
         Vector2 core = Add(t.Pos(), {0, 4});
-        Burst(core, def.beam, 22, 210, 6, 0.45f);
-        Burst(core, {255, 180, 60, 255}, 10, 120, 7, 0.3f);
-        Burst(core, WHITE, 6, 70, 8, 0.22f);
-        AddRing(core, 8, range, 0.55f, 6, def.beam);
-        AddRing(core, 6, range * 0.72f, 0.45f, 3, {255, 170, 50, 255});
-        AddRing(core, 4, range * 0.4f, 0.3f, 2, WHITE);
-        Smoke(core, 4, 10);
-        shake = std::max(shake, 0.16f);
-        Sfx::Play("explode", 0.35f);
+        for (int i = 0; i < 5; ++i) Bolt(core, Add(core, Mul(Dir(Rand(0, 2 * PI)), range * Rand(0.5f, 0.95f))), i % 2 ? dark : field);
+        Burst(core, field, 16, 190, 5, 0.4f);
+        Burst(core, dark, 8, 110, 6, 0.3f);
+        AddRing(core, 8, range, 0.5f, 5, field);
+        AddRing(core, 6, range * 0.7f, 0.4f, 3, dark);
+        AddBeam(origin, aim, 7, 0.3f, def.beam, WHITE);
+        Bolt(origin, aim, field);
+        Burst(aim, def.beam, 10, 150, 5, 0.35f);
+        Sfx::Play("pulse", 0.3f);
         break;
     }
     case AttackKind::Splash: {
@@ -675,7 +678,7 @@ void BattleScene::Fire(HeroActor& t, MonsterActor& target) {
         }
         if (t.level >= 2 && t.shots % 5 == 0) {
             PierceBeam(t, origin, aim, dmg * 3, range * 1.2f, {90, 255, 160, 255}, false);
-            Text(Add(origin, {0, -30}), "集束光线", {90, 255, 160, 255}, 13);
+            Text(Add(origin, {0, -30}), "艾梅利姆切割", {90, 255, 160, 255}, 13);
         }
         Sfx::Play("zero", 0.3f);
         break;
@@ -733,7 +736,7 @@ void BattleScene::DamageEnemy(MonsterActor& e, float amount, int towerId, bool i
     float armor = e.breakTime > 0 ? e.armor * 0.4f : e.armor;
     float dmg = ignoreArmor ? amount : std::max(amount * 0.25f, amount - armor);
     if (e.vulnTime > 0) dmg *= 1.2f;
-    if (e.shieldTime > 0) dmg *= 0.42f;
+    if (e.shieldTime > 0) dmg *= kShieldTaken;
     e.hp -= dmg;
     if (amount > 2) e.flash = 0.7f;
     if (HeroActor* t = FindTower(towerId)) t->dealt += dmg;
@@ -1015,6 +1018,19 @@ void BattleScene::AddBeam(Vector2 a, Vector2 b, float width, float life, Color g
 
 void BattleScene::AddRing(Vector2 c, float r0, float r1, float life, float width, Color color) {
     effects->Ring(c, {r0, r1, width, life, color});
+}
+
+void BattleScene::Bolt(Vector2 a, Vector2 b, Color color) {
+    Vector2 d = Sub(b, a);
+    Vector2 n = Normalize({-d.y, d.x});
+    float jitter = std::min(14.0f, Len(d) * 0.12f);
+    Vector2 prev = a;
+    for (int i = 1; i <= 4; ++i) {
+        Vector2 p = Add(a, Mul(d, i / 4.0f));
+        if (i < 4) p = Add(p, Mul(n, Rand(-jitter, jitter)));
+        AddBeam(prev, p, 2.6f, 0.2f, color, WithAlpha(WHITE, 0.8f));
+        prev = p;
+    }
 }
 
 std::weak_ptr<GameObject> BattleScene::Follow(MonsterActor& target) const { return target.object; }
@@ -1542,17 +1558,19 @@ void BattleScene::DrawInfo(Rectangle area) {
     }
     Gui::Text("作战提示", x, y, 14, Palette::gold, Gui::Align::Left, true);
     static const char* tips[] = {
-        "在道路旁的草地上放置英雄，拐角处可覆盖更长的路径。",
+        "在道路旁的空地上放置英雄，拐角处可覆盖更长的路径。",
         "点击已放置的英雄可以升级、出售或切换攻击目标。",
-        "高斯的月神光波能减速怪兽，与泰罗的爆炸配合效果极佳。",
-        "红王护甲很厚，迪迦的高伤害光线和赛文的破甲头镖是克星。",
+        "捷德的力场能让怪兽变慢，再让亚刻的光弹在怪群里爆开。",
+        "红王护甲很厚，高伤害光线和欧布圣剑的破甲是克星。",
         "提前召唤下一波可以获得额外金币奖励。",
-        "杰顿会展开护盾，护盾期间伤害大幅降低，可等护盾消失再集火。",
+        "芝顿会展开护盾，护盾期间受到的伤害降低，可等护盾消失再集火。",
         "巴尔坦星人被击倒后会分裂，记得在后方保留火力。",
+        "六位英雄都上场后，右侧「究极合体」开始蓄能，按 E 发动。",
     };
-    int tip = ((int)(RealTime() / 6)) % 7;
+    constexpr int kTips = (int)(sizeof(tips) / sizeof(tips[0]));
+    int tip = ((int)(RealTime() / 6)) % kTips;
     Gui::Paragraph(tips[tip], x, y + 24, w, 12.5f, Palette::muted, 1.5f);
-    Gui::Text("空格 召唤  F 倍速  Q/W 必杀  右键 取消", x, area.y + area.height - 22, 10.5f, WithAlpha(Palette::muted, 0.8f));
+    Gui::Text("空格 召唤  F 倍速  Q/W/E 必杀  右键 取消", x, area.y + area.height - 22, 10.5f, WithAlpha(Palette::muted, 0.8f));
 }
 
 void BattleScene::DrawBanner() {
@@ -1595,7 +1613,9 @@ void BattleScene::DrawBossBar() {
     Rectangle r{kMapX + kMapW / 2 - 260, kMapY + 8, 520, 40};
     Draw::RoundedPanel(r, 10, {14, 6, 16, 225}, WithAlpha(Palette::red, 0.8f), 1.5f);
     Gui::Text(TextFormat("%s · %s", def.title, def.name), r.x + 12, r.y + 4, 14, Palette::text, Gui::Align::Left, true);
-    std::string status = boss->shieldTime > 0 ? "护盾展开！伤害 -85%" : boss->enraged ? "暴怒" : "";
+    std::string status = boss->shieldTime > 0 ? TextFormat("护盾展开！伤害 -%d%%", (int)std::lround((1 - kShieldTaken) * 100))
+                         : boss->enraged      ? "暴怒"
+                                              : "";
     if (!status.empty())
         Gui::Text(status, r.x + r.width - 12, r.y + 4, 13, boss->shieldTime > 0 ? Palette::gold : Palette::red, Gui::Align::Right, true);
     float ratio = Clamp(boss->hp / boss->maxHp, 0.0f, 1.0f);

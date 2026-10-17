@@ -31,7 +31,7 @@ pwsh -NoProfile -File scripts/build-android.ps1 -Game ultra_guard
 - Q 合体光线（全场伤害），W 空中支援（选区轰炸并眩晕）。
 - E 究极合体：六位奥特曼都放置在场上后才会点亮，对全场造成很高的真实伤害并眩晕。
 - 右键或“取消”按钮退出放置/瞄准；Android 返回键 = Esc，切到后台自动暂停。
-- 怪兽特性：巴尔坦被击倒后分裂、艾雷王抗减速、红王高护甲、杰顿周期护盾并瞬移、
+- 怪兽特性：巴尔坦被击倒后分裂、艾雷王抗减速、红王高护甲、芝顿周期护盾并瞬移、
   贝利亚召唤分身并在半血后暴怒加速。
 
 ## 关卡配置（assets/levels/）
@@ -53,8 +53,9 @@ wave     redking x4 every 1.8 | baltan x10 every 0.7 after 2 | zetton x1 after 8
 
 ## 奥特曼数据库（assets/ultras/codex.txt）
 
-标题页「奥特数据库」列出可上阵的六位，以及尚未编入防卫队的档案（初代、赛文、泰罗、戴拿、盖亚、梦比优斯、银河、艾克斯、特利迦、德凯）。
-招式名按映像里的常用叫法。新增一条用 `---` 分隔；`id` 与英雄 key 相同才会显示头像。
+标题页「奥特数据库」列出可上阵的英雄，以及尚未编入防卫队的档案（特利迦、德凯、布莱泽、泰迦，
+另收初代、赛文、泰罗三位经典战士）。招式名按中文常用译名；游戏里的攻击方式是改编，`note` 会写明。
+新增一条用 `---` 分隔；`id` 与英雄 key 相同才会显示头像。
 档案本身不会自动变成可放置英雄，接入新关卡时再在 `Data.cpp` 的 `HeroId` 里补战斗数据。
 
 ## 皮肤（assets/skins/）
@@ -72,7 +73,7 @@ wave     redking x4 every 1.8 | baltan x10 every 0.7 after 2 | zetton x1 after 8
 | --- | --- |
 | GameObject/Component、`ySort` | 怪兽、英雄、尸体、弹道是组件，按 y 排序遮挡；`DestroyAfter` 清理尸体 |
 | `PhysicsWorld` 查询 | 怪兽身上挂 trigger `CircleCollider`（mask=0 不产生接触），索敌/爆炸用 `OverlapCircle`，穿透光线用 `SegmentCast` |
-| `Projectile` | 头镖（回旋、穿透）、火球与双头镖（追踪）、轰炸（抛物） |
+| `Projectile` | 圣剑光刃（回旋、穿透）、光弹与赛罗头镖（追踪）、轰炸（抛物） |
 | `EffectLayer` | 光线、冲击环、伤害飘字 |
 | `ParticleEmitter` | 四个共享发射器：径向爆发、拖尾火花（`alignToVelocity`）、烟雾、余烬 |
 | `GameEngine::SetTimeScale` | 1x-3x 倍速；暂停即时间缩放为 0 |

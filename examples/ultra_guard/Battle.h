@@ -191,6 +191,7 @@ private:
     void Text(Vector2 at, const std::string& text, Color color, float size = 16);
     void AddBeam(Vector2 a, Vector2 b, float width, float life, Color glow, Color core);
     void AddRing(Vector2 c, float r0, float r1, float life, float width, Color color);
+    void Bolt(Vector2 a, Vector2 b, Color color);
 
     // drawing
     void DrawWorld();
