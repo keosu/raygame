@@ -45,6 +45,10 @@ inline Color WithAlpha(Color c, float a) {
     c.a = (unsigned char)(Clamp(a, 0.0f, 1.0f) * 255.0f);
     return c;
 }
+inline Color Desaturate(Color c, float k = 1) {
+    auto grey = (unsigned char)(0.3f * c.r + 0.59f * c.g + 0.11f * c.b);
+    return Mix(c, {grey, grey, grey, c.a}, k);
+}
 inline Color MulAlpha(Color c, float a) {
     c.a = (unsigned char)(c.a * Clamp(a, 0.0f, 1.0f));
     return c;

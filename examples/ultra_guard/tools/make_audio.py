@@ -257,7 +257,8 @@ def make_effects():
     tele = osc("sine", phase(800 + 600 * np.sin(2 * np.pi * 7 * t))) * np.sin(np.pi * t / d)
     save("teleport", tele, 0.6)
 
-    d = 2.6
+    # Matches the in-game cut-in: hero stingers from 0.3 s, a riser, the blast at 2.9 s.
+    d = 4.6
     n = int(d * SR)
     t = t_axis(d)
     choir = np.zeros(n)
@@ -266,8 +267,17 @@ def make_effects():
         nn = n - start
         tone = osc("sine", phase(note(midi) * (1 + 0.01 * np.sin(2 * np.pi * (2 + i) * t[:nn]))))
         tone += 0.4 * osc("tri", phase(np.full(nn, note(midi + 12))))
-        choir[start:] += tone * np.minimum(1, np.arange(nn) / (0.4 * SR)) * 0.2
-    blast_at = int(1.25 * SR)
+        choir[start:] += tone * np.minimum(1, np.arange(nn) / (2.6 * SR)) * 0.17
+    for i, midi in enumerate([72, 76, 79, 84, 88, 91]):
+        s = int((0.3 + i * 0.2) * SR)
+        ln = int(0.35 * SR)
+        choir[s:s + ln] += 0.22 * osc("tri", phase(np.full(ln, note(midi)))) * decay(ln, 9)
+    rs, re = int(0.4 * SR), int(2.9 * SR)
+    rl = re - rs
+    riser = lowpass(noise_n(rl), np.linspace(300, 7000, rl)) * np.linspace(0, 0.5, rl) ** 1.5
+    riser += 0.25 * osc("saw", phase(np.geomspace(110, 880, rl))) * np.linspace(0, 1, rl) ** 2
+    choir[rs:re] += riser
+    blast_at = int(2.9 * SR)
     bl = n - blast_at
     boom = lowpass(noise_n(bl), np.linspace(4200, 70, bl)) * decay(bl, 2.0)
     boom += 0.85 * osc("sine", phase(np.linspace(78, 34, bl))) * decay(bl, 2.4)

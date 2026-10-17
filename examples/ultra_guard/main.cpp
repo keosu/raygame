@@ -215,10 +215,16 @@ private:
             Shot("20_studio");
             if (auto* b = Debug()) b->DebugCast();
             break;
-        case 1686: // 3x speed: the beams fade within a few frames
-            Shot("21_fusion");
+        case 1745: // the fusion cut-in runs in real time: heroes slide in, the orb gathers, the pillar lands at 2.9 s
+            Shot("21_fusion_cutin");
             break;
-        case 1700:
+        case 1825:
+            Shot("22_fusion_orb");
+            break;
+        case 1862:
+            Shot("23_fusion_impact");
+            break;
+        case 1960:
             Quit();
             break;
         default:

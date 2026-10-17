@@ -16,6 +16,7 @@ constexpr float kStrikeMax = 30;
 constexpr float kFusionMax = 75;
 constexpr float kFusionCharge = 25; // first charge after the roster completes
 constexpr float kShieldTaken = 0.42f; // damage share that gets through Zetton's barrier
+constexpr float kFusionImpactAt = 2.9f, kFusionEnd = 4.6f; // cut-in timeline, real seconds
 constexpr float kWaveGap = 16;
 constexpr unsigned kKaijuMask = 1u << kKaijuLayer;
 constexpr const char* kModeNames[] = {"最前", "最强", "最近"};
@@ -23,8 +24,8 @@ constexpr const char* kModeNames[] = {"最前", "最强", "最近"};
 Rectangle MapRect() { return {kMapX, kMapY, kMapW, kMapH}; }
 Rectangle CardRect(int i) { return {1086 + (i % 2) * 98.0f, 90 + (i / 2) * 104.0f, 92, 98}; }
 Rectangle SkillRect(int i) { return {1086 + i * 98.0f, 404, 92, 52}; }
-Rectangle FusionRect() { return {1086, 460, 190, 40}; }
-Rectangle InfoRect() { return {1086, 506, 190, 206}; }
+Rectangle FusionRect() { return {1086, 460, 190, 58}; }
+Rectangle InfoRect() { return {1086, 524, 190, 188}; }
 
 Color SpinHue(Color c, int steps) {
     for (int i = 0; i < steps % 3; ++i) {
@@ -326,6 +327,7 @@ void BattleScene::OnLoad() {
     brothersCooldown = 35;
     strikeCooldown = 12;
     fusionCooldown = 0;
+    fusionAnim = -1;
     fogTime = 0;
     flashScreen = shake = baseFlash = goldPulse = livesPulse = 0;
     ApplySpeed();
@@ -392,6 +394,7 @@ void BattleScene::Update() {
     }
     float real = GameTime::UnscaledDeltaTime();
     HandleInput();
+    UpdateFusion(real);
     bannerTime += real;
     goldPulse = std::max(0.0f, goldPulse - real * 3);
     livesPulse = std::max(0.0f, livesPulse - real * 2);
@@ -409,7 +412,8 @@ void BattleScene::CycleSpeed() {
 }
 
 void BattleScene::ApplySpeed() const {
-    if (!headless) SetGameSpeed(paused ? 0.0f : kSpeeds[speedIndex]);
+    bool frozen = fusionAnim >= 0 && fusionAnim < kFusionImpactAt;
+    if (!headless) SetGameSpeed(paused || frozen ? 0.0f : kSpeeds[speedIndex]);
 }
 
 bool BattleScene::CanStartWave() const {
@@ -430,7 +434,7 @@ void BattleScene::HandleInput() {
         }
     }
     if (Input::GetKeyDown(KEY_P)) SetPaused(!paused);
-    if (paused) return;
+    if (paused || Cinematic()) return;
 
     for (int i = 0; i < (int)level->heroes.size(); ++i) {
         if (Input::GetKeyDown(KEY_ONE + i)) {
@@ -1041,19 +1045,40 @@ int BattleScene::RosterCount() const {
 bool BattleScene::RosterComplete() const { return RosterCount() >= (int)level->heroes.size(); }
 
 void BattleScene::CastFusion(bool force) {
-    if (fusionCooldown > 0 || !Running() || waveIndex < 0) return;
+    if (fusionCooldown > 0 || !Running() || waveIndex < 0 || fusionAnim >= 0) return;
     if (!force && !RosterComplete()) return;
-    fusionCooldown = kFusionMax;
+    fusionCooldown = fusionSpan = kFusionMax;
+    Sfx::Play("fusion", 1.0f, 0);
+    if (headless) return FusionImpact();
+    // The battle freezes while the cut-in plays; FusionImpact lands at kFusionImpactAt.
+    fusionAnim = 0;
+    placing = -1;
+    targetingStrike = false;
+    ApplySpeed();
+}
+
+void BattleScene::UpdateFusion(float real) {
+    if (fusionAnim < 0 || paused) return;
+    float before = fusionAnim;
+    fusionAnim += real;
+    if (before < kFusionImpactAt && fusionAnim >= kFusionImpactAt) {
+        FusionImpact();
+        ApplySpeed();
+    }
+    if (fusionAnim >= kFusionEnd) fusionAnim = -1;
+}
+
+void BattleScene::FusionImpact() {
     Vector2 center{kMapX + kMapW * 0.5f, kMapY + kMapH * 0.45f};
     static const Color hues[] = {{255, 70, 70, 255},  {255, 196, 60, 255},  {80, 255, 170, 255},
                                  {70, 170, 255, 255}, {190, 110, 255, 255}, {255, 120, 210, 255}};
     int beam = 0;
     for (const auto& hero : heroes) {
         Color c = HeroInfo(hero->hero).beam;
-        AddBeam(Add(hero->Pos(), {0, -28}), center, 8, 0.7f, c, WHITE);
+        AddBeam(Add(hero->Pos(), {0, -28}), center, 8, 0.9f, c, WHITE);
         if (++beam >= 10) break;
     }
-    AddBeam({center.x, kMapY - 30}, {center.x, kMapY + kMapH}, 22, 0.85f, {255, 244, 210, 255}, WHITE);
+    AddBeam({center.x, kMapY - 30}, {center.x, kMapY + kMapH}, 40, 1.3f, {255, 244, 210, 255}, WHITE);
     auto alive = Alive();
     int shown = 0;
     for (const auto& enemy : alive) {
@@ -1067,14 +1092,14 @@ void BattleScene::CastFusion(bool force) {
         ++shown;
     }
     for (int i = 0; i < 6; ++i) {
-        AddRing(center, 10, 90.0f + i * 78, 0.5f + i * 0.08f, 6, hues[i]);
-        Burst(center, hues[i], 16, 260, 7, 0.55f);
+        AddRing(center, 10, 90.0f + i * 78, 0.7f + i * 0.12f, 7, hues[i]);
+        AddRing(center, 20, 140.0f + i * 90, 1.0f + i * 0.12f, 3, WHITE);
+        Burst(center, hues[i], 22, 300, 8, 0.7f);
     }
-    Burst(center, WHITE, 22, 140, 10, 0.35f);
-    flashScreen = 1.4f;
-    shake = 1.8f;
-    Banner("究极合体 · 新世代闪光", "全员同时放出必杀光线！", Palette::gold);
-    Sfx::Play("fusion", 1.0f, 0);
+    Burst(center, WHITE, 30, 160, 12, 0.5f);
+    Smoke(center, 14, 26);
+    flashScreen = 1.6f;
+    shake = 2.0f;
 }
 
 // ================================================================ towers
@@ -1114,6 +1139,7 @@ bool BattleScene::BuyTower(HeroId hero, int col, int row) {
     towerGrid[row][col] = t->id;
     if (before < (int)level->heroes.size() && RosterComplete()) {
         fusionCooldown = std::max(fusionCooldown, kFusionCharge);
+        fusionSpan = std::max(fusionCooldown, 1.0f);
         Banner("光之巨人全员集结！", "究极合体开始蓄能，完成后按 E 发动", Palette::gold);
     }
     Burst(Add(at, {0, -10}), def.beam, 26, 150, 5, 0.6f);
@@ -1440,8 +1466,115 @@ void BattleScene::Render() {
     }
     DrawHud();
     DrawPanel();
+    DrawFusionCinematic();
     DrawPauseMenu();
     DrawResult();
+}
+
+bool BattleScene::Cinematic() const { return fusionAnim >= 0 && fusionAnim < kFusionImpactAt; }
+
+void BattleScene::DrawFusionCinematic() {
+    if (fusionAnim < 0) return;
+    float t = fusionAnim;
+    auto ramp = [](float x, float a, float b) { return Clamp((x - a) / (b - a), 0.0f, 1.0f); };
+    float outro = 1 - ramp(t, kFusionEnd - 0.6f, kFusionEnd);
+    Rectangle canvas{0, 0, (float)kCanvasW, (float)kCanvasH};
+    Vector2 sky{kMapX + kMapW * 0.5f, kMapY + kMapH * 0.2f};
+    Vector2 ground{kMapX + kMapW * 0.5f, kMapY + kMapH * 0.45f};
+    static const Color hues[] = {{255, 70, 70, 255},  {255, 196, 60, 255},  {80, 255, 170, 255},
+                                 {70, 170, 255, 255}, {190, 110, 255, 255}, {255, 120, 210, 255}};
+    const auto& roster = level->heroes;
+    int n = (int)roster.size();
+
+    // Time stop: dim the field and slide in letterbox bars.
+    float dim = ramp(t, 0, 0.4f) * (t < kFusionImpactAt ? 0.6f : 0.35f) * outro;
+    DrawRectangleRec(canvas, WithAlpha({4, 4, 16, 255}, dim));
+    float bar = 70 * ramp(t, 0, 0.35f) * outro;
+    DrawRectangleRec({0, 0, (float)kCanvasW, bar}, BLACK);
+    DrawRectangleRec({0, kCanvasH - bar, (float)kCanvasW, bar}, BLACK);
+
+    // Light pillars rise from every hero on the field, then bend into the sky orb.
+    float rise = ramp(t, 0.35f, 1.4f), gather = ramp(t, 1.6f, 2.7f);
+    Draw::BlendAdd();
+    int k = 0;
+    for (const auto& h : heroes) {
+        Color c = HeroInfo(h->hero).beam;
+        Vector2 foot = Add(h->Pos(), {0, -24});
+        if (t < kFusionImpactAt) {
+            Vector2 top = Lerp({foot.x, foot.y - 260 * rise}, sky, gather);
+            Draw::Line(foot, top, 5 + 3 * gather, WithAlpha(c, 0.75f * rise));
+            Draw::Line(foot, top, 2, WithAlpha(WHITE, 0.8f * rise));
+            Draw::Glow(foot, 26, WithAlpha(c, 0.6f * rise));
+        }
+        if (++k >= 16) break;
+    }
+    // The orb swells and spins rainbow rings until it drops.
+    if (t > 1.2f && t < kFusionImpactAt + 0.1f) {
+        float grow = ramp(t, 1.2f, kFusionImpactAt);
+        float r = 14 + 60 * grow;
+        Draw::Glow(sky, r * 3.2f, WithAlpha({255, 230, 160, 255}, 0.45f * grow));
+        for (int i = 0; i < 6; ++i) {
+            float a = RealTime() * (2 + i * 0.35f) + i;
+            Draw::Arc(sky, r * (0.8f + i * 0.16f), 4, a, a + PI * 1.2f, WithAlpha(hues[i], 0.85f), 24);
+        }
+        Draw::Glow(sky, r, WithAlpha(WHITE, 0.95f));
+    }
+    // Impact: a rainbow pillar slams down and lingers.
+    if (t >= kFusionImpactAt) {
+        float life = 1 - ramp(t, kFusionImpactAt, kFusionEnd);
+        float w = 90 * (0.4f + 0.6f * life);
+        for (int i = 0; i < 6; ++i) {
+            float off = (i - 2.5f) * w * 0.18f;
+            Draw::Line({ground.x + off, kMapY - 40}, {ground.x + off * 0.4f, ground.y}, w * 0.22f, WithAlpha(hues[i], 0.55f * life));
+        }
+        Draw::Line({ground.x, kMapY - 40}, ground, w * 0.45f, WithAlpha(WHITE, 0.85f * life));
+        Draw::Glow(ground, 220 * (1.4f - life), WithAlpha({255, 240, 200, 255}, 0.6f * life));
+        float flash = 1 - ramp(t, kFusionImpactAt, kFusionImpactAt + 0.35f);
+        DrawRectangleRec(canvas, WithAlpha(WHITE, 0.85f * flash));
+    }
+    Draw::BlendNormal();
+
+    // Cut-ins: each roster hero slides across a slanted band with their name.
+    if (t < kFusionImpactAt) {
+        float bandH = 92, gapY = 8;
+        int rows = std::min(n, 6);
+        float total = rows * bandH + (rows - 1) * gapY;
+        float y0 = kCanvasH / 2.0f - total / 2;
+        for (int i = 0; i < rows; ++i) {
+            float start = 0.3f + i * 0.2f;
+            float in = ramp(t, start, start + 0.35f), out = ramp(t, 2.2f, 2.6f);
+            if (in <= 0) continue;
+            const HeroDef& def = HeroInfo(roster[i]);
+            bool fromLeft = i % 2 == 0;
+            float slide = (1 - EaseOut(in)) * 700 + out * 900;
+            float x = fromLeft ? 140 - slide : kCanvasW - 140 - 420 + slide;
+            float y = y0 + i * (bandH + gapY);
+            float skew = 26;
+            Color band = WithAlpha(Mix(def.primary, {8, 10, 24, 255}, 0.35f), 0.92f * (1 - out));
+            Draw::Quad({x + skew, y}, {x + 420 + skew, y}, {x + 420 - skew, y + bandH}, {x - skew, y + bandH}, band);
+            Draw::BlendAdd();
+            Draw::Line({x + skew, y}, {x + 420 + skew, y}, 3, WithAlpha(def.beam, 0.9f * (1 - out)));
+            Draw::Line({x - skew, y + bandH}, {x + 420 - skew, y + bandH}, 3, WithAlpha(def.beam, 0.9f * (1 - out)));
+            Draw::BlendNormal();
+            float face = fromLeft ? x + 20 : x + 420 - 20 - 112;
+            Art::DrawPortrait(roster[i], {face, y - 12, 112, 112}, WithAlpha(WHITE, 1 - out));
+            float tx = fromLeft ? x + 150 : x + 40;
+            Gui::TextOutline(def.name, tx, y + 16, 26, WithAlpha(WHITE, 1 - out), WithAlpha(BLACK, 1 - out), 1.6f, Gui::Align::Left);
+            Gui::Text(def.move, tx + 2, y + 54, 17, WithAlpha(def.beam, 1 - out), Gui::Align::Left, true);
+        }
+    }
+
+    // Title: "究极合体" during the build-up, "新世代闪光" on impact.
+    float titleIn = ramp(t, 0.1f, 0.5f);
+    if (t < kFusionImpactAt) {
+        Gui::TextOutline("究极合体", kCanvasW / 2.0f, 16 + (1 - titleIn) * -30, 40, WithAlpha(Palette::gold, titleIn),
+                         WithAlpha({60, 20, 0, 255}, titleIn), 2.4f);
+    } else {
+        float pop = ramp(t, kFusionImpactAt, kFusionImpactAt + 0.25f);
+        float size = 64 + (1 - pop) * 40;
+        Gui::TextOutline("新世代闪光", kCanvasW / 2.0f, kCanvasH / 2.0f - size / 2, size, WithAlpha({255, 244, 210, 255}, outro),
+                         WithAlpha({120, 40, 0, 255}, outro), 3);
+    }
 }
 
 void BattleScene::DrawWorld() {
@@ -1692,7 +1825,7 @@ void BattleScene::DrawHeroCard(int slot, Rectangle r) {
                             WithAlpha(Palette::gold, 0.22f + 0.08f * std::sin(RealTime() * 6)));
         Draw::BlendNormal();
     }
-    if (outcome == Outcome::None && !paused && Gui::Clicked(r)) {
+    if (outcome == Outcome::None && !paused && !Cinematic() && Gui::Clicked(r)) {
         if (afford) {
             placing = placing == (int)id ? -1 : (int)id;
             selected = -1;
@@ -1709,25 +1842,64 @@ void BattleScene::DrawFusion() {
     int need = (int)level->heroes.size();
     bool assembled = have >= need;
     bool ready = assembled && fusionCooldown <= 0 && waveIndex >= 0 && outcome == Outcome::None;
+    bool charging = assembled && fusionCooldown > 0 && outcome == Outcome::None;
     bool hover = ready && !paused && Gui::Hover(r);
-    Color tone = ready ? Color{255, 210, 80, 255} : Palette::muted;
-    Draw::RoundedPanel(r, 8, Mix(tone, {8, 10, 24, 255}, hover ? 0.45f : 0.78f),
-                       ready ? WithAlpha(tone, 0.55f + 0.45f * std::sin(RealTime() * 6)) : Palette::line, ready ? 2.2f : 1.4f);
+    float t = RealTime();
+    const Color gold{255, 206, 80, 255};
+
+    // Body: dark when assembling, navy while charging, gold gradient once ready.
     if (ready) {
         Draw::BlendAdd();
-        Draw::GlowStretched({r.x + r.width / 2, r.y + r.height / 2}, 100, 22, 0, WithAlpha({255, 180, 80, 255}, 0.28f));
+        Draw::GlowStretched({r.x + r.width / 2, r.y + r.height / 2}, 118, 40, 0, WithAlpha({255, 170, 60, 255}, 0.3f + 0.12f * std::sin(t * 5)));
         Draw::BlendNormal();
+        Draw::RoundedPanel(r, 10, {150, 92, 16, 255}, BLANK, 0);
+        DrawRectangleGradientV((int)r.x + 2, (int)r.y + 2, (int)r.width - 4, (int)r.height - 4, hover ? Color{255, 214, 110, 255} : Color{240, 184, 64, 255},
+                               {150, 80, 10, 255});
+        float sweep = std::fmod(t * 140, r.width + 80) - 40;
+        Draw::BlendAdd();
+        Draw::Quad({r.x + sweep, r.y + 2}, {r.x + sweep + 18, r.y + 2}, {r.x + sweep + 4, r.y + r.height - 2}, {r.x + sweep - 14, r.y + r.height - 2},
+                   WithAlpha(WHITE, 0.35f));
+        Draw::BlendNormal();
+        Draw::RoundedPanel(r, 10, BLANK, WithAlpha({255, 240, 190, 255}, 0.6f + 0.4f * std::sin(t * 6)), 2.4f);
+    } else {
+        Draw::RoundedPanel(r, 10, charging ? Color{18, 22, 44, 245} : Color{24, 26, 34, 245}, charging ? WithAlpha(gold, 0.45f) : Color{60, 64, 76, 255},
+                           1.4f);
     }
-    std::string label = "集结完成";
-    if (ready) label = "究极合体  [E]";
-    else if (!assembled) label = TextFormat("集结 %d / %d", have, need);
-    else if (fusionCooldown > 0) label = "蓄能中";
-    if (assembled && fusionCooldown > 0 && outcome == Outcome::None) {
-        float k = Clamp(fusionCooldown / kFusionMax, 0.0f, 1.0f);
-        DrawRectangleRec({r.x + 2, r.y + 2, (r.width - 4) * k, r.height - 4}, {4, 6, 14, 150});
-        Gui::Text(TextFormat("%d", (int)std::ceil(fusionCooldown)), r.x + r.width - 8, r.y + 12, 13, WHITE, Gui::Align::Right, true);
+
+    // One slot per roster hero: lit once placed, a dark silhouette until then.
+    const float slot = 24, gap = 4;
+    float sx = r.x + (r.width - need * slot - (need - 1) * gap) / 2;
+    for (int i = 0; i < need; ++i) {
+        HeroId id = level->heroes[i];
+        bool placed = std::any_of(heroes.begin(), heroes.end(), [id](const Ref<HeroActor>& h) { return h->hero == id; });
+        Rectangle s{sx + i * (slot + gap), r.y + 5, slot, slot};
+        Color ring = ready ? Color{255, 250, 220, 255} : placed ? WithAlpha(HeroInfo(id).beam, 0.9f) : Color{56, 60, 72, 255};
+        DrawCircleV({s.x + slot / 2, s.y + slot / 2}, slot / 2 + 1.5f, ring);
+        DrawCircleV({s.x + slot / 2, s.y + slot / 2}, slot / 2, placed ? Mix(HeroInfo(id).primary, {10, 12, 24, 255}, 0.5f) : Color{14, 16, 22, 255});
+        Art::DrawPortrait(id, {s.x - 3, s.y - 2, slot + 6, slot + 6}, placed ? WHITE : Color{30, 32, 40, 200});
     }
-    Gui::Text(label, r.x + r.width / 2, r.y + 12, 14, ready ? Palette::gold : Palette::muted, Gui::Align::Center, true);
+
+    std::string label;
+    Color labelTone = Palette::muted;
+    if (ready) {
+        label = "究极合体  E";
+        labelTone = {60, 24, 0, 255};
+    } else if (!assembled) {
+        label = TextFormat("集结 %d / %d", have, need);
+    } else if (charging) {
+        label = TextFormat("蓄能中  %d 秒", (int)std::ceil(fusionCooldown));
+        labelTone = gold;
+    } else {
+        label = "全员集结";
+        labelTone = gold;
+    }
+    Gui::Text(label, r.x + r.width / 2, r.y + 33, 14, labelTone, Gui::Align::Center, true);
+    if (charging) {
+        float k = 1 - Clamp(fusionCooldown / std::max(1.0f, fusionSpan), 0.0f, 1.0f);
+        Rectangle bar{r.x + 8, r.y + r.height - 6, r.width - 16, 3};
+        DrawRectangleRec(bar, {8, 10, 18, 255});
+        DrawRectangleRec({bar.x, bar.y, bar.width * k, bar.height}, gold);
+    }
     if (ready && !paused && Gui::Clicked(r)) CastFusion();
 }
 
@@ -1739,34 +1911,48 @@ void BattleScene::DrawSkills() {
         bool ready = cd <= 0 && waveIndex >= 0 && outcome == Outcome::None;
         bool hover = Gui::Hover(r) && ready && !paused;
         Color tone = i == 0 ? Palette::cyan : Color{255, 150, 70, 255};
-        Draw::RoundedPanel(r, 10, Mix(tone, {10, 14, 30, 255}, hover ? 0.6f : 0.78f),
-                           ready ? WithAlpha(tone, 0.6f + 0.4f * std::sin(RealTime() * 5)) : Palette::line, ready ? 2.2f : 1.5f);
-        Vector2 c{r.x + r.width / 2, r.y + 16};
-        if (i == 0) {
+        // Unavailable skills read as switched off: grey body, desaturated icon, no glow.
+        auto ink = [ready](Color c) { return ready ? c : Darken(Desaturate(c), 0.45f); };
+        Color fill = ready ? Mix(tone, {10, 14, 30, 255}, hover ? 0.55f : 0.74f) : Color{26, 28, 36, 245};
+        Draw::RoundedPanel(r, 10, fill, ready ? WithAlpha(tone, 0.6f + 0.4f * std::sin(RealTime() * 5)) : Color{60, 64, 76, 255},
+                           ready ? 2.4f : 1.2f);
+        Vector2 c{r.x + r.width / 2, r.y + 18};
+        if (ready) {
             Draw::BlendAdd();
+            Draw::Glow(c, 26, WithAlpha(tone, 0.35f + 0.15f * std::sin(RealTime() * 5)));
+            Draw::BlendNormal();
+        }
+        if (i == 0) {
+            if (ready) Draw::BlendAdd();
             for (int k = 0; k < 5; ++k) {
                 float a = -PI / 2 + (k - 2) * 0.36f;
-                Draw::Line(c, Add(c, Mul(Dir(a), 22)), 3, WithAlpha(HeroInfo((HeroId)k).beam, 0.9f));
+                Color beam = HeroInfo(level->heroes[k % level->heroes.size()]).beam;
+                Draw::Line(c, Add(c, Mul(Dir(a), 20)), 3, WithAlpha(ink(beam), 0.9f));
             }
-            Draw::Glow(c, 16, WithAlpha(WHITE, 0.8f));
-            Draw::BlendNormal();
-            Draw::Star(c, 9, 4, RealTime(), WHITE);
+            if (ready) Draw::Glow(c, 16, WithAlpha(WHITE, 0.8f));
+            if (ready) Draw::BlendNormal();
+            Draw::Star(c, 9, 4, ready ? RealTime() : 0, ink(WHITE));
         } else {
-            Draw::Quad({c.x + 18, c.y}, {c.x - 14, c.y - 4}, {c.x - 16, c.y}, {c.x - 14, c.y + 4}, {220, 224, 232, 255});
-            Draw::Tri({c.x + 2, c.y - 2}, {c.x - 10, c.y - 16}, {c.x - 14, c.y - 14}, {190, 196, 210, 255});
-            Draw::Tri({c.x + 2, c.y + 2}, {c.x - 10, c.y + 16}, {c.x - 14, c.y + 14}, {170, 176, 192, 255});
-            Draw::Line({c.x - 14, c.y}, {c.x + 16, c.y}, 1.6f, {236, 120, 40, 255});
+            Draw::Quad({c.x + 18, c.y}, {c.x - 14, c.y - 4}, {c.x - 16, c.y}, {c.x - 14, c.y + 4}, ink({220, 224, 232, 255}));
+            Draw::Tri({c.x + 2, c.y - 2}, {c.x - 10, c.y - 16}, {c.x - 14, c.y - 14}, ink({190, 196, 210, 255}));
+            Draw::Tri({c.x + 2, c.y + 2}, {c.x - 10, c.y + 16}, {c.x - 14, c.y + 14}, ink({170, 176, 192, 255}));
+            Draw::Line({c.x - 14, c.y}, {c.x + 16, c.y}, 1.6f, ink({236, 120, 40, 255}));
         }
-        Gui::Text(i == 0 ? "合体光线" : "空中支援", c.x, r.y + 32, 12, Palette::text, Gui::Align::Center, true);
-        Draw::RoundedPanel({r.x + 4, r.y + 4, 16, 16}, 4, {6, 8, 20, 220}, BLANK, 0);
-        Gui::Text(i == 0 ? "Q" : "W", r.x + 12, r.y + 5, 12, Palette::muted, Gui::Align::Center, true);
+        Gui::Text(i == 0 ? "合体光线" : "空中支援", c.x, r.y + 33, 12, ready ? Palette::text : Color{110, 114, 126, 255}, Gui::Align::Center,
+                  true);
+        Draw::RoundedPanel({r.x + 4, r.y + 4, 16, 16}, 4, ready ? Mix(tone, {6, 8, 20, 255}, 0.4f) : Color{14, 16, 22, 230}, BLANK, 0);
+        Gui::Text(i == 0 ? "Q" : "W", r.x + 12, r.y + 5, 12, ready ? WHITE : Color{90, 94, 104, 255}, Gui::Align::Center, true);
         if (!ready) {
             float k = waveIndex < 0 ? 1.0f : Clamp(cd / max, 0.0f, 1.0f);
-            DrawRectangleRec({r.x + 2, r.y + 2 + (r.height - 4) * (1 - k), r.width - 4, (r.height - 4) * k}, {4, 6, 14, 170});
+            // Clock wipe over the icon plus a refill bar along the bottom.
+            DrawCircleSector(c, 19, -90, -90 + 360 * k, 32, {6, 8, 12, 170});
+            Rectangle bar{r.x + 8, r.y + r.height - 7, r.width - 16, 3};
+            DrawRectangleRec(bar, {10, 12, 18, 255});
+            DrawRectangleRec({bar.x, bar.y, bar.width * (1 - k), bar.height}, WithAlpha(tone, 0.8f));
             if (waveIndex >= 0 && outcome == Outcome::None)
-                Gui::TextOutline(TextFormat("%d", (int)std::ceil(cd)), c.x, c.y - 10, 20, WHITE, {0, 0, 0, 255}, 1.4f);
+                Gui::TextOutline(TextFormat("%d", (int)std::ceil(cd)), c.x, c.y - 11, 20, WHITE, {0, 0, 0, 255}, 1.6f);
         }
-        if (ready && !paused && Gui::Clicked(r)) {
+        if (ready && !paused && !Cinematic() && Gui::Clicked(r)) {
             if (i == 0) CastBrothers();
             else {
                 targetingStrike = !targetingStrike;

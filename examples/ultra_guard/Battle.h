@@ -136,6 +136,8 @@ private:
     bool targetingStrike = false;
     bool restartRequested = false;
     float brothersCooldown = 0, strikeCooldown = 0, fusionCooldown = 0;
+    float fusionSpan = 1; // length of the current charge, for the progress bar
+    float fusionAnim = -1; // real seconds into the fusion cut-in; < 0 when idle
     float flashScreen = 0, shake = 0, baseFlash = 0;
     float fogTime = 0; // Gatanothor's dark fog: heroes reload at half speed
     float goldPulse = 0, livesPulse = 0;
@@ -166,6 +168,10 @@ private:
     void CastBrothers();
     void CastStrike(Vector2 target);
     void CastFusion(bool force = false);
+    void UpdateFusion(float real);
+    void FusionImpact();
+    bool Cinematic() const;
+    void DrawFusionCinematic();
     bool RosterComplete() const;
     int RosterCount() const;
     std::vector<MonsterActor*> KaijuInCircle(Vector2 center, float radius) const;
