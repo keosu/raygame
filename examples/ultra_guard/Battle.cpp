@@ -305,7 +305,7 @@ BattleScene::BattleScene(int index) : Scene("Battle"), levelIndex(index) {}
 void BattleScene::OnLoad() {
     level = &Levels()[levelIndex];
     map.Build(*level);
-    if (!mapTexture.id && !headless) mapTexture = RenderMap(map, 2.0f);
+    if (!mapTexture.id && !headless) mapTexture = RenderMap(map, 2.0f, false, false);
     for (auto& row : towerGrid) row.fill(-1);
     monsters.clear();
     heroes.clear();

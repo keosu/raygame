@@ -10,11 +10,13 @@ struct Frame {
     Vector2 o;
     float s, f;
     float flash, alpha, chill, burn;
+    bool statue = false;
     Vector2 P(float x, float y) const { return {o.x + x * s * f, o.y + y * s}; }
     float R(float r) const { return r * s; }
     float A(float radians) const { return f > 0 ? radians : PI - radians; }
     float Rot(float radians) const { return radians * f; }
     Color C(Color c) const {
+        if (statue) c = Mix(Desaturate(c), {176, 132, 74, c.a}, 0.55f);
         if (chill > 0) c = Mix(c, {150, 210, 255, c.a}, chill * 0.45f);
         if (burn > 0) c = Mix(c, {255, 120, 40, c.a}, burn * 0.25f);
         if (flash > 0) c = Mix(c, {255, 255, 255, c.a}, flash);
@@ -342,7 +344,7 @@ void DrawKaiju(EnemyId id, const KaijuPose& pose) {
         if (pose.shielded) Draw::Glow(center, h * 0.65f, WithAlpha({120, 200, 255, 255}, 0.45f * alpha));
         Draw::BlendNormal();
     }
-    Color tint = WHITE;
+    Color tint = pose.statue ? Color{190, 150, 96, 255} : WHITE;
     if (pose.chill > 0) tint = Mix(tint, {150, 210, 255, 255}, pose.chill * 0.45f);
     if (pose.burn > 0) tint = Mix(tint, {255, 150, 90, 255}, pose.burn * 0.3f);
     DrawTexturePro(tex, src, dst, {0, 0}, 0, WithAlpha(tint, alpha));
@@ -354,7 +356,7 @@ void DrawKaiju(EnemyId id, const KaijuPose& pose) {
 }
 
 void DrawBuiltinKaiju(EnemyId id, const KaijuPose& pose) {
-    Frame k{pose.feet, pose.scale, pose.face >= 0 ? 1.0f : -1.0f, pose.flash, pose.alpha, pose.chill, pose.burn};
+    Frame k{pose.feet, pose.scale, pose.face >= 0 ? 1.0f : -1.0f, pose.flash, pose.alpha, pose.chill, pose.burn, pose.statue};
     switch (id) {
     case EnemyId::Gomora: Gomora(k, pose.time); break;
     case EnemyId::RedKing: RedKing(k, pose.time); break;

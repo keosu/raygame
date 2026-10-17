@@ -33,6 +33,7 @@ struct KaijuPose {
     float burn = 0;
     bool shielded = false;
     bool enraged = false;
+    bool statue = false; // bronze monument, e.g. on the theme-park plinth
 };
 
 // Uses the current skin's sprite when it has one.

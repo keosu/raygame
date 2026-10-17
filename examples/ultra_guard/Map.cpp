@@ -1,4 +1,6 @@
 #include "Map.h"
+#include "Art.h"
+#include "Assets.h"
 #include "Draw.h"
 #include "Skins.h"
 #include <rlgl.h>
@@ -16,11 +18,69 @@ Vector2 PathLine::Sample(float distance, Vector2* direction) const {
     return Lerp(points[i - 1], points[i], t);
 }
 
+void MapData::PlaceLandmarks() {
+    struct Want {
+        Landmark kind;
+        int w, h;
+    };
+    std::vector<Want> wants;
+    switch (level->theme) {
+    case Theme::Park: wants = {{Landmark::FerrisWheel, 3, 3}, {Landmark::Safari, 3, 2}, {Landmark::WhaleShark, 2, 2}}; break;
+    case Theme::Plaza: wants = {{Landmark::UltraStatue, 2, 3}, {Landmark::KaijuPlinth, 3, 2}}; break;
+    case Theme::Studio: wants = {{Landmark::Castle, 3, 3}, {Landmark::Dinosaur, 3, 2}, {Landmark::Soundstage, 3, 2}}; break;
+    default: return;
+    }
+    // Distance (in tiles) from the nearest road or base cell: landmarks take the spots towers want least.
+    std::array<std::array<int, kCols>, kRows> far{};
+    std::vector<GridPoint> frontier;
+    for (int r = 0; r < kRows; ++r)
+        for (int c = 0; c < kCols; ++c) {
+            bool road = cells[r][c] == Cell::Path || cells[r][c] == Cell::Base;
+            far[r][c] = road ? 0 : 99;
+            if (road) frontier.push_back({c, r});
+        }
+    for (size_t i = 0; i < frontier.size(); ++i) {
+        GridPoint g = frontier[i];
+        for (GridPoint d : {GridPoint{1, 0}, GridPoint{-1, 0}, GridPoint{0, 1}, GridPoint{0, -1}}) {
+            int c = g.col + d.col, r = g.row + d.row;
+            if (InGrid(c, r) && far[r][c] > far[g.row][g.col] + 1) {
+                far[r][c] = far[g.row][g.col] + 1;
+                frontier.push_back({c, r});
+            }
+        }
+    }
+    for (const Want& want : wants) {
+        int bestScore = -1, bestC = 0, bestR = 0;
+        for (int r = 0; r + want.h <= kRows; ++r)
+            for (int c = 0; c + want.w <= kCols; ++c) {
+                int score = 0, nearest = 99;
+                for (int dr = 0; dr < want.h; ++dr)
+                    for (int dc = 0; dc < want.w; ++dc) {
+                        if (cells[r + dr][c + dc] != Cell::Open) nearest = -1;
+                        nearest = std::min(nearest, far[r + dr][c + dc]);
+                        score += std::min(far[r + dr][c + dc], 4);
+                    }
+                if (nearest < 1) continue; // never on or inside the road
+                if (nearest >= 2) score += 100;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestC = c;
+                    bestR = r;
+                }
+            }
+        if (bestScore < 0) continue;
+        landmarks.push_back({want.kind, bestC, bestR, want.w, want.h});
+        for (int dr = 0; dr < want.h; ++dr)
+            for (int dc = 0; dc < want.w; ++dc) cells[bestR + dr][bestC + dc] = Cell::Blocked;
+    }
+}
+
 void MapData::Build(const LevelDef& def) {
     level = &def;
     for (auto& row : cells) row.fill(Cell::Open);
     paths.clear();
     decor.clear();
+    landmarks.clear();
     for (const auto& waypoints : def.paths) {
         PathLine line;
         for (size_t i = 0; i < waypoints.size(); ++i) {
@@ -45,6 +105,7 @@ void MapData::Build(const LevelDef& def) {
     for (int r = def.base.row - 1; r <= def.base.row + 1; ++r)
         for (int c = def.base.col; c <= def.base.col + 1; ++c)
             if (InGrid(c, r)) cells[r][c] = Cell::Base;
+    PlaceLandmarks();
 
     Rng rng(def.seed);
     for (int r = 0; r < kRows; ++r) {
@@ -230,19 +291,20 @@ void Palm(Vector2 p, float s) {
     DrawCircleV(top, 3.5f * s, {36, 110, 52, 255});
 }
 
-void Tent(Vector2 p, float s, std::uint32_t seed) {
+void BalloonCart(Vector2 p, float s, std::uint32_t seed) {
     Rng rng(seed);
-    Color a = rng.Int(0, 1) ? Color{214, 42, 52, 255} : Color{28, 92, 186, 255};
-    Color b{255, 214, 72, 255};
-    float w = 20 * s;
-    Vector2 peak{p.x, p.y - 24 * s};
-    Draw::GlowStretched(Add(p, {3, 8}), w * 1.2f, 8 * s, 0, WithAlpha(BLACK, 0.4f));
-    Draw::Tri(peak, {p.x - w, p.y + 6}, {p.x + w, p.y + 6}, Darken(a, 0.25f));
-    for (int i = -2; i <= 2; ++i) {
-        float x = p.x + i * w * 0.32f;
-        Draw::Tri(peak, {x, p.y + 6}, {x + 4 * s, p.y + 6}, (i & 1) ? b : a);
+    Draw::GlowStretched(Add(p, {3, 12}), 16 * s, 6 * s, 0, WithAlpha(BLACK, 0.4f));
+    DrawRectangleRec({p.x - 10 * s, p.y + 2 * s, 20 * s, 9 * s}, {214, 60, 70, 255});
+    DrawRectangleRec({p.x - 10 * s, p.y + 2 * s, 20 * s, 3 * s}, {255, 230, 120, 255});
+    DrawCircleV({p.x - 6 * s, p.y + 12 * s}, 2.4f * s, {40, 40, 48, 255});
+    DrawCircleV({p.x + 6 * s, p.y + 12 * s}, 2.4f * s, {40, 40, 48, 255});
+    static const Color hues[] = {{255, 80, 110, 255}, {255, 200, 60, 255}, {90, 200, 255, 255}, {150, 230, 110, 255}, {200, 120, 255, 255}};
+    for (int i = 0; i < 5; ++i) {
+        Vector2 b{p.x + (i - 2) * 5.5f * s + rng.Range(-1, 1), p.y - (16 + rng.Range(0, 10)) * s};
+        Draw::Line({p.x, p.y + 2 * s}, b, 0.8f, {240, 240, 240, 200});
+        Draw::Ellipse(b, 4 * s, 5 * s, hues[(i + seed) % 5], 0);
+        DrawCircleV(Add(b, {-1.2f * s, -1.8f * s}), 1.2f * s, WithAlpha(WHITE, 0.7f));
     }
-    DrawCircleV(peak, 2.4f * s, b);
 }
 
 void UltraStatue(Vector2 p, float s) {
@@ -265,12 +327,303 @@ void Pylon(Vector2 p, float s, Color glow) {
     Draw::BlendNormal();
 }
 
-void Turret(Vector2 p, float s) {
-    Draw::GlowStretched(Add(p, {3, 14}), 18 * s, 7 * s, 0, WithAlpha(BLACK, 0.4f));
-    DrawRectangleRec({p.x - 8 * s, p.y - 8 * s, 16 * s, 24 * s}, {148, 156, 172, 255});
-    DrawRectangleRec({p.x - 8 * s, p.y - 8 * s, 5 * s, 24 * s}, {178, 186, 200, 255});
-    Draw::Tri({p.x, p.y - 28 * s}, {p.x - 12 * s, p.y - 6 * s}, {p.x + 12 * s, p.y - 6 * s}, {64, 108, 196, 255});
-    DrawRectangleRec({p.x - 1 * s, p.y - 36 * s, 2 * s, 10 * s}, {220, 48, 60, 255});
+void FilmCamera(Vector2 p, float s) {
+    Draw::GlowStretched(Add(p, {3, 14}), 16 * s, 6 * s, 0, WithAlpha(BLACK, 0.4f));
+    Color dark{40, 42, 52, 255};
+    for (float dx : {-9.0f, 0.0f, 9.0f}) Draw::Line({p.x, p.y - 4 * s}, {p.x + dx * s, p.y + 14 * s}, 2 * s, {90, 92, 104, 255});
+    DrawRectangleRec({p.x - 9 * s, p.y - 14 * s, 18 * s, 11 * s}, dark);
+    Draw::Quad({p.x + 9 * s, p.y - 12 * s}, {p.x + 17 * s, p.y - 15 * s}, {p.x + 17 * s, p.y - 2 * s}, {p.x + 9 * s, p.y - 5 * s}, {70, 72, 86, 255});
+    for (float dx : {-4.5f, 4.5f}) {
+        DrawCircleV({p.x + dx * s, p.y - 20 * s}, 5 * s, dark);
+        DrawCircleV({p.x + dx * s, p.y - 20 * s}, 2 * s, {150, 152, 164, 255});
+    }
+    DrawCircleV({p.x - 6 * s, p.y - 10 * s}, 1.4f * s, {255, 60, 60, 255});
+}
+
+void PathPlanks(const MapData& map, float width, float spacing, Color color) {
+    for (const auto& path : map.paths)
+        for (float d = 0; d < path.length; d += spacing) {
+            Vector2 dir;
+            Vector2 p = path.Sample(d, &dir);
+            Vector2 n = Mul(Vector2{-dir.y, dir.x}, width / 2);
+            DrawLineEx(Sub(p, n), Add(p, n), 1.6f, color);
+        }
+}
+
+void PathStars(const MapData& map, float spacing, Color star, Color rim) {
+    for (const auto& path : map.paths)
+        for (float d = kTile * 0.8f; d < path.length - kTile * 0.5f; d += spacing) {
+            Vector2 p = path.Sample(d);
+            Draw::Star(p, 8, 3.4f, 0, rim);
+            Draw::Star(p, 6, 2.5f, 0, star);
+        }
+}
+
+void PathEmblems(const MapData& map, float spacing) {
+    for (const auto& path : map.paths)
+        for (float d = kTile; d < path.length - kTile * 0.5f; d += spacing) {
+            Vector2 p = path.Sample(d);
+            Draw::Diamond(p, 7, 9, {230, 232, 240, 255});
+            Draw::Diamond(p, 4, 5.5f, {214, 36, 52, 255});
+            DrawCircleV(p, 2, {130, 220, 255, 255});
+        }
+}
+
+// ---------------------------------------------------------------- landmarks
+
+Texture2D StatueTexture() {
+    static TextureHandle handle;
+    static bool tried = false;
+    if (!tried) {
+        tried = true;
+        std::string path = AssetPath("landmarks/ultra_statue.png");
+        Image image = FileSystem::AssetExists(path) ? LoadImage(path.c_str()) : Image{};
+        if (IsImageValid(image)) {
+            ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+            handle = ResourceManager::CreateTextureFromImage("landmark-ultra-statue", image, true);
+        }
+        UnloadImage(image);
+    }
+    return handle ? *handle : Texture2D{};
+}
+
+void FerrisWheel(Rectangle a, float time) {
+    Vector2 hub{a.x + a.width / 2, a.y + a.height * 0.42f};
+    float R = a.width * 0.38f;
+    Color steel{214, 220, 232, 255};
+    Draw::GlowStretched({hub.x + 6, a.y + a.height - 6}, a.width * 0.42f, 12, 0, WithAlpha(BLACK, 0.4f));
+    for (float s : {-1.0f, 1.0f}) Draw::Line(hub, {hub.x + s * R * 0.75f, a.y + a.height - 8}, 5, {150, 158, 176, 255});
+    DrawRectangleRec({hub.x - R * 0.9f, a.y + a.height - 11, R * 1.8f, 6}, {110, 116, 132, 255});
+    DrawRing(hub, R - 2, R + 2, 0, 360, 56, steel);
+    DrawRing(hub, R * 0.55f - 1, R * 0.55f + 1, 0, 360, 40, WithAlpha(steel, 0.7f));
+    static const Color cabins[] = {{255, 90, 90, 255},  {255, 190, 60, 255},  {90, 200, 120, 255},
+                                   {80, 160, 255, 255}, {190, 110, 255, 255}, {255, 120, 200, 255}};
+    float spin = time * 0.3f;
+    for (int i = 0; i < 12; ++i) {
+        Vector2 rim = Add(hub, Mul(Dir(spin + i * 2 * PI / 12), R));
+        Draw::Line(hub, rim, 1.4f, WithAlpha(steel, 0.8f));
+        Vector2 cab = Add(rim, {0, 6});
+        Draw::Line(rim, cab, 1.2f, steel);
+        Color c = cabins[i % 6];
+        Draw::RoundedPanel({cab.x - 6, cab.y - 1, 12, 10}, 3, c, Darken(c, 0.45f), 1);
+    }
+    DrawCircleV(hub, 7, {232, 238, 248, 255});
+    DrawCircleV(hub, 3.5f, {255, 90, 90, 255});
+    Draw::BlendAdd();
+    for (int i = 0; i < 24; ++i) {
+        bool on = ((int)(time * 4) + i) % 3 != 0;
+        Draw::Glow(Add(hub, Mul(Dir(spin + i * PI / 12 + 0.13f), R)), on ? 6.0f : 3.0f, WithAlpha({255, 236, 160, 255}, on ? 0.7f : 0.3f));
+    }
+    Draw::BlendNormal();
+}
+
+void Giraffe(Vector2 feet, float s, float t) {
+    Color body{234, 184, 72, 255}, spot{150, 92, 40, 255}, dark{120, 80, 40, 255};
+    float bob = std::sin(t * 1.3f) * 2 * s;
+    Vector2 b{feet.x, feet.y - 20 * s};
+    for (float dx : {-8.0f, -4.0f, 5.0f, 9.0f}) Draw::Line({b.x + dx * s, b.y + 2 * s}, {feet.x + dx * s, feet.y}, 2.2f * s, dark);
+    Draw::Ellipse(b, 12 * s, 7 * s, body, 0);
+    Vector2 head{b.x + 13 * s, b.y - 30 * s + bob};
+    Draw::Quad({b.x + 6 * s, b.y - 4 * s}, {b.x + 11 * s, b.y - 3 * s}, {head.x + 2 * s, head.y + 3 * s}, {head.x - 3 * s, head.y + 2 * s}, body);
+    Draw::Ellipse(Add(head, {3 * s, 0}), 6 * s, 3.4f * s, body, 0.2f);
+    Draw::Line({head.x - 1 * s, head.y - 2 * s}, {head.x - 2 * s, head.y - 7 * s}, 1.4f * s, dark);
+    Draw::Line({head.x + 2 * s, head.y - 2 * s}, {head.x + 2 * s, head.y - 7 * s}, 1.4f * s, dark);
+    Rng rng(91);
+    for (int i = 0; i < 7; ++i) DrawCircleV({b.x + rng.Range(-9, 9) * s, b.y + rng.Range(-4, 4) * s}, 1.8f * s, spot);
+    for (int i = 0; i < 4; ++i) DrawCircleV(Lerp({b.x + 9 * s, b.y - 6 * s}, head, 0.2f + i * 0.2f), 1.5f * s, spot);
+}
+
+void Panda(Vector2 feet, float t) {
+    Color white{240, 240, 236, 255}, black{30, 30, 36, 255};
+    Vector2 b{feet.x, feet.y - 8};
+    Draw::Ellipse(b, 10, 8, white, 0);
+    DrawCircleV({b.x - 7, b.y + 6}, 3.5f, black);
+    DrawCircleV({b.x + 7, b.y + 6}, 3.5f, black);
+    Draw::Ellipse({b.x, b.y - 1}, 10, 3.5f, black, 0);
+    Vector2 h{b.x + 2, b.y - 12};
+    DrawCircleV({h.x - 5, h.y - 5}, 3, black);
+    DrawCircleV({h.x + 5, h.y - 5}, 3, black);
+    DrawCircleV(h, 7, white);
+    Draw::Ellipse({h.x - 3, h.y}, 2, 2.6f, black, -0.4f);
+    Draw::Ellipse({h.x + 3, h.y}, 2, 2.6f, black, 0.4f);
+    float chew = std::sin(t * 3) * 1.5f;
+    Draw::Line({b.x + 8, b.y - 4 + chew}, {b.x + 16, b.y - 18 + chew}, 2, {90, 170, 70, 255});
+}
+
+void Safari(Rectangle a, float time) {
+    Rectangle pen{a.x + 6, a.y + 8, a.width - 12, a.height - 14};
+    Draw::GlowStretched({pen.x + pen.width / 2 + 4, pen.y + pen.height}, pen.width * 0.55f, 10, 0, WithAlpha(BLACK, 0.35f));
+    Draw::RoundedPanel(pen, 14, {218, 190, 120, 255}, BLANK, 0);
+    Draw::Ellipse({pen.x + pen.width * 0.7f, pen.y + pen.height * 0.68f}, 26, 10, {150, 170, 84, 220}, 0);
+    Vector2 tree{pen.x + pen.width * 0.84f, pen.y + 18};
+    Draw::Line({tree.x, tree.y + 30}, tree, 4, {112, 78, 42, 255});
+    Draw::Ellipse(tree, 24, 8, {78, 138, 60, 255}, 0);
+    Draw::Ellipse(Add(tree, {-4, -4}), 16, 5, {112, 172, 80, 255}, 0);
+    Giraffe({pen.x + 26, pen.y + pen.height - 8}, 1.0f, time);
+    Giraffe({pen.x + 62, pen.y + pen.height - 4}, 0.82f, time + 1.3f);
+    Panda({pen.x + pen.width - 32, pen.y + pen.height - 10}, time);
+    Color wood{132, 92, 52, 255};
+    for (float y : {pen.y + 2, pen.y + pen.height - 2}) {
+        Draw::Line({pen.x + 4, y}, {pen.x + pen.width - 4, y}, 2, wood);
+        for (float x = pen.x + 6; x < pen.x + pen.width - 4; x += 13) DrawRectangleRec({x - 1.5f, y - 6, 3, 9}, Darken(wood, 0.2f));
+    }
+}
+
+void WhaleShark(Rectangle a, float time) {
+    Vector2 c{a.x + a.width / 2, a.y + a.height / 2 + 4};
+    float rx = a.width * 0.46f, ry = a.height * 0.4f;
+    Draw::GlowStretched(Add(c, {4, ry}), rx, 10, 0, WithAlpha(BLACK, 0.35f));
+    Draw::Ellipse(c, rx + 4, ry + 4, {200, 230, 240, 255}, 0);
+    Draw::GradientEllipse(c, rx, ry, {10, 50, 120, 255}, {40, 150, 210, 255}, {c.x - rx * 0.3f, c.y - ry * 0.3f}, 10);
+    float ang = time * 0.6f;
+    Vector2 pos = Add(c, {std::cos(ang) * rx * 0.5f, std::sin(ang) * ry * 0.45f});
+    float heading = ang + PI / 2;
+    Vector2 d = Dir(heading);
+    Draw::Ellipse(pos, 18, 6.5f, {60, 78, 110, 255}, heading);
+    Vector2 tail = Sub(pos, Mul(d, 18));
+    Draw::Tri(tail, Add(Sub(tail, Mul(d, 8)), Mul(Vector2{-d.y, d.x}, 7)), Sub(Sub(tail, Mul(d, 8)), Mul(Vector2{-d.y, d.x}, 7)), {60, 78, 110, 255});
+    Rng rng(5);
+    for (int i = 0; i < 8; ++i) DrawCircleV(Add(pos, Rotate({rng.Range(-12, 12), rng.Range(-3, 3)}, heading)), 1.2f, {230, 240, 255, 255});
+    Draw::BlendAdd();
+    for (int i = 0; i < 4; ++i)
+        Draw::Ellipse(Add(c, {std::sin(time * 0.9f + i * 1.7f) * rx * 0.6f, std::cos(time * 0.7f + i) * ry * 0.5f}), 10, 3, WithAlpha({140, 220, 255, 255}, 0.25f),
+                      0.3f);
+    Draw::BlendNormal();
+}
+
+void UltraStatueLandmark(Rectangle a, float time) {
+    float cx = a.x + a.width / 2;
+    Rectangle step{a.x + 6, a.y + a.height - 16, a.width - 12, 10};
+    Rectangle ped{a.x + 16, a.y + a.height - 34, a.width - 32, 20};
+    Draw::GlowStretched({cx + 4, step.y + 10}, a.width * 0.5f, 10, 0, WithAlpha(BLACK, 0.45f));
+    Draw::BlendAdd();
+    Draw::Glow({cx, a.y + a.height * 0.45f}, a.width * 0.75f, WithAlpha({255, 214, 150, 255}, 0.28f + 0.08f * std::sin(time * 2)));
+    for (float side : {-1.0f, 1.0f}) {
+        float sway = std::sin(time * 0.8f + side) * 10;
+        Vector2 base{cx + side * a.width * 0.42f, step.y};
+        Draw::Tri(base, {cx + sway - 18, a.y + 6}, {cx + sway + 18, a.y + 6}, WithAlpha({255, 240, 200, 255}, 0.12f));
+    }
+    Draw::BlendNormal();
+    Draw::RoundedPanel(step, 3, {150, 150, 160, 255}, {100, 100, 112, 255}, 1);
+    Draw::RoundedPanel(ped, 3, {188, 188, 198, 255}, {120, 120, 132, 255}, 1);
+    DrawRectangleRec({cx - 12, ped.y + 6, 24, 7}, {214, 172, 70, 255});
+    Texture2D tex = StatueTexture();
+    float h = a.height - 30;
+    if (tex.id) {
+        float w = h * tex.width / tex.height;
+        DrawTexturePro(tex, {0, 0, (float)tex.width, (float)tex.height}, {cx - w / 2, ped.y - h + 4, w, h}, {0, 0}, 0, WHITE);
+    } else {
+        Draw::Capsule({cx, ped.y - 20}, {cx, ped.y - h + 30}, 12, {200, 206, 220, 255});
+        DrawCircleV({cx, ped.y - h + 18}, 12, {210, 216, 228, 255});
+        DrawCircleV({cx, ped.y - h * 0.6f}, 5, {120, 220, 255, 255});
+    }
+}
+
+void KaijuPlinth(Rectangle a, float time) {
+    Rectangle plinth{a.x + 6, a.y + a.height - 24, a.width - 12, 16};
+    Draw::GlowStretched({plinth.x + plinth.width / 2 + 4, plinth.y + 16}, plinth.width * 0.55f, 8, 0, WithAlpha(BLACK, 0.4f));
+    Draw::RoundedPanel(plinth, 4, {170, 166, 160, 255}, {110, 106, 100, 255}, 1.2f);
+    static const EnemyId kinds[] = {EnemyId::Gomora, EnemyId::Zetton, EnemyId::Baltan};
+    for (int i = 0; i < 3; ++i) {
+        Art::KaijuPose pose;
+        pose.feet = {plinth.x + plinth.width * (0.2f + 0.3f * i), plinth.y + 4};
+        pose.scale = i == 1 ? 1.15f : 1.0f;
+        pose.face = i == 2 ? -1.0f : 1.0f;
+        pose.statue = true;
+        Art::DrawKaiju(kinds[i], pose);
+        DrawRectangleRec({pose.feet.x - 8, plinth.y + 8, 16, 4}, {214, 172, 70, 255});
+    }
+}
+
+void Castle(Rectangle a, float time) {
+    float base = a.y + a.height - 10;
+    Draw::Ellipse({a.x + a.width / 2, base}, a.width * 0.5f, 14, {96, 120, 88, 255}, 0);
+    Color stone{176, 172, 190, 255}, shade{140, 136, 156, 255}, roof{58, 70, 150, 255};
+    DrawRectangleRec({a.x + 18, base - 48, a.width - 36, 46}, stone);
+    for (float x = a.x + 18; x < a.x + a.width - 22; x += 10) DrawRectangleRec({x, base - 54, 6, 7}, stone);
+    Draw::RoundedPanel({a.x + a.width / 2 - 10, base - 26, 20, 24}, 9, {50, 40, 60, 255}, BLANK, 0);
+    struct Tower {
+        float x, w, h;
+    };
+    Tower towers[] = {{a.x + 14, 18, 76}, {a.x + a.width / 2 - 13, 26, 118}, {a.x + a.width - 32, 18, 84}};
+    for (const auto& t : towers) {
+        DrawRectangleRec({t.x, base - t.h, t.w, t.h}, stone);
+        DrawRectangleRec({t.x + t.w * 0.65f, base - t.h, t.w * 0.35f, t.h}, shade);
+        Draw::Tri({t.x + t.w / 2, base - t.h - t.w * 1.3f}, {t.x - 4, base - t.h + 2}, {t.x + t.w + 4, base - t.h + 2}, roof);
+        Vector2 pole{t.x + t.w / 2, base - t.h - t.w * 1.3f};
+        Draw::Line(pole, Add(pole, {0, -10}), 1.2f, {60, 60, 70, 255});
+        float wave = std::sin(time * 4 + t.x) * 2;
+        Draw::Tri(Add(pole, {0, -10}), Add(pole, {9, -7 + wave}), Add(pole, {0, -4}), {230, 50, 60, 255});
+        for (int i = 0; i < 2; ++i) {
+            Rectangle win{t.x + t.w / 2 - 2.5f, base - t.h + 14 + i * 22.0f, 5, 8};
+            DrawRectangleRec(win, {255, 214, 120, 255});
+        }
+    }
+    Draw::BlendAdd();
+    Draw::Glow({a.x + a.width / 2, base - 70}, 40, WithAlpha({255, 220, 150, 255}, 0.18f));
+    Draw::BlendNormal();
+}
+
+void Dinosaur(Rectangle a, float time) {
+    float base = a.y + a.height - 8;
+    Draw::Ellipse({a.x + a.width / 2, base - 6}, a.width * 0.48f, 16, {52, 96, 52, 255}, 0);
+    for (int i = 0; i < 6; ++i) {
+        Vector2 f{a.x + 10 + i * (a.width - 20) / 5, base - 4};
+        for (int k = -2; k <= 2; ++k) Draw::Tri(f, Add(f, Mul(Dir(-PI / 2 + k * 0.4f), 16)), Add(f, Mul(Dir(-PI / 2 + k * 0.4f + 0.18f), 14)),
+                                                 k % 2 ? Color{60, 130, 60, 255} : Color{90, 160, 70, 255});
+    }
+    Color skin{96, 116, 74, 255}, belly{150, 160, 110, 255};
+    Vector2 hip{a.x + a.width * 0.45f, base - 30};
+    Draw::Tri({hip.x - 8, hip.y - 6}, {hip.x - 8, hip.y + 8}, {a.x + 6, hip.y + 10}, skin);
+    Draw::Line({hip.x - 4, hip.y + 6}, {hip.x - 8, base - 6}, 6, Darken(skin, 0.2f));
+    Draw::Line({hip.x + 6, hip.y + 6}, {hip.x + 8, base - 4}, 6, skin);
+    Draw::Ellipse(hip, 20, 13, skin, -0.35f);
+    Draw::Ellipse({hip.x + 4, hip.y + 4}, 12, 6, belly, -0.35f);
+    Vector2 neck{hip.x + 18, hip.y - 14};
+    float jaw = std::max(0.0f, std::sin(time * 1.4f)) * 0.5f;
+    DrawRectangleRec({neck.x - 2, neck.y - 8, 24, 12}, skin);
+    Draw::Quad({neck.x, neck.y + 4}, {neck.x + 22, neck.y + 4}, {neck.x + 20 - jaw * 6, neck.y + 9 + jaw * 10}, {neck.x + 2, neck.y + 8}, Darken(skin, 0.15f));
+    DrawCircleV({neck.x + 15, neck.y - 4}, 1.8f, {255, 210, 60, 255});
+    Draw::Line({hip.x + 14, hip.y - 2}, {hip.x + 20, hip.y + 4}, 2, skin);
+}
+
+void Soundstage(Rectangle a, float time, bool live) {
+    float base = a.y + a.height - 6;
+    Rectangle hall{a.x + 8, base - 54, a.width - 16, 50};
+    Draw::GlowStretched({hall.x + hall.width / 2 + 4, base}, hall.width * 0.55f, 9, 0, WithAlpha(BLACK, 0.4f));
+    Draw::Ellipse({hall.x + hall.width / 2, hall.y + 2}, hall.width / 2, 14, {200, 192, 170, 255}, 0);
+    DrawRectangleRec(hall, {218, 210, 188, 255});
+    DrawRectangleRec({hall.x, hall.y + hall.height - 6, hall.width, 6}, {170, 162, 140, 255});
+    DrawRectangleRec({hall.x + 12, hall.y + 18, 30, 28}, {120, 112, 96, 255});
+    DrawText("27", (int)(hall.x + hall.width - 52), (int)(hall.y + 10), 30, {60, 60, 70, 255});
+    Rectangle board{hall.x + hall.width - 50, hall.y + 42, 22, 12};
+    DrawRectangleRec(board, {30, 30, 36, 255});
+    for (int i = 0; i < 4; ++i) DrawRectangleRec({board.x + i * 6.0f, board.y - 5, 3, 5}, i % 2 ? WHITE : Color{30, 30, 36, 255});
+    if (!live) return;
+    Draw::BlendAdd();
+    for (int i = 0; i < 2; ++i) {
+        Vector2 lamp{hall.x + 10 + i * (hall.width - 20), hall.y};
+        float ang = -PI / 2 + std::sin(time * 0.7f + i * 2.1f) * 0.55f;
+        Vector2 d = Dir(ang), n{-d.y, d.x};
+        Vector2 far = Add(lamp, Mul(d, 300));
+        Draw::Tri(lamp, Add(far, Mul(n, 34)), Sub(far, Mul(n, 34)), WithAlpha({255, 244, 200, 255}, 0.1f));
+        Draw::Glow(lamp, 10, WithAlpha({255, 244, 200, 255}, 0.7f));
+    }
+    Draw::BlendNormal();
+}
+
+void DrawLandmark(const LandmarkSpot& spot, float time, bool live) {
+    Rectangle a = spot.Area();
+    switch (spot.kind) {
+    case Landmark::FerrisWheel: FerrisWheel(a, time); break;
+    case Landmark::Safari: Safari(a, time); break;
+    case Landmark::WhaleShark: WhaleShark(a, time); break;
+    case Landmark::UltraStatue: UltraStatueLandmark(a, time); break;
+    case Landmark::KaijuPlinth: KaijuPlinth(a, time); break;
+    case Landmark::Castle: Castle(a, time); break;
+    case Landmark::Dinosaur: Dinosaur(a, time); break;
+    case Landmark::Soundstage: Soundstage(a, time, live); break;
+    }
 }
 
 void SpotLight(Vector2 p, float s) {
@@ -470,19 +823,22 @@ void Paths(const MapData& map) {
         PathStroke(map, kTile * 1.02f, {92, 64, 36, 255});
         PathStroke(map, kTile * 0.9f, {196, 150, 88, 255});
         PathStroke(map, kTile * 0.72f, {222, 184, 120, 255});
-        PathArrows(map, kTile * 1.5f, {120, 78, 40, 170});
+        PathPlanks(map, kTile * 0.72f, 7, {170, 124, 70, 255});
+        PathArrows(map, kTile * 1.5f, {110, 70, 36, 190});
         break;
     case Theme::Plaza:
-        PathStroke(map, kTile * 1.0f, {120, 78, 36, 255});
-        PathStroke(map, kTile * 0.86f, {186, 36, 52, 255});
-        PathStroke(map, kTile * 0.62f, {214, 54, 68, 255});
-        PathArrows(map, kTile * 1.5f, {255, 214, 120, 190});
+        PathStroke(map, kTile * 1.0f, {214, 172, 70, 255});
+        PathStroke(map, kTile * 0.9f, {150, 24, 40, 255});
+        PathStroke(map, kTile * 0.78f, {200, 40, 56, 255});
+        PathEmblems(map, kTile * 2.5f);
+        PathArrows(map, kTile * 1.25f, {255, 214, 120, 190});
         break;
     case Theme::Studio:
         PathStroke(map, kTile * 0.92f, {48, 52, 64, 255});
         PathStroke(map, kTile * 0.78f, {28, 30, 40, 255});
-        PathDashes(map, 14, 10, 3.0f, {255, 214, 60, 255});
-        PathArrows(map, kTile * 2.0f, {255, 214, 60, 200});
+        PathStroke(map, kTile * 0.62f, {54, 50, 62, 255});
+        PathStars(map, kTile * 1.4f, {255, 150, 190, 255}, {214, 172, 70, 255});
+        PathArrows(map, kTile * 1.4f, {255, 214, 60, 160});
         break;
     }
 }
@@ -509,7 +865,7 @@ void DecorLayer(const MapData& map) {
             break;
         case Theme::Park:
             if (d.kind == 0) Palm(d.pos, d.size);
-            else if (d.kind == 1) Tent(d.pos, d.size, d.seed);
+            else if (d.kind == 1) BalloonCart(d.pos, d.size, d.seed);
             else Tree(d.pos, d.size * 0.9f, {36, 150, 72, 255}, d.seed);
             break;
         case Theme::Plaza:
@@ -518,7 +874,7 @@ void DecorLayer(const MapData& map) {
             else Crystal(d.pos, d.size * 0.85f, {255, 80, 90, 255}, d.seed);
             break;
         case Theme::Studio:
-            if (d.kind == 0) Turret(d.pos, d.size);
+            if (d.kind == 0) FilmCamera(d.pos, d.size);
             else if (d.kind == 1) SpotLight(d.pos, d.size);
             else SetWall(d.pos, d.size, d.seed);
             break;
@@ -632,7 +988,7 @@ void Base(const MapData& map, float time, float flash) {
 
 } // namespace
 
-RenderTexture2D RenderMap(const MapData& map, float scale, bool builtinGroundOnly) {
+RenderTexture2D RenderMap(const MapData& map, float scale, bool builtinGroundOnly, bool withLandmarks) {
     RenderTexture2D target = LoadRenderTexture((int)(kMapW * scale), (int)(kMapH * scale));
     SetTextureFilter(target.texture, TEXTURE_FILTER_BILINEAR);
     BeginTextureMode(target);
@@ -649,6 +1005,8 @@ RenderTexture2D RenderMap(const MapData& map, float scale, bool builtinGroundOnl
     if (!builtinGroundOnly) {
         if (!ground.id || Skins::MapPaths()) Paths(map);
         if (!ground.id || Skins::MapDecor()) DecorLayer(map);
+        if (withLandmarks)
+            for (const auto& spot : map.landmarks) DrawLandmark(spot, 0, true);
         Lighting(map);
     }
     rlPopMatrix();
@@ -659,6 +1017,7 @@ RenderTexture2D RenderMap(const MapData& map, float scale, bool builtinGroundOnl
 void DrawMapTexture(const RenderTexture2D& texture, Rectangle dest) { Display::PresentOpaque(texture.texture, dest); }
 
 void DrawMapLive(const MapData& map, float time, float baseDamageFlash) {
+    for (const auto& spot : map.landmarks) DrawLandmark(spot, time, true);
     Color tone = ThemeAccent(map.level->theme);
     if (map.level->theme == Theme::City || map.level->theme == Theme::Mountain) tone = {200, 40, 120, 255};
     std::vector<Vector2> drawn;

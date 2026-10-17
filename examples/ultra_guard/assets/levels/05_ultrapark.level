@@ -6,7 +6,7 @@ desc     巡游花车改走上下两条交叉路线。要同时照看两侧，�
 theme    plaza
 gold     780
 lives    20
-hp       1.88
+hp       2.25
 seed     2016
 base     18 5
 heroes   z orb trigger geed arc decker

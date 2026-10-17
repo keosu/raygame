@@ -21,21 +21,33 @@ struct Decor {
     std::uint32_t seed;
 };
 
+// Big theme set pieces that make the park stages recognisable; they reserve their cells.
+enum class Landmark { FerrisWheel, Safari, WhaleShark, UltraStatue, KaijuPlinth, Castle, Dinosaur, Soundstage };
+
+struct LandmarkSpot {
+    Landmark kind;
+    int col, row, w, h;
+    Rectangle Area() const { return {kMapX + col * kTile, kMapY + row * kTile, w * kTile, h * kTile}; }
+};
+
 struct MapData {
     const LevelDef* level = nullptr;
     std::array<std::array<Cell, kCols>, kRows> cells{};
     std::vector<PathLine> paths;
     std::vector<Decor> decor;
+    std::vector<LandmarkSpot> landmarks;
     Vector2 basePos{};
 
     void Build(const LevelDef& def);
+    void PlaceLandmarks();
     bool InGrid(int col, int row) const { return col >= 0 && row >= 0 && col < kCols && row < kRows; }
     bool Buildable(int col, int row) const { return InGrid(col, row) && cells[row][col] == Cell::Open; }
 };
 
 // Static background in canvas coordinates, rendered at `scale` for supersampling. A skin's
 // maps/<level id or theme>.png replaces the ground; `builtinGroundOnly` exports the plain ground.
-RenderTexture2D RenderMap(const MapData& map, float scale, bool builtinGroundOnly = false);
+// Landmarks animate, so battles draw them live (`withLandmarks` false) and previews bake them.
+RenderTexture2D RenderMap(const MapData& map, float scale, bool builtinGroundOnly = false, bool withLandmarks = true);
 // Opaque copy: translucent decoration lowered the texture's alpha while baking.
 void DrawMapTexture(const RenderTexture2D& texture, Rectangle dest);
 // Animated elements above the static layer: portals, the base and ambience.
