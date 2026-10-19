@@ -1428,7 +1428,7 @@ int RunBalanceReport(const std::string& path) {
     std::string report;
     SetTraceLogLevel(LOG_NONE);
     for (int i = 0; i < (int)Levels().size(); ++i) {
-        for (int run = 0; run < 9; ++run) {
+        for (int run = 0; run < 15; ++run) {
             bool casual = run >= 3;
             SetRandomSeed(1000 + run * 77 + i);
             auto scene = CreateRef<BattleScene>(i);
