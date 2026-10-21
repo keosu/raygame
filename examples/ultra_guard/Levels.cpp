@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <iterator>
+#include <memory>
 #include <sstream>
 
 namespace UG {
@@ -59,6 +61,7 @@ std::string Stem(const std::string& file) {
 struct Loaded {
     std::vector<LevelDef> levels;
     std::vector<std::string> errors;
+    std::unique_ptr<LevelDef> survival;
 };
 
 Loaded Load() {
@@ -88,6 +91,31 @@ Loaded Load() {
         state.levels.push_back(std::move(def));
     }
     if (state.levels.empty() && state.errors.empty()) state.errors.push_back("levels/levels.txt: 没有列出任何关卡");
+    std::vector<std::string> arcs;
+    int inArc = 0;
+    for (size_t i = 0; i < state.levels.size(); ++i) {
+        LevelDef& def = state.levels[i];
+        if (def.arc.empty()) {
+            def.tag = std::to_string(i + 1);
+            continue;
+        }
+        if (arcs.empty() || arcs.back() != def.arc) {
+            arcs.push_back(def.arc);
+            inArc = 0;
+        }
+        def.tag = std::to_string(arcs.size()) + "-" + std::to_string(++inArc);
+    }
+    std::string text;
+    if (FileSystem::ReadAssetText(AssetPath("levels/survival.level"), text)) {
+        LevelDef def;
+        if (ParseLevel(text, "levels/survival.level", def, state.errors)) {
+            def.endless = true;
+            def.tag = "∞";
+            state.survival = std::make_unique<LevelDef>(std::move(def));
+        }
+    } else {
+        state.errors.push_back("levels/survival.level: 无法读取生存模式地图");
+    }
     for (const auto& e : state.errors) Diagnostics::Write(LogLevel::Warning, "Level: " + e);
     Diagnostics::Write(LogLevel::Info, "Loaded " + std::to_string(state.levels.size()) + " levels");
     return state;
@@ -101,6 +129,62 @@ Loaded& State() {
 
 const std::vector<LevelDef>& Levels() { return State().levels; }
 const std::vector<std::string>& LevelErrors() { return State().errors; }
+const LevelDef* SurvivalLevel() { return State().survival.get(); }
+
+WaveDef SurvivalWave(int wave) {
+    static const EnemyId kBosses[] = {EnemyId::Zetton, EnemyId::Tregear, EnemyId::Belial, EnemyId::Gatanothor};
+    struct Pick {
+        EnemyId enemy;
+        int from;      // first wave it can appear in
+        float count;   // at wave `from`
+        float growth;  // extra kaiju per wave
+        float interval;
+    };
+    static const Pick kPool[] = {
+        {EnemyId::Gomora, 0, 6, 0.55f, 1.0f},   {EnemyId::Baltan, 0, 6, 0.5f, 0.85f}, {EnemyId::Eleking, 1, 5, 0.5f, 0.7f},
+        {EnemyId::RedKing, 2, 2, 0.22f, 2.1f},  {EnemyId::Metron, 4, 2, 0.18f, 2.0f}, {EnemyId::KingJoe, 6, 1, 0.16f, 2.6f},
+    };
+    Rng rng(7919u * (std::uint32_t)(wave + 1));
+    std::vector<const Pick*> pool;
+    for (const auto& p : kPool)
+        if (wave >= p.from) pool.push_back(&p);
+    WaveDef out;
+    int groups = wave < 3 ? 1 : wave < 9 ? 2 : 3;
+    float pace = std::max(0.55f, 1.0f - wave * 0.015f);
+    for (int g = 0; g < groups; ++g) {
+        const Pick& p = *pool[rng.Int(0, (int)pool.size() - 1)];
+        int count = std::max(1, (int)std::round(p.count + p.growth * (wave - p.from)));
+        out.groups.push_back({p.enemy, std::min(count, 40), p.interval * pace, g * 3.0f, -1});
+    }
+    if (wave % 5 == 4) {
+        int boss = wave / 5;
+        out.groups.push_back({kBosses[boss % 4], 1 + boss / 4, 6, 2, -1});
+        out.boss = true;
+    }
+    return out;
+}
+
+float SurvivalAssault(const LevelDef& level, int wave) {
+    return wave < 2 ? 0.0f : level.assault * (0.5f + 0.07f * (wave - 2));
+}
+
+LevelDef DemoLevel(HeroId hero) {
+    LevelDef def;
+    def.id = std::string("demo.") + HeroInfo(hero).key;
+    def.file = "demo";
+    def.name = HeroInfo(hero).name;
+    def.subtitle = std::string("技能演示 · ") + HeroInfo(hero).move;
+    def.theme = Theme::Nebula;
+    def.paths = {{{-1, 6}, {18, 6}}};
+    def.base = {18, 6};
+    def.gold = 99999;
+    def.lives = 999;
+    def.hpScale = 1;
+    def.seed = 4242;
+    def.heroes = {hero};
+    def.waves.resize(1);
+    return def;
+}
 
 bool ParseLevel(const std::string& text, const std::string& file, LevelDef& out, std::vector<std::string>& errors) {
     LevelDef def;
@@ -141,13 +225,22 @@ bool ParseLevel(const std::string& text, const std::string& file, LevelDef& out,
                  : key == "arc"      ? def.arc
                                      : def.desc) = value;
         } else if (key == "theme") {
-            if (value == "city") def.theme = Theme::City;
-            else if (value == "mountain") def.theme = Theme::Mountain;
-            else if (value == "nebula") def.theme = Theme::Nebula;
-            else if (value == "park") def.theme = Theme::Park;
-            else if (value == "plaza") def.theme = Theme::Plaza;
-            else if (value == "studio") def.theme = Theme::Studio;
-            else fail(number, "未知主题“" + value + "”，可用：city / mountain / nebula / park / plaza / studio");
+            int found = -1;
+            std::string keys;
+            for (int i = 0; i < (int)std::size(kThemeKeys); ++i) {
+                if (value == kThemeKeys[i]) found = i;
+                keys += std::string(i ? " / " : "") + kThemeKeys[i];
+            }
+            if (found < 0) fail(number, "未知主题“" + value + "”，可用：" + keys);
+            else def.theme = (Theme)found;
+        } else if (key == "assault") {
+            float v = 0;
+            if (tokens.size() != 1 || !Number(tokens[0], v) || v < 0) fail(number, "assault 需要一个非负数（0 为怪兽不攻击英雄）");
+            else def.assault = v;
+        } else if (key == "siege") {
+            float v = 0;
+            if (tokens.size() != 1 || !Number(tokens[0], v) || v <= 0) fail(number, "siege 需要一个正数（灯塔耐久）");
+            else def.siege = v;
         } else if (key == "gold" || key == "lives") {
             int v = 0;
             if (tokens.size() != 1 || !Integer(tokens[0], v) || v <= 0) fail(number, key + " 需要一个正整数");
@@ -166,6 +259,16 @@ bool ParseLevel(const std::string& text, const std::string& file, LevelDef& out,
                 b.col >= kCols - 1 || b.row >= kRows)
                 fail(number, "base 需要两个整数“列 行”，列 0-" + std::to_string(kCols - 2) + "，行 0-" + std::to_string(kRows - 1));
             else def.base = b;
+        } else if (key == "castle") {
+            GridPoint a{}, b{};
+            if (tokens.size() != 4 || !Integer(tokens[0], a.col) || !Integer(tokens[1], a.row) || !Integer(tokens[2], b.col) ||
+                !Integer(tokens[3], b.row) || a.col < 0 || a.row < 0 || b.col >= kCols || b.row >= kRows || b.col - a.col < 4 ||
+                b.row - a.row < 4)
+                fail(number, "castle 需要四个整数“左列 上行 右列 下行”，城墙围成至少 5×5 格且不出地图");
+            else {
+                def.castleMin = a;
+                def.castleMax = b;
+            }
         } else if (key == "heroes") {
             std::vector<HeroId> roster;
             for (const auto& t : tokens) {
@@ -250,7 +353,7 @@ bool ParseLevel(const std::string& text, const std::string& file, LevelDef& out,
     if (def.name.empty()) fail(number, "缺少 name");
     if (def.base.col < 0) fail(number, "缺少 base");
     if (def.paths.empty()) fail(number, "至少需要一条 path");
-    if (def.waves.empty()) fail(number, "至少需要一个 wave");
+    if (def.waves.empty() && file != "levels/survival.level") fail(number, "至少需要一个 wave");
     for (size_t i = 0; i < def.paths.size(); ++i) {
         const auto& end = def.paths[i].back();
         if (def.base.col >= 0 && (end.col != def.base.col || end.row != def.base.row))

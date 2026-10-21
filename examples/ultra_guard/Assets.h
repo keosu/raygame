@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Common.h"
+#include "Data.h"
 
 namespace UG {
 
@@ -16,6 +16,8 @@ namespace Sfx {
 void Load();
 // Repeated triggers of one effect are throttled so dense fights stay readable.
 void Play(const char* name, float volume = 1.0f, float pitchJitter = 0.06f);
+// Multiplies every Play volume; the database page quiets its embedded skill preview.
+void SetEffectScale(float scale);
 void PlayMusic(const char* name);
 void StopMusic();
 void ApplySettings();
@@ -37,6 +39,12 @@ bool Unlocked(int level);
 Settings& Options();
 int TotalKills();
 void AddKills(int kills);
+// The player's lineup for a level, or the level's recommended one until they pick.
+std::vector<HeroId> Roster(const LevelDef& level);
+void SetRoster(const LevelDef& level, const std::vector<HeroId>& roster);
+float SurvivalBestTime(); // seconds
+int SurvivalBestWave();
+bool RecordSurvival(float seconds, int wave); // true for a new best time
 } // namespace Progress
 
 } // namespace UG

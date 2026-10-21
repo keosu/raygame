@@ -187,7 +187,7 @@ private:
             break;
         case 1165:
             Shot("16_levels");
-            PreviewCodex(10); // an archive entry on the second page
+            PreviewHero((int)HeroId::Tiga);
             GoToMenu(MenuPage::Heroes);
             break;
         case 1210:
@@ -223,8 +223,77 @@ private:
             break;
         case 1862:
             Shot("23_fusion_impact");
+            PrepareLevel(6);
+            GoToMenu(MenuPage::Prepare);
             break;
-        case 1960:
+        case 1910:
+            Shot("24_prepare");
+            GoToBattle(6);
+            break;
+        case 1950:
+            if (auto* b = Debug()) b->DebugAutoplay(5);
+            break;
+        case 2130:
+            Shot("25_volcano_strikes");
+            GoToBattle(9);
+            break;
+        case 2170:
+            if (auto* b = Debug()) b->DebugAutoplay(4);
+            break;
+        case 2350:
+            Shot("26_moon");
+            GoToBattle(11);
+            break;
+        case 2390:
+            if (auto* b = Debug()) b->DebugAutoplay(6);
+            break;
+        case 2570:
+            Shot("27_land_of_light");
+            GoToBattle(kSurvivalIndex);
+            break;
+        case 2610:
+            if (auto* b = Debug()) b->DebugAutoplay(6);
+            break;
+        case 2790:
+            Shot("28_survival");
+            if (auto* b = Debug()) b->DebugFinish();
+            break;
+        case 2930:
+            Shot("29_survival_result");
+            GoToMenu(MenuPage::Prepare);
+            break;
+        case 2970: // database page: the preview plays inside the panel, a few seconds per hero
+            Shot("30_prepare_pool");
+            PreviewHero((int)HeroId::Man);
+            GoToMenu(MenuPage::Heroes);
+            break;
+        case 3130:
+            Shot("31_preview_man");
+            PreviewHero((int)HeroId::Nexus);
+            GoToMenu(MenuPage::Heroes);
+            break;
+        case 3290:
+            Shot("32_preview_nexus");
+            PreviewHero((int)HeroId::Ginga);
+            GoToMenu(MenuPage::Heroes);
+            break;
+        case 3450:
+            Shot("33_preview_ginga");
+            PreviewHero((int)HeroId::Gaia);
+            GoToMenu(MenuPage::Heroes);
+            break;
+        case 3610:
+            Shot("34_preview_gaia");
+            PreviewHero((int)HeroId::Leo);
+            GoToMenu(MenuPage::Heroes);
+            break;
+        case 3770:
+            Shot("35_preview_leo");
+            PreviewHero((int)HeroId::Mebius);
+            GoToMenu(MenuPage::Heroes);
+            break;
+        case 3930:
+            Shot("36_preview_mebius");
             Quit();
             break;
         default:
@@ -255,7 +324,8 @@ void GoToMenu(MenuPage page) {
 }
 
 void GoToBattle(int level) {
-    if (level < 0 || level >= (int)Levels().size()) return GoToMenu(MenuPage::Levels);
+    bool survival = level == kSurvivalIndex && SurvivalLevel();
+    if (!survival && (level < 0 || level >= (int)Levels().size())) return GoToMenu(MenuPage::Levels);
     if (game) game->LoadScene(CreateRef<BattleScene>(level));
 }
 

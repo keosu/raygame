@@ -1,0 +1,33 @@
+# 静海：两条车道在 (6,4) 与 (13,7) 十字交叉，最后在第 5 行汇合（格式说明见 01_tokyo.level）。
+id       tranquility
+name     静海环形山
+subtitle 宇宙决战篇 · 静海
+arc      宇宙决战篇
+desc     两条月面车道两次交叉。交叉点能同时打到两路，也会同时被两路怪兽围攻。
+theme    moon
+gold     800
+lives    20
+hp       1.7
+assault  1.4
+seed     4102
+base     18 5
+heroes   z blazar tiga geed arc decker
+path     -1,1 6,1 6,10 13,10 13,5 18,5
+path     -1,10 3,10 3,4 10,4 10,7 16,7 16,5 18,5
+
+wave     gomora x6 every 1.1 path 1 | eleking x6 every 0.8 after 1 path 2
+wave     baltan x8 every 0.75 path 2 | baltan x8 every 0.75 after 1 path 1
+wave     redking x2 every 2.2 path 1 | metron x2 every 2 after 2 path 2
+wave     kingjoe x1 path 2 | gomora x8 every 0.85 after 2 path 1 | eleking x6 every 0.7 after 4 path 2
+wave     zetton x1 path 1 | baltan x8 every 0.7 after 3 path 2
+wave     metron x3 every 1.8 | redking x3 every 2 after 3
+wave     eleking x10 every 0.55 path 1 | eleking x10 every 0.55 after 1 path 2
+wave     kingjoe x2 every 2.5 | baltan x10 every 0.6 after 3
+wave     tregear x1 path 2 | redking x3 every 1.8 after 3 path 1
+wave     gomora x12 every 0.65 | metron x3 every 1.8 after 4
+wave     kingjoe x3 every 2.2 path 1 | eleking x10 every 0.55 after 2 path 2
+wave     zetton x1 path 2 | redking x4 every 1.6 after 3 path 1 | baltan x10 every 0.55 after 5
+wave     belial x1 path 1 | metron x4 every 1.6 after 4 path 2
+wave     redking x5 every 1.4 | eleking x12 every 0.5 after 3 | kingjoe x2 every 3 after 6
+wave     tregear x1 path 1 | zetton x1 after 6 path 2 | baltan x12 every 0.5 after 3
+wave     gatanothor x1 path 2 | kingjoe x3 every 2.4 after 6 path 1 | redking x4 every 1.6 after 4

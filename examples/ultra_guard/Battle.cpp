@@ -18,6 +18,7 @@ constexpr float kFusionCharge = 25; // first charge after the roster completes
 constexpr float kShieldTaken = 0.42f; // damage share that gets through Zetton's barrier
 constexpr float kFusionImpactAt = 2.9f, kFusionEnd = 4.6f; // cut-in timeline, real seconds
 constexpr float kWaveGap = 16;
+constexpr float kExhaustTime = 8; // a drained hero stays down this long, then stands at 60% energy
 constexpr unsigned kKaijuMask = 1u << kKaijuLayer;
 constexpr const char* kModeNames[] = {"最前", "最强", "最近"};
 
@@ -171,19 +172,62 @@ void MonsterActor::FixedUpdate() {
         }
     }
 
+    strikePause = std::max(0.0f, strikePause - dt);
+    if (def.strikeDamage > 0 && b.Assault() > 0 && phaseTime <= 0 && stunTime <= 0 && appear >= 1) {
+        strikeTimer -= dt;
+        if (strikeTimer <= 0) {
+            HeroActor* target = nullptr;
+            float best = def.strikeRange * kTile;
+            for (auto& h : b.heroes) {
+                float d = Len(Sub(h->Pos(), Center()));
+                if (h->disabled != HeroActor::Disable::Exhausted && d <= best) {
+                    best = d;
+                    target = h.get();
+                }
+            }
+            if (target) {
+                b.KaijuAttack(*this, *target);
+                strikeTimer = def.strikeCooldown * Rand(0.9f, 1.1f);
+                if (!def.boss) strikePause = 0.45f;
+            } else {
+                strikeTimer = 0.25f;
+            }
+        }
+    }
+
     float slow = slowTime > 0 ? slowAmount * (1 - def.slowResist) : 0;
-    float v = stunTime > 0 ? 0 : def.speed * kTile * speedMul * (1 - slow);
+    float v = stunTime > 0 || strikePause > 0 || sieging ? 0 : def.speed * kTile * speedMul * (1 - slow);
     if (buffTime > 0) v *= 1.4f;
     if (phaseTime > 0) v *= 1.3f;
-    dist += v * dt;
-    gameObject->transform->position = line.Sample(dist, &dir);
+    dist = std::min(dist + v * dt, line.length);
+    Vector2 at = line.Sample(dist, &dir);
     if (dir.x > 0.2f) face = 1;
     else if (dir.x < -0.2f) face = -1;
-    if (dist >= line.length) b.Leak(*this);
+    if (!b.Siege()) {
+        gameObject->transform->position = at;
+        if (dist >= line.length) b.Leak(*this);
+        return;
+    }
+    if (!sieging && (Len(Sub(at, b.map.basePos)) < siegeReach || dist >= line.length)) {
+        sieging = true;
+        siegeTimer = Rand(0.2f, 0.6f);
+    }
+    if (sieging) {
+        at = Add(at, Mul(Vector2{-dir.y, dir.x}, siegeSide));
+        face = b.map.basePos.x >= at.x ? 1.0f : -1.0f;
+        if (stunTime <= 0 && phaseTime <= 0 && appear >= 1) {
+            siegeTimer -= dt;
+            if (siegeTimer <= 0) {
+                b.SiegeHit(*this);
+                siegeTimer = def.boss ? 1.5f : 1.2f;
+            }
+        }
+    }
+    gameObject->transform->position = at;
 }
 
 void MonsterActor::Render() {
-    if (dead) return;
+    if (dead || battle->embedded) return; // the database preview shows only the skill's effects
     Art::KaijuPose pose;
     pose.feet = Add(Feet(), {0, (1 - appear) * 6});
     pose.scale = Scale() * (0.6f + 0.4f * appear);
@@ -216,10 +260,21 @@ void HeroActor::FixedUpdate() {
     float dt = GameTime::DeltaTime();
     build = std::min(1.0f, build + dt * 3);
     recoil = std::max(0.0f, recoil - dt * 5);
+    lunge = std::max(0.0f, lunge - dt * 3.5f);
     flash = std::max(0.0f, flash - dt * 4);
+    hurt = std::max(0.0f, hurt - dt * 4);
+    calm += dt;
+    if (calm > 4 && disabled != Disable::Exhausted) hp = std::min(maxHp, hp + maxHp * 0.05f * dt);
     if (disabledTime > 0) {
         disabledTime = std::max(0.0f, disabledTime - dt);
-        if (disabledTime <= 0) disabled = Disable::None;
+        if (disabledTime <= 0) {
+            if (disabled == Disable::Exhausted) {
+                hp = maxHp * 0.6f;
+                battle->AddRing(Pos(), 6, 40, 0.4f, 3, HeroInfo(hero).beam);
+                battle->Text(Add(Pos(), {0, -50}), "重新站起！", HeroInfo(hero).beam, 14);
+            }
+            disabled = Disable::None;
+        }
         return;
     }
     cooldown -= battle->fogTime > 0 ? dt * 0.5f : dt;
@@ -239,11 +294,12 @@ void HeroActor::FixedUpdate() {
         return;
     }
     battle->Fire(*this, *best);
-    cooldown = HeroCooldown(hero, level) * nextCooldownScale;
+    cooldown = HeroCooldown(hero, level) * nextCooldownScale * (battle->embedded ? 0.5f : 1.0f); // the preview is a showcase
     nextCooldownScale = 1;
 }
 
 void HeroActor::Render() {
+    if (battle->embedded) return; // the database page draws the big portrait instead
     const HeroDef& def = HeroInfo(hero);
     Vector2 p = Pos();
     float time = battle->simTime;
@@ -263,9 +319,53 @@ void HeroActor::Render() {
     float size = (58 + level * 3.0f) * EaseOut(build) * (1 + 0.07f * recoil);
     bool stone = disabled == Disable::Petrified && disabledTime > 0;
     bool confused = disabled == Disable::Confused && disabledTime > 0;
-    if (stone) bob = 0;
-    Rectangle dest{p.x - size / 2, p.y + 10 - size * 0.92f + bob, size, size};
-    Art::DrawPortrait(hero, dest, stone ? Color{120, 116, 106, 255} : WHITE);
+    bool exhausted = disabled == Disable::Exhausted && disabledTime > 0;
+    if (stone || exhausted) bob = 0;
+    if (exhausted) size *= 0.9f;
+    Vector2 kick{0, 0};
+    if (lunge > 0) {
+        // Leap out along an arc and drop back onto the pedestal.
+        float k = std::sin(lunge * PI);
+        kick = Mul(Normalize(Sub(lungeTo, p)), 26 * k);
+        kick.y -= 16 * k;
+    }
+    Rectangle dest{p.x - size / 2 + kick.x, p.y + 10 - size * 0.92f + bob + (exhausted ? 6 : 0) + kick.y, size, size};
+    if (focus > 0 && def.kind == AttackKind::Focus) {
+        float k = focus / (level >= 2 ? 6.0f : 4.0f);
+        Draw::BlendAdd();
+        Draw::Glow(Add(p, {0, -26}), 30 + 26 * k, WithAlpha({255, 214, 90, 255}, 0.18f + 0.3f * k));
+        for (int i = 0; i < focus; ++i) {
+            float a = time * 2.4f + i * 2 * PI / focus;
+            Draw::Glow(Add(p, {std::cos(a) * 24, -20 + std::sin(a) * 9}), 5, WithAlpha({255, 236, 150, 255}, 0.9f));
+        }
+        Draw::BlendNormal();
+    }
+    Color tint = stone ? Color{120, 116, 106, 255} : exhausted ? Color{86, 88, 110, 255} : WHITE;
+    if (hurt > 0) tint = Mix(tint, {255, 90, 90, 255}, hurt * 0.6f);
+    Art::DrawPortrait(hero, dest, tint);
+    if (battle->Assault() > 0 || hp < maxHp) {
+        // Colour timer on the pedestal: blue while healthy, blinking red when low or exhausted.
+        float ratio = Clamp(hp / maxHp, 0.0f, 1.0f);
+        bool low = ratio < 0.35f || exhausted;
+        bool blinkOn = !low || std::fmod(time, low && exhausted ? 0.3f : 0.5f) < (exhausted ? 0.15f : 0.3f);
+        Vector2 lamp{p.x, p.y + 22};
+        Color tone = low ? Color{255, 50, 50, 255} : Color{70, 170, 255, 255};
+        DrawCircleV(lamp, 5.5f, {30, 34, 46, 255});
+        DrawCircleV(lamp, 4, blinkOn ? tone : Darken(tone, 0.6f));
+        if (blinkOn) {
+            Draw::BlendAdd();
+            Draw::Glow(lamp, low ? 16.0f : 10.0f, WithAlpha(tone, low ? 0.7f : 0.35f));
+            Draw::BlendNormal();
+        }
+        if (ratio < 1 || exhausted) {
+            Rectangle bar{p.x - 20, p.y + 29, 40, 4};
+            DrawRectangleRec({bar.x - 1, bar.y - 1, bar.width + 2, bar.height + 2}, {10, 10, 18, 220});
+            float shown = exhausted ? 1 - disabledTime / kExhaustTime : ratio;
+            Color fill = exhausted ? Color{120, 120, 140, 255} : ratio > 0.35f ? Color{80, 190, 255, 255} : Color{255, 70, 70, 255};
+            DrawRectangleRec({bar.x, bar.y, bar.width * Clamp(shown, 0.0f, 1.0f), bar.height}, fill);
+        }
+    }
+    if (exhausted) Gui::TextOutline("能量耗尽", p.x, p.y - size * 0.95f, 12, {255, 120, 120, 255}, BLACK, 1.2f);
     if (stone) {
         Draw::BlendAdd();
         Draw::Glow(Add(p, {0, -24}), 26, WithAlpha({200, 196, 180, 255}, 0.25f));
@@ -302,8 +402,22 @@ void CorpseActor::Render() {
 
 BattleScene::BattleScene(int index) : Scene("Battle"), levelIndex(index) {}
 
+BattleScene::BattleScene(HeroId hero) : Scene("Battle"), levelIndex(0), demo(true), demoHero(hero) {}
+
 void BattleScene::OnLoad() {
-    level = &Levels()[levelIndex];
+    if (demo) {
+        endless = DemoLevel(demoHero);
+        level = &endless;
+    } else if (levelIndex == kSurvivalIndex) {
+        endless = *SurvivalLevel();
+        level = &endless;
+        EnsureWaves(2);
+    } else {
+        level = &Levels()[levelIndex];
+    }
+    roster = headless || demo ? level->heroes : Progress::Roster(*level);
+    surviveTime = 0;
+    newRecord = false;
     map.Build(*level);
     if (!mapTexture.id && !headless) mapTexture = RenderMap(map, 2.0f, false, false);
     for (auto& row : towerGrid) row.fill(-1);
@@ -311,9 +425,13 @@ void BattleScene::OnLoad() {
     heroes.clear();
     strikes.clear();
     spawning.clear();
+    zones.clear();
     CreateEmitters();
     gold = level->gold;
     lives = level->lives;
+    citadel = citadelMax = level->siege;
+    citadelShot = 2;
+    citadelPulse = 0;
     kills = botPurchases = 0;
     waveIndex = -1;
     pathToggle = 0;
@@ -332,8 +450,18 @@ void BattleScene::OnLoad() {
     flashScreen = shake = baseFlash = goldPulse = livesPulse = 0;
     ApplySpeed();
     Banner(level->name, level->subtitle, Palette::gold);
-    EventBus::Subscribe("ug.kill", [this](const EventData&) { goldPulse = 1; });
-    Sfx::PlayMusic("battle");
+    if (!embedded) {
+        EventBus::Subscribe("ug.kill", [this](const EventData&) { goldPulse = 1; });
+        Sfx::PlayMusic("battle");
+    }
+    if (demo) {
+        speedIndex = 0;
+        ApplySpeed();
+        waveIndex = 0; // skills and wave scaling behave as in the first wave
+        demoSpawn = 0.6f;
+        demoCount = 0;
+        if (BuyTower(demoHero, 9, 5)) SetDemoStar(demoStar);
+    }
 }
 
 void BattleScene::OnUnload() {
@@ -413,7 +541,17 @@ void BattleScene::CycleSpeed() {
 
 void BattleScene::ApplySpeed() const {
     bool frozen = fusionAnim >= 0 && fusionAnim < kFusionImpactAt;
-    if (!headless) SetGameSpeed(paused || frozen ? 0.0f : kSpeeds[speedIndex]);
+    if (!headless && !embedded) SetGameSpeed(paused || frozen ? 0.0f : kSpeeds[speedIndex]);
+}
+
+void BattleScene::EnsureWaves(int count) {
+    if (!Endless()) return;
+    while ((int)endless.waves.size() < count) endless.waves.push_back(SurvivalWave((int)endless.waves.size()));
+}
+
+float BattleScene::Assault() const {
+    int wave = std::max(0, waveIndex);
+    return Endless() ? SurvivalAssault(*level, wave) : level->assault * (1 + 0.03f * wave);
 }
 
 bool BattleScene::CanStartWave() const {
@@ -436,9 +574,9 @@ void BattleScene::HandleInput() {
     if (Input::GetKeyDown(KEY_P)) SetPaused(!paused);
     if (paused || Cinematic()) return;
 
-    for (int i = 0; i < (int)level->heroes.size(); ++i) {
+    for (int i = 0; i < (int)roster.size(); ++i) {
         if (Input::GetKeyDown(KEY_ONE + i)) {
-            int hero = (int)level->heroes[i];
+            int hero = (int)roster[i];
             placing = placing == hero ? -1 : hero;
             selected = -1;
             targetingStrike = false;
@@ -532,19 +670,24 @@ void BattleScene::FixedUpdate() {
             }
         }
         strikes.erase(std::remove_if(strikes.begin(), strikes.end(), [](const Airstrike& s) { return s.time > 1.8f; }), strikes.end());
+        if (demo) StepDemo(dt);
+        StepZones(dt);
+        if (Siege()) StepSiege(dt);
     }
 
     Scene::FixedUpdate(); // kaiju walk and use abilities, heroes attack, projectiles fly
     monsters.erase(std::remove_if(monsters.begin(), monsters.end(), [](const Ref<MonsterActor>& m) { return m->dead; }), monsters.end());
 
     if (Running()) {
+        if (Siege()) lives = citadel > 0 ? (int)std::ceil(citadel) : 0;
         if (lives <= 0) {
             lives = 0;
             SetOutcome(Outcome::Defeat);
-        } else if (waveIndex == (int)level->waves.size() - 1 && spawning.empty() && monsters.empty()) {
+        } else if (!Endless() && !demo && waveIndex == (int)level->waves.size() - 1 && spawning.empty() && monsters.empty()) {
             SetOutcome(Outcome::Victory);
         }
     }
+    if (Running() && waveIndex >= 0) surviveTime += dt;
     StepEffects(dt);
 }
 
@@ -556,8 +699,15 @@ void BattleScene::StartNextWave(bool early) {
         goldPulse = 1;
         Text({kMapX + kMapW / 2, kMapY + 40}, TextFormat("提前召唤 +%d", bonus), Palette::gold, 18);
     }
-    if (waveIndex >= 0) gold += 20 + 5 * waveIndex;
+    if (waveIndex >= 0) gold += 20 + 5 * std::min(waveIndex, 20);
+    if (Siege() && waveIndex >= 0 && citadel < citadelMax) {
+        float repair = std::min(citadelMax - citadel, citadelMax * 0.05f);
+        citadel += repair;
+        Text(Add(map.basePos, {0, -150}), TextFormat("灯塔修复 +%.0f", repair), Palette::cyan, 16);
+        AddRing(map.basePos, 20, kTile * 2, 0.6f, 4, {150, 220, 255, 255});
+    }
     waveIndex++;
+    EnsureWaves(waveIndex + 2); // the HUD previews the wave after this one
     nextWaveTimer = -1;
     const WaveDef& w = level->waves[waveIndex];
     for (const auto& g : w.groups) spawning.push_back({g, 0, g.delay});
@@ -585,10 +735,16 @@ void BattleScene::SpawnEnemy(EnemyId type, int path, float dist) {
     e->dist = dist;
     int wave = std::max(0, waveIndex);
     e->maxHp = e->hp = def.hp * (def.boss ? BossHpScale(*level, wave) : WaveHpScale(*level, wave));
+    if (embedded) e->maxHp = e->hp = 1e7f; // invisible preview targets never die: no corpses or reward text
     e->armor = def.armor * (1 + 0.05f * wave);
     e->speedMul = def.boss ? 1.0f : Rand(0.94f, 1.06f);
     e->abilityA = type == EnemyId::Belial ? 6.0f : type == EnemyId::Metron ? Rand(2, 5) : type == EnemyId::Gatanothor ? 8.0f : 4.0f;
     e->abilityB = type == EnemyId::Tregear ? 8.0f : type == EnemyId::Gatanothor ? 5.0f : 6.5f;
+    e->strikeTimer = Rand(0.8f, std::max(1.0f, def.strikeCooldown));
+    if (Siege()) {
+        e->siegeReach = kTile * Rand(1.65f, 2.15f) * (def.boss ? 1.2f : 1.0f);
+        e->siegeSide = Rand(-16, 16);
+    }
     e->anim = Rand(0, 10);
     e->ySort = true;
     object->transform->position = map.paths[path].Sample(dist, &e->dir);
@@ -614,10 +770,143 @@ std::vector<Ref<MonsterActor>> BattleScene::Alive() const {
     return out;
 }
 
+void BattleScene::SiegeHit(MonsterActor& e) {
+    const EnemyDef& def = e.Def();
+    int wave = std::max(0, waveIndex);
+    float damage = def.leak * (1 + 0.04f * wave) * (e.buffTime > 0 || e.enraged ? 1.3f : 1.0f);
+    citadel = std::max(0.0f, citadel - damage);
+    citadelPulse = 1;
+    livesPulse = 1;
+    baseFlash = std::max(baseFlash, 0.6f);
+    if (leakWave < 0) leakWave = waveIndex + 1;
+    leakCount[(int)e.type]++;
+    Vector2 hit = Add(map.basePos, {Rand(-16, 16), Rand(-80, 20)});
+    Color tone = def.strike == KaijuStrike::Beam ? Color{255, 96, 70, 255} : def.strike == KaijuStrike::Bolt ? Color{255, 236, 90, 255}
+                                                                                                             : Color{255, 160, 90, 255};
+    if (def.strike == KaijuStrike::Beam || def.strike == KaijuStrike::Bolt || def.boss) {
+        AddBeam(e.Center(), hit, def.boss ? 6.0f : 3.0f, 0.25f, tone, WHITE);
+    } else {
+        Vector2 claw = Lerp(e.Center(), hit, 0.75f);
+        AddRing(claw, 4, 20, 0.25f, 3, tone);
+    }
+    Sparks(hit, tone, 5, 150);
+    if (def.boss) {
+        shake = std::max(shake, 0.45f);
+        Text(Add(hit, {0, -20}), TextFormat("-%.0f", damage), Palette::red, 18);
+    }
+    Sfx::Play("hit", 0.2f);
+}
+
+void BattleScene::StepSiege(float dt) {
+    citadelPulse = std::max(0.0f, citadelPulse - dt * 2);
+    citadelShot -= dt;
+    if (citadelShot > 0 || waveIndex < 0) return;
+    // Lighthouse beam: the lamp picks off the nearest kaiju at its wall.
+    MonsterActor* best = nullptr;
+    float bestDist = kTile * 3.4f;
+    for (const auto& e : monsters) {
+        if (e->dead || e->appear < 0.5f || e->phaseTime > 0) continue;
+        float d = Len(Sub(e->Feet(), map.basePos));
+        if (d < bestDist) {
+            bestDist = d;
+            best = e.get();
+        }
+    }
+    if (!best) {
+        citadelShot = 0.2f;
+        return;
+    }
+    citadelShot = 1.0f;
+    Vector2 sun = Add(map.basePos, kLanternOffset), at = best->Center();
+    AddBeam(sun, at, 10, 0.35f, {120, 200, 255, 255}, WHITE);
+    AddBeam(sun, at, 4, 0.35f, {255, 220, 150, 255}, WHITE);
+    AddRing(sun, 10, 42, 0.3f, 3, {200, 236, 255, 255});
+    Burst(at, {150, 210, 255, 255}, 12, 160, 5, 0.4f);
+    DamageEnemy(*best, 80 * (1 + 0.12f * std::max(0, waveIndex)), -1, true);
+    Sfx::Play("beam", 0.3f);
+}
+
+void BattleScene::StepZones(float dt) {
+    for (auto& z : zones) {
+        z.time += dt;
+        for (MonsterActor* e : KaijuInCircle(z.at, z.radius)) {
+            DamageEnemy(*e, z.dps * dt, z.tower, true);
+            if (e->dead) continue;
+            e->slowAmount = e->slowTime > 0 ? std::max(e->slowAmount, z.slow) : z.slow;
+            e->slowTime = std::max(e->slowTime, 0.3f);
+            if (z.vuln) e->vulnTime = std::max(e->vulnTime, 0.3f);
+        }
+        if (GetRandomValue(0, 3) == 0) {
+            Vector2 p = Add(z.at, Mul(Dir(Rand(0, 2 * PI)), z.radius * std::sqrt(Rand(0, 1))));
+            Emit(Fx::Ember, p, {255, 200, 90, 255}, 1, 40, 5, 0.7f);
+        }
+    }
+    zones.erase(std::remove_if(zones.begin(), zones.end(), [](const Zone& z) { return z.time >= z.life; }), zones.end());
+}
+
+void BattleScene::StepDemo(float dt) {
+    demoClock += dt;
+    if (embedded && !heroes.empty()) {
+        // The database preview frames about four tiles either side of the portrait; targets that
+        // walk past it leave quietly instead of crossing the text column.
+        float retireX = heroes.front()->Pos().x + kTile * 3.2f;
+        for (const auto& e : monsters)
+            if (!e->dead && e->Feet().x > retireX) {
+                e->dead = true;
+                Destroy(e->GetGameObject());
+            }
+    }
+    demoSpawn -= dt;
+    if (demoSpawn > 0) return;
+    static const EnemyId kParade[] = {EnemyId::Gomora, EnemyId::Baltan, EnemyId::Eleking, EnemyId::Gomora, EnemyId::RedKing, EnemyId::KingJoe};
+    EnemyId next = kParade[demoCount++ % (int)std::size(kParade)];
+    float start = embedded ? kTile * 8.5f : 0; // two tiles left of the hero, already in range
+    SpawnEnemy(next, 0, start);
+    if (demoCount % 3 == 0) SpawnEnemy(EnemyId::Gomora, 0, start); // a pair now and then, for chains and splash
+    demoSpawn = (EnemyInfo(next).hp > 300 ? 2.2f : 1.2f) * (embedded ? 0.6f : 1.0f);
+}
+
+void BattleScene::SetDemoStar(int star) {
+    demoStar = Clamp(star, 0, 2);
+    if (heroes.empty()) return;
+    HeroActor& t = *heroes.front();
+    t.level = demoStar;
+    t.maxHp = t.hp = HeroMaxHp(t.hero, t.level);
+    t.shots = 0;
+    t.focus = 0;
+    t.dealt = 0;
+    t.recoil = 1;
+    demoClock = 0;
+    AddRing(t.Pos(), 8, 52, 0.5f, 4, Palette::gold);
+    Burst(Add(t.Pos(), {0, -14}), Palette::gold, 20, 150, 5, 0.6f);
+}
+
+void BattleScene::Knock(MonsterActor& e, float tiles) {
+    if (e.dead || e.Def().boss) return;
+    e.dist = std::max(0.0f, e.dist - tiles * kTile);
+    e.sieging = false;
+    e.GetGameObject()->transform->position = map.paths[e.path].Sample(e.dist, &e.dir);
+}
+
+MonsterActor* BattleScene::NearestKaiju(Vector2 at, float radius, const std::vector<const MonsterActor*>& skip) const {
+    MonsterActor* best = nullptr;
+    float bestDist = radius;
+    for (MonsterActor* e : KaijuInCircle(at, radius)) {
+        if (e->phaseTime > 0 || std::find(skip.begin(), skip.end(), e) != skip.end()) continue;
+        float d = Len(Sub(e->Center(), at));
+        if (d <= bestDist) {
+            bestDist = d;
+            best = e;
+        }
+    }
+    return best;
+}
+
 void BattleScene::Leak(MonsterActor& e) {
     const EnemyDef& def = e.Def();
     e.dead = true;
     Destroy(e.GetGameObject());
+    if (demo) return;
     lives -= def.leak;
     leakCount[(int)e.type]++;
     if (leakWave < 0) leakWave = waveIndex + 1;
@@ -901,6 +1190,277 @@ void BattleScene::Fire(HeroActor& t, MonsterActor& target) {
         Sfx::Play("slugger", 0.35f);
         break;
     }
+    default:
+        FireSignature(t, target, dmg, range, origin, aim);
+        break;
+    }
+}
+
+void BattleScene::FireSignature(HeroActor& t, MonsterActor& target, float dmg, float range, Vector2 origin, Vector2 aim) {
+    const HeroDef& def = HeroInfo(t.hero);
+    int tower = t.id;
+    switch (def.kind) {
+    case AttackKind::Slash: {
+        if (t.level >= 2 && t.shots % 4 == 0) {
+            // Specium Ray: arms crossed, a wide white-blue stream.
+            PierceBeam(t, origin, aim, dmg * 3, range * 1.2f, {150, 220, 255, 255}, false);
+            AddBeam(origin, Add(origin, Mul(Normalize(Sub(aim, origin)), range * 1.2f)), 18, 0.45f, WithAlpha({150, 220, 255, 255}, 0.6f), WHITE);
+            Text(Add(origin, {0, -34}), "斯派修姆光线", {170, 230, 255, 255}, 14);
+            Sfx::Play("beam", 0.5f);
+            break;
+        }
+        // Ultra Slash: a spinning saw disc that flies straight through every kaiju in line.
+        Vector2 d = Normalize(Sub(aim, origin));
+        constexpr float kSpeed = 600;
+        auto p = Launch(ProjectileMotion::Straight, Add(origin, {0, -16}));
+        p->velocity = Mul(d, kSpeed);
+        p->hitRadius = 14;
+        p->pierce = true;
+        p->maxLife = range * 1.3f / kSpeed;
+        p->onHit = [this, dmg, tower, d](Projectile& self, Collider* c) {
+            MonsterActor* e = KaijuOf(c);
+            if (!e || !Running()) return;
+            Vector2 at = e->Center(), n{-d.y, d.x};
+            DamageEnemy(*e, dmg, tower);
+            AddBeam(Sub(at, Mul(n, 18)), Add(at, Mul(n, 18)), 3, 0.22f, {150, 220, 255, 255}, WHITE);
+            Sparks(self.Position(), WHITE, 6, 200);
+            Sparks(self.Position(), {150, 220, 255, 255}, 4, 160);
+            Sfx::Play("hit", 0.25f);
+        };
+        p->onStep = [this](Projectile& self) { Emit(Fx::Glow, self.Position(), {150, 220, 255, 255}, 1, 0, 12, 0.18f); };
+        p->onDraw = [](const Projectile& self) {
+            Vector2 at = self.RenderPosition();
+            float spin = self.Age() * 26;
+            auto flat = [at](Vector2 v) { return Vector2{at.x + v.x, at.y + v.y * 0.62f}; };
+            Draw::BlendAdd();
+            Draw::Glow(at, 24, WithAlpha({140, 210, 255, 255}, 0.55f));
+            Draw::BlendNormal();
+            for (int i = 0; i < 12; ++i) {
+                float a = spin + i * PI / 6;
+                Draw::Tri(flat(Mul(Dir(a), 9)), flat(Mul(Dir(a + 0.42f), 9)), flat(Mul(Dir(a + 0.12f), 16)), {210, 240, 255, 255});
+            }
+            Draw::Ellipse(at, 10, 6.2f, {190, 232, 255, 240}, 0);
+            Draw::Ellipse(at, 5, 3.1f, WHITE, 0);
+        };
+        Sfx::Play("slugger", 0.35f);
+        break;
+    }
+    case AttackKind::Infinity: {
+        Color gold{255, 190, 80, 255}, red{255, 70, 50, 255};
+        // The Mebius Brace traces an infinity sign before every shot.
+        Vector2 sign = Add(origin, {0, -18});
+        for (int k = 0; k < 20; ++k) {
+            float u = k * 2 * PI / 20, s = std::sin(u), q = 1 + s * s;
+            Vector2 p = Add(sign, {16 * std::cos(u) / q, 16 * s * std::cos(u) / q});
+            Emit(Fx::Glow, p, k % 2 ? gold : red, 1, 6, 6, 0.35f);
+        }
+        int period = t.level >= 2 ? 3 : 4;
+        if (t.shots % period == 0) {
+            // Mebium Burst: Burning Brave hurls a sun-like fireball.
+            auto p = Launch(ProjectileMotion::Homing, Add(origin, {0, -6}));
+            p->follow = Follow(target);
+            p->followOffset = {0, -target.Height() * 0.45f};
+            p->target = aim;
+            p->speed = 380;
+            p->maxLife = 3;
+            float splash = def.splash * kTile * 1.25f;
+            bool burn = t.level >= 2;
+            p->onArrive = [this, dmg, splash, tower, burn](Projectile&, Vector2 at) {
+                if (Running()) Explode(at, splash, dmg * 2.2f, tower, burn, false, {255, 110, 40, 255});
+            };
+            p->onStep = [this](Projectile& self) {
+                Emit(Fx::Ember, self.Position(), {255, 140, 40, 255}, 1, 50, 8, 0.4f);
+                Emit(Fx::Glow, self.Position(), {255, 90, 30, 255}, 1, 10, 18, 0.25f);
+            };
+            p->onDraw = [](const Projectile& self) {
+                Vector2 at = self.RenderPosition();
+                float pulse = 1 + 0.12f * std::sin(self.Age() * 30);
+                Draw::BlendAdd();
+                Draw::Glow(at, 34 * pulse, WithAlpha({255, 90, 30, 255}, 0.8f));
+                Draw::Glow(at, 16, WithAlpha({255, 230, 160, 255}, 0.95f));
+                for (int i = 0; i < 6; ++i) {
+                    float a = self.Age() * 9 + i * PI / 3;
+                    Draw::Glow(Add(at, Mul(Dir(a), 14)), 6, WithAlpha({255, 160, 60, 255}, 0.8f));
+                }
+                Draw::BlendNormal();
+            };
+            Text(Add(origin, {0, -36}), "梦比姆爆裂", {255, 150, 60, 255}, 14);
+            Sfx::Play("fire", 0.45f);
+            break;
+        }
+        AddBeam(origin, aim, 9, 0.3f, gold, {255, 250, 220, 255});
+        AddBeam(origin, aim, 3, 0.3f, red, WHITE);
+        DamageEnemy(target, dmg, tower);
+        Burst(aim, gold, 12, 170, 5, 0.4f);
+        AddRing(aim, 4, 30, 0.3f, 3, gold);
+        Sfx::Play("beam", 0.35f);
+        break;
+    }
+    case AttackKind::Kick: {
+        Color flame{255, 130, 40, 255}, hot{255, 230, 160, 255};
+        auto kick = [&](MonsterActor& e, float scale) {
+            Vector2 at = e.Center();
+            Vector2 from = Add(t.Pos(), {0, -40});
+            AddBeam(from, at, 10, 0.25f, flame, hot);
+            for (int i = 0; i < 6; ++i) Emit(Fx::Ember, Lerp(from, at, Rand(0, 1)), flame, 1, 50, 6, 0.4f);
+            DamageEnemy(e, dmg * scale, tower);
+            for (MonsterActor* other : KaijuInCircle(at, def.splash * kTile))
+                if (other != &e) DamageEnemy(*other, dmg * scale * 0.4f, tower);
+            if (!e.dead) {
+                e.stunTime = std::max(e.stunTime, t.level >= 2 ? 1.0f : 0.5f);
+                Knock(e, 0.35f);
+            }
+            Burst(at, flame, 18, 220, 6, 0.4f);
+            Burst(at, hot, 8, 100, 7, 0.25f);
+            AddRing(at, 6, 40, 0.3f, 4, flame);
+            Smoke(at, 3, 10);
+        };
+        t.lunge = 1;
+        t.lungeTo = target.Feet();
+        kick(target, 1);
+        if (t.level >= 2)
+            if (MonsterActor* second = NearestKaiju(aim, range, {&target})) {
+                kick(*second, 0.7f);
+                Text(Add(origin, {0, -36}), "双重飞踢", flame, 13);
+            }
+        shake = std::max(shake, 0.15f);
+        Sfx::Play("slugger", 0.4f);
+        break;
+    }
+    case AttackKind::Chain: {
+        // Ginga Thunderbolt: the arms wind a lightning vortex, then it leaps from kaiju to kaiju.
+        Color yellow{255, 236, 90, 255}, cyan{120, 220, 255, 255};
+        AddRing(origin, 4, 26, 0.3f, 3, yellow);
+        for (int i = 0; i < 6; ++i) Emit(Fx::Glow, Add(origin, Mul(Dir(i * PI / 3 + simTime * 6), 14)), cyan, 1, 30, 6, 0.3f);
+        int hops = t.level >= 2 ? 6 : 4;
+        std::vector<const MonsterActor*> struck;
+        MonsterActor* current = &target;
+        Vector2 from = origin;
+        float amount = dmg;
+        for (int i = 0; i < hops && current; ++i) {
+            Vector2 at = current->Center();
+            Bolt(from, at, yellow);
+            Bolt(from, at, cyan);
+            Sparks(at, yellow, 6, 180);
+            struck.push_back(current);
+            DamageEnemy(*current, amount, tower);
+            if (!current->dead && t.level >= 2) current->stunTime = std::max(current->stunTime, 0.3f);
+            from = at;
+            amount *= 0.75f;
+            current = NearestKaiju(at, kTile * 1.8f, struck);
+        }
+        Sfx::Play("pulse", 0.3f);
+        break;
+    }
+    case AttackKind::Edge: {
+        // Photon Edge: a whip of light flung from the crest sweeps a cone.
+        Color red{255, 90, 60, 255}, gold{255, 210, 120, 255};
+        Vector2 d = Normalize(Sub(aim, origin));
+        float base = std::atan2(d.y, d.x);
+        constexpr float kHalf = 35 * DEG2RAD;
+        std::vector<MonsterActor*> hit;
+        for (MonsterActor* e : KaijuInCircle(t.Pos(), range)) {
+            Vector2 to = Sub(e->Center(), origin);
+            float diff = std::atan2(to.y, to.x) - base;
+            diff = std::atan2(std::sin(diff), std::cos(diff));
+            if (e == &target || std::fabs(diff) <= kHalf) hit.push_back(e);
+        }
+        auto ribbon = [&](Vector2 end, float width) {
+            Vector2 n{-(end.y - origin.y), end.x - origin.x};
+            n = Normalize(n);
+            Vector2 prev = origin;
+            for (int k = 1; k <= 10; ++k) {
+                float u = k / 10.0f;
+                Vector2 q = Add(Lerp(origin, end, u), Mul(n, std::sin(u * 3 * PI + simTime * 10) * 10 * (1 - u * 0.5f)));
+                AddBeam(prev, q, width, 0.28f, k % 2 ? red : gold, {255, 245, 220, 255});
+                prev = q;
+            }
+        };
+        ribbon(Add(aim, Mul(d, 20)), 7);
+        Vector2 prev{};
+        for (int k = -5; k <= 5; ++k) {
+            Vector2 q = Add(origin, Mul(Dir(base + k * kHalf / 5), range * 0.8f));
+            if (k > -5) AddBeam(prev, q, 3, 0.25f, WithAlpha(red, 0.7f), gold);
+            prev = q;
+        }
+        for (MonsterActor* e : hit) {
+            if (e != &target) ribbon(e->Center(), 3.5f);
+            Vector2 at = e->Center();
+            DamageEnemy(*e, dmg, tower);
+            Sparks(at, gold, 5, 170);
+            if (t.level >= 2) Knock(*e, 0.25f);
+        }
+        Sfx::Play("snipe", 0.35f);
+        break;
+    }
+    case AttackKind::Field: {
+        // Meta Field: a golden dimension that pins kaiju down.
+        Vector2 at = target.Feet();
+        zones.push_back({at, def.splash * kTile * (1 + 0.1f * t.level), dmg, def.slow, 0, 3.5f, tower, t.level >= 2});
+        AddBeam(origin, Add(at, {0, -10}), 5, 0.35f, {255, 200, 100, 255}, WHITE);
+        AddRing(at, 6, def.splash * kTile, 0.45f, 4, {255, 210, 110, 255});
+        Burst(at, {255, 210, 110, 255}, 16, 150, 5, 0.5f);
+        Sfx::Play("shield", 0.35f);
+        break;
+    }
+    case AttackKind::Dual: {
+        int period = t.level >= 2 ? 2 : 3;
+        if (t.shots % period == 0) {
+            // Strong Type: the Garnate Bomber, a red fireball that stuns where it lands.
+            Color red{255, 80, 40, 255};
+            auto p = Launch(ProjectileMotion::Lob, origin);
+            p->target = target.Feet();
+            p->flightTime = 0.5f;
+            float splash = def.splash * kTile;
+            p->onArrive = [this, dmg, splash, tower, red](Projectile&, Vector2 at) {
+                if (!Running()) return;
+                Explode(at, splash, dmg * 2.2f, tower, false, false, red);
+                for (MonsterActor* e : KaijuInCircle(at, splash)) e->stunTime = std::max(e->stunTime, 0.6f);
+            };
+            p->onStep = [this, red](Projectile& self) { Emit(Fx::Ember, self.Position(), red, 1, 40, 7, 0.35f); };
+            p->onDraw = [](const Projectile& self) {
+                Vector2 at = self.RenderPosition();
+                Draw::Shadow(self.target, 8, 4, 0.35f);
+                Draw::BlendAdd();
+                Draw::Glow(at, 26, WithAlpha({255, 70, 30, 255}, 0.85f));
+                Draw::Glow(at, 10, WithAlpha({255, 230, 170, 255}, 0.95f));
+                Draw::BlendNormal();
+            };
+            AddRing(Add(t.Pos(), {0, -20}), 6, 34, 0.3f, 4, red);
+            Text(Add(origin, {0, -34}), "强壮型", red, 13);
+            Sfx::Play("fire", 0.4f);
+            break;
+        }
+        // Flash Type: the Solgent Ray from crossed arms.
+        Color blue{130, 200, 255, 255};
+        AddBeam(origin, aim, 9, 0.28f, blue, WHITE);
+        AddBeam(origin, aim, 3, 0.28f, {255, 90, 90, 255}, WHITE);
+        DamageEnemy(target, dmg, tower);
+        Burst(aim, blue, 10, 160, 5, 0.35f);
+        Sfx::Play("beam", 0.3f);
+        break;
+    }
+    case AttackKind::Focus: {
+        int cap = t.level >= 2 ? 6 : 4;
+        if (t.focusTarget == &target) t.focus = std::min(t.focus + 1, cap);
+        else t.focus /= 2; // switching targets keeps half the charge
+        t.focusTarget = &target;
+        float mult = 1 + 0.3f * t.focus;
+        Color tone = Mix({90, 160, 255, 255}, {255, 214, 90, 255}, t.focus / (float)cap);
+        if (t.level >= 2 && t.focus == cap) {
+            PierceBeam(t, origin, aim, dmg * mult, range * 1.2f, tone, false);
+            if (t.shots % 3 == 0) Text(Add(origin, {0, -34}), "全力光线", tone, 13);
+        } else {
+            AddBeam(origin, aim, 6 + t.focus * 1.6f, 0.3f, tone, WHITE);
+            DamageEnemy(target, dmg * mult, tower);
+            Burst(aim, tone, 8 + t.focus * 3, 160, 5, 0.35f);
+        }
+        if (t.focus > 0) AddRing(aim, 4, 18 + t.focus * 5, 0.25f, 2, tone);
+        Sfx::Play("beam", 0.3f + 0.03f * t.focus);
+        break;
+    }
+    default:
+        break;
     }
 }
 
@@ -1016,7 +1576,7 @@ void BattleScene::CastBrothers() {
     float dmg = 260 + 55.0f * std::max(0, waveIndex);
     int i = 0;
     for (const auto& e : Alive()) {
-        Color c = HeroInfo(level->heroes[i++ % level->heroes.size()]).beam;
+        Color c = HeroInfo(roster[i++ % roster.size()]).beam;
         Vector2 cc = e->Center();
         AddBeam({cc.x + Rand(-30, 30), kMapY - 20}, cc, 13, 0.75f, c, WHITE);
         Burst(cc, c, 10, 160, 5, 0.5f);
@@ -1037,12 +1597,12 @@ void BattleScene::CastStrike(Vector2 target) {
 
 int BattleScene::RosterCount() const {
     int count = 0;
-    for (HeroId id : level->heroes)
+    for (HeroId id : roster)
         if (std::any_of(heroes.begin(), heroes.end(), [id](const Ref<HeroActor>& h) { return h->hero == id; })) ++count;
     return count;
 }
 
-bool BattleScene::RosterComplete() const { return RosterCount() >= (int)level->heroes.size(); }
+bool BattleScene::RosterComplete() const { return RosterCount() >= (int)roster.size(); }
 
 void BattleScene::CastFusion(bool force) {
     if (fusionCooldown > 0 || !Running() || waveIndex < 0 || fusionAnim >= 0) return;
@@ -1132,12 +1692,13 @@ bool BattleScene::BuyTower(HeroId hero, int col, int row) {
     t->col = col;
     t->row = row;
     t->invested = def.cost;
+    t->hp = t->maxHp = HeroMaxHp(hero, 0);
     t->mode = def.kind == AttackKind::Snipe ? 1 : 0;
     t->ySort = true;
     int before = RosterCount();
     heroes.push_back(t);
     towerGrid[row][col] = t->id;
-    if (before < (int)level->heroes.size() && RosterComplete()) {
+    if (before < (int)roster.size() && RosterComplete()) {
         fusionCooldown = std::max(fusionCooldown, kFusionCharge);
         fusionSpan = std::max(fusionCooldown, 1.0f);
         Banner("光之巨人全员集结！", "究极合体开始蓄能，完成后按 E 发动", Palette::gold);
@@ -1159,6 +1720,8 @@ void BattleScene::UpgradeTower(HeroActor& t) {
     gold -= cost;
     t.invested += cost;
     t.level++;
+    t.maxHp = HeroMaxHp(t.hero, t.level);
+    if (t.disabled != HeroActor::Disable::Exhausted) t.hp = t.maxHp; // an upgrade refills the colour timer
     t.recoil = 1;
     Burst(Add(t.Pos(), {0, -14}), Palette::gold, 30, 170, 5, 0.7f);
     AddRing(t.Pos(), 8, 52, 0.5f, 4, Palette::gold);
@@ -1213,6 +1776,93 @@ void BattleScene::DisableHero(HeroActor& hero, HeroActor::Disable kind, float se
     Sfx::Play(stone ? "shield" : "teleport", 0.45f);
 }
 
+void BattleScene::KaijuAttack(MonsterActor& e, HeroActor& target) {
+    const EnemyDef& def = e.Def();
+    float damage = def.strikeDamage * Assault() * (e.buffTime > 0 || e.enraged ? 1.3f : 1.0f);
+    Vector2 from = e.Center(), to = Add(target.Pos(), {0, -22});
+    int heroId = target.id;
+    if (def.boss || def.strike == KaijuStrike::Rock)
+        Text(Add(from, {0, -e.Height() * 0.6f}), def.strikeName, {255, 160, 120, 255}, def.boss ? 15.0f : 12.0f);
+    switch (def.strike) {
+    case KaijuStrike::None:
+        return;
+    case KaijuStrike::Shock: {
+        Color tone{255, 170, 90, 255};
+        AddRing(e.Feet(), 8, def.strikeRange * kTile, 0.35f, 4, tone);
+        Sparks(to, tone, 6, 140);
+        DamageHero(target, damage);
+        Sfx::Play("pulse", 0.3f);
+        break;
+    }
+    case KaijuStrike::Beam: {
+        Color glow = e.type == EnemyId::Baltan    ? Color{120, 200, 255, 255}
+                     : e.type == EnemyId::Belial  ? Color{220, 30, 60, 255}
+                     : e.type == EnemyId::Tregear ? Color{140, 100, 255, 255}
+                                                  : Color{255, 96, 70, 255};
+        AddBeam(from, to, def.boss ? 7.0f : 4.0f, 0.3f, glow, WHITE);
+        Sparks(to, glow, 6, 150);
+        DamageHero(target, damage);
+        Sfx::Play("beam", 0.25f);
+        break;
+    }
+    case KaijuStrike::Bolt:
+        Bolt(from, to, {255, 236, 90, 255});
+        Sparks(to, {255, 236, 90, 255}, 5, 160);
+        DamageHero(target, damage);
+        Sfx::Play("hit", 0.25f);
+        break;
+    case KaijuStrike::Rock:
+    case KaijuStrike::Fireball: {
+        bool fire = def.strike == KaijuStrike::Fireball;
+        auto p = Launch(ProjectileMotion::Lob, from);
+        p->layerMask = 0; // lands on a hero, never on kaiju
+        p->target = to;
+        p->flightTime = fire ? 0.8f : 0.7f;
+        p->onArrive = [this, heroId, damage, fire](Projectile&, Vector2 at) {
+            if (!Running()) return;
+            if (HeroActor* h = FindTower(heroId)) DamageHero(*h, damage);
+            if (fire) {
+                for (auto& h : heroes)
+                    if (h->id != heroId && Len(Sub(h->Pos(), at)) < kTile * 1.2f) DamageHero(*h, damage * 0.5f);
+                AddRing(at, 6, kTile * 1.2f, 0.35f, 4, {255, 150, 50, 255});
+            }
+            Burst(at, fire ? Color{255, 140, 40, 255} : Color{170, 140, 100, 255}, 14, 160, 6, 0.4f);
+            Smoke(at, fire ? 4 : 6, 12);
+            Sfx::Play("explode", 0.35f);
+        };
+        p->onDraw = [fire](const Projectile& self) {
+            Vector2 at = self.RenderPosition();
+            Draw::Shadow(self.target, 8, 4, 0.35f);
+            if (fire) {
+                Draw::BlendAdd();
+                Draw::Glow(at, 24, WithAlpha({255, 110, 30, 255}, 0.8f));
+                Draw::Glow(at, 9, WithAlpha({255, 240, 180, 255}, 0.95f));
+                Draw::BlendNormal();
+            } else {
+                Draw::Shaded(at, 8, 7, {132, 112, 88, 255}, self.Age() * 6, 1.5f);
+            }
+        };
+        Sfx::Play(fire ? "fire" : "slugger", 0.35f);
+        break;
+    }
+    }
+}
+
+void BattleScene::DamageHero(HeroActor& hero, float amount) {
+    if (!Running() || amount <= 0 || hero.disabled == HeroActor::Disable::Exhausted) return;
+    hero.hp -= amount;
+    hero.hurt = 1;
+    hero.calm = 0;
+    if (hero.hp > 0) return;
+    hero.hp = 0;
+    hero.disabled = HeroActor::Disable::Exhausted;
+    hero.disabledTime = kExhaustTime;
+    ++exhaustions;
+    Text(Add(hero.Pos(), {0, -52}), "能量耗尽！", {255, 90, 90, 255}, 15);
+    Burst(Add(hero.Pos(), {0, -20}), {255, 70, 70, 255}, 16, 140, 5, 0.5f);
+    Sfx::Play("leak", 0.4f);
+}
+
 // ================================================================ helpers
 
 void BattleScene::Banner(const std::string& title, const std::string& sub, Color color, bool warning) {
@@ -1231,7 +1881,10 @@ void BattleScene::SetOutcome(Outcome value) {
     targetingStrike = false;
     earnedStars = value == Outcome::Victory ? (lives >= level->lives ? 3 : lives >= level->lives * 0.6f ? 2 : 1) : 0;
     if (headless) return;
-    if (value == Outcome::Victory) {
+    if (Endless()) {
+        newRecord = Progress::RecordSurvival(surviveTime, waveIndex + 1);
+        Sfx::Play(newRecord ? "victory" : "defeat", 0.9f, 0);
+    } else if (value == Outcome::Victory) {
         Progress::RecordStars(levelIndex, earnedStars);
         Sfx::Play("victory", 0.9f, 0);
     } else {
@@ -1331,7 +1984,6 @@ std::vector<GridPoint> BattleScene::RankedTiles() const {
 void BattleScene::BotAct() {
     // Card slots, not heroes: each level's roster keeps the cheap opener first and the premium pick last.
     static const int order[] = {0, 4, 3, 1, 2, 5, 0, 4, 2, 1, 5, 3};
-    const auto& roster = level->heroes;
     auto alive = Alive();
     bool boss = std::any_of(alive.begin(), alive.end(), [](const auto& e) { return e->Def().boss; });
     const MonsterActor* front = nullptr;
@@ -1388,13 +2040,65 @@ BattleScene::BotResult BattleScene::RunBot(bool casual) {
         GameTime::FixedStepScope step(kStep, simTime);
         FixedUpdate();
     }
-    return {outcome == Outcome::Victory, lives, waveIndex + 1, (int)heroes.size(), gold, kills, leakWave, leakCount, simTime / 60};
+    return {outcome == Outcome::Victory, lives, waveIndex + 1, (int)heroes.size(), gold, kills, leakWave, leakCount, simTime / 60, exhaustions};
 }
+
+float BattleScene::BenchmarkDemo(int star, float seconds) {
+    if (!demo || heroes.empty()) return 0;
+    SetDemoStar(star);
+    float start = simTime;
+    while (simTime - start < seconds) {
+        GameTime::FixedStepScope step(kStep, simTime);
+        FixedUpdate();
+    }
+    return heroes.front()->dealt / seconds;
+}
+
+// Mirrors GameEngine's frame: variable update, fixed steps with pose capture and physics, then
+// interpolation, so projectiles render where they really are.
+void BattleScene::TickEmbedded(float real) {
+    ScopeActivation scope(GetCallbackScope());
+    Scene::Update();
+    embedClock += std::min(real, 0.1f);
+    while (embedClock >= kStep) {
+        embedClock -= kStep;
+        GameTime::FixedStepScope step(kStep, simTime);
+        BeginFixedStep();
+        FixedUpdate();
+        IntegratePhysics(kStep);
+        GetPhysicsWorld().Step();
+        PostFixedUpdate();
+    }
+    SetInterpolationAlpha(embedClock / kStep);
+    LateUpdate();
+}
+
+// Only the skill itself: beams, projectiles, fields and particles, shifted so the hero sits at heroAt.
+void BattleScene::DrawEmbedded(Rectangle clip, Vector2 heroAt) {
+    if (heroes.empty()) return;
+    Vector2 from = heroes.front()->Pos();
+    BeginScissorMode((int)clip.x, (int)clip.y, (int)clip.width, (int)clip.height);
+    rlPushMatrix();
+    rlTranslatef(heroAt.x - from.x, heroAt.y - from.y, 0);
+    ScopeActivation scope(GetCallbackScope());
+    DrawZones();
+    Scene::Render();
+    rlPopMatrix();
+    EndScissorMode();
+}
+
+void BattleScene::ReleaseEmbedded() {
+    if (mapTexture.id) UnloadRenderTexture(mapTexture);
+    mapTexture = {};
+    Clear();
+}
+
 
 void BattleScene::DebugAutoplay(int startWave) {
     gold += 2500 + startWave * 400;
     for (int i = 0; i < 6; ++i) BotAct();
     waveIndex = startWave - 1;
+    EnsureWaves(startWave + 1);
     StartNextWave(false);
     speedIndex = 2;
     ApplySpeed();
@@ -1418,16 +2122,22 @@ void BattleScene::DebugInspect(bool pause) {
 
 void BattleScene::DebugFinish() {
     headless = true; // keeps the player's save untouched
+    kills = 286;
+    if (Endless()) {
+        lives = 0;
+        SetOutcome(Outcome::Defeat);
+        return;
+    }
     lives = level->lives - 3;
     waveIndex = (int)level->waves.size() - 1;
-    kills = 286;
     SetOutcome(Outcome::Victory);
 }
 
 int RunBalanceReport(const std::string& path) {
     std::string report;
     SetTraceLogLevel(LOG_NONE);
-    for (int i = 0; i < (int)Levels().size(); ++i) {
+    int count = (int)Levels().size();
+    for (int i = SurvivalLevel() ? kSurvivalIndex : 0; i < count; ++i) {
         for (int run = 0; run < 15; ++run) {
             bool casual = run >= 3;
             SetRandomSeed(1000 + run * 77 + i);
@@ -1436,13 +2146,25 @@ int RunBalanceReport(const std::string& path) {
             scene->Load();
             auto r = scene->RunBot(casual);
             report += TextFormat("level %d %s %d: %s lives=%d wave=%d towers=%d gold=%d kills=%d firstLeak=%d "
-                                 "minutes=%.1f leaks:",
+                                 "minutes=%.1f exhausted=%d leaks:",
                                  i, casual ? "casual" : "expert", casual ? run - 3 : run, r.won ? "WIN " : "LOSE", r.lives, r.wave, r.towers, r.gold,
-                                 r.kills, r.firstLeakWave, r.minutes);
+                                 r.kills, r.firstLeakWave, r.minutes, r.exhausted);
             for (int k = 0; k < kEnemyCount; ++k) report += TextFormat(" %d", r.leaks[k]);
             report += "\n";
             scene->Clear();
         }
+    }
+    for (int h = 0; h < kHeroCount; ++h) {
+        report += TextFormat("hero %s cost=%d dps:", HeroInfo((HeroId)h).key, HeroInfo((HeroId)h).cost);
+        for (int star : {0, 2}) {
+            SetRandomSeed(500 + h);
+            auto scene = CreateRef<BattleScene>((HeroId)h);
+            scene->headless = true;
+            scene->Load();
+            report += TextFormat(" %.1f", scene->BenchmarkDemo(star, 90));
+            scene->Clear();
+        }
+        report += "\n";
     }
     SaveFileText(path.c_str(), report.data());
     return 0;
@@ -1483,7 +2205,6 @@ void BattleScene::DrawFusionCinematic() {
     Vector2 ground{kMapX + kMapW * 0.5f, kMapY + kMapH * 0.45f};
     static const Color hues[] = {{255, 70, 70, 255},  {255, 196, 60, 255},  {80, 255, 170, 255},
                                  {70, 170, 255, 255}, {190, 110, 255, 255}, {255, 120, 210, 255}};
-    const auto& roster = level->heroes;
     int n = (int)roster.size();
 
     // Time stop: dim the field and slide in letterbox bars.
@@ -1583,7 +2304,9 @@ void BattleScene::DrawWorld() {
     if (s > 0.01f) rlTranslatef(Rand(-1, 1) * s, Rand(-1, 1) * s, 0);
 
     DrawMapTexture(mapTexture, MapRect());
+    if (Siege()) DrawSiege();
     DrawMapLive(map, simTime, baseFlash);
+    DrawZones();
     DrawPlacement();
     for (const auto& t : heroes) Draw::Shadow(Add(t->Pos(), {2, 12}), 22, 8, 0.45f);
     for (const auto& e : monsters)
@@ -1604,6 +2327,15 @@ void BattleScene::DrawWorld() {
     }
 
     for (const auto& e : monsters) DrawHealthBar(*e);
+    if (Siege()) {
+        // Tower durability under the spire.
+        float ratio = citadelMax > 0 ? Clamp(citadel / citadelMax, 0.0f, 1.0f) : 0;
+        Rectangle bar{map.basePos.x - 52, map.basePos.y + 66, 104, 9};
+        Color fill = ratio > 0.5f ? Color{110, 200, 255, 255} : ratio > 0.25f ? Color{250, 200, 70, 255} : Color{240, 70, 70, 255};
+        Draw::RoundedPanel({bar.x - 3, bar.y - 3, bar.width + 6, bar.height + 6}, 5, {8, 10, 24, 220}, WithAlpha(fill, 0.5f + 0.5f * citadelPulse), 1.2f);
+        DrawRectangleRec({bar.x, bar.y, bar.width * ratio, bar.height}, fill);
+        DrawRectangleRec({bar.x, bar.y, bar.width * ratio, 3}, Lighten(fill, 0.4f));
+    }
 
     if (placing >= 0) {
         Vector2 m = Input::GetMousePosition();
@@ -1638,6 +2370,46 @@ void BattleScene::DrawWorld() {
         DrawRectangleRec(MapRect(), WithAlpha({220, 240, 255, 255}, flashScreen * 0.5f));
         Draw::BlendNormal();
     }
+}
+
+void BattleScene::DrawZones() {
+    for (const auto& z : zones) {
+        float fade = Clamp(z.time / 0.25f, 0.0f, 1.0f) * Clamp((z.life - z.time) / 0.4f, 0.0f, 1.0f);
+        Color gold{255, 200, 90, 255}, amber{255, 140, 50, 255};
+        DrawCircleV(z.at, z.radius, WithAlpha(amber, 0.16f * fade));
+        Draw::BlendAdd();
+        Draw::Glow(z.at, z.radius * 1.3f, WithAlpha(gold, 0.22f * fade));
+        DrawRing(z.at, z.radius - 2, z.radius + 1.5f, 0, 360, 64, WithAlpha(gold, 0.85f * fade));
+        for (int i = 0; i < 3; ++i) {
+            float a = simTime * (1.2f + i * 0.5f) + i * 2.1f;
+            Draw::Arc(z.at, z.radius * (0.45f + i * 0.18f), 2.5f, a, a + PI * 0.7f, WithAlpha(gold, 0.6f * fade), 16);
+        }
+        // Rising curtain lines, the field's "dimension wall".
+        for (int i = 0; i < 10; ++i) {
+            float a = i * PI / 5 + simTime * 0.4f;
+            Vector2 foot = Add(z.at, {std::cos(a) * z.radius, std::sin(a) * z.radius});
+            float h = 18 + 10 * std::sin(simTime * 4 + i);
+            Draw::Line(foot, Add(foot, {0, -h}), 2, WithAlpha(gold, 0.45f * fade));
+        }
+        Draw::BlendNormal();
+    }
+}
+
+void BattleScene::DrawSiege() {
+    float ratio = citadelMax > 0 ? Clamp(citadel / citadelMax, 0.0f, 1.0f) : 0;
+    Vector2 c = map.basePos;
+    float r = kTile * 1.75f;
+    Color tone = Mix({255, 90, 80, 255}, {130, 210, 255, 255}, ratio);
+    DrawCircleV(c, r, WithAlpha(tone, 0.07f));
+    Draw::BlendAdd();
+    DrawRing(c, r - 2, r + 2, 0, 360, 96, WithAlpha(tone, 0.35f + 0.25f * citadelPulse));
+    for (int i = 0; i < 8; ++i) {
+        float a = i * PI / 4 + simTime * 0.15f;
+        Vector2 post = Add(c, Mul(Dir(a), r));
+        Draw::Glow(post, 10, WithAlpha(tone, 0.6f));
+        Draw::Arc(c, r, 3, a + 0.12f, a + PI / 4 - 0.12f, WithAlpha(tone, 0.5f * ratio), 8);
+    }
+    Draw::BlendNormal();
 }
 
 void BattleScene::DrawPlacement() {
@@ -1711,19 +2483,36 @@ void BattleScene::DrawHud() {
     DrawRing(em, 15, 18, 0, 360, 32, Palette::silver);
     Draw::GradientEllipse(em, 13, 13, {20, 100, 210, 255}, {200, 245, 255, 255}, {em.x - 4, em.y - 4}, 8);
     Draw::Star(em, 7, 3, RealTime() * 0.5f, WHITE);
-    Gui::TextShadow(level->name, 58, 8, 21, Palette::text);
-    Gui::Text(level->subtitle, 58, 34, 13, Palette::muted);
+    Gui::TextShadow(Endless() ? level->name : level->tag + "  " + level->name, 58, 8, 21, Palette::text);
+    if (Endless()) {
+        auto clock = [](float s) { return TextFormat("%02d:%02d", (int)s / 60, (int)s % 60); };
+        std::string now = clock(surviveTime);
+        Gui::Text("生存 " + now + "   最佳 " + clock(Progress::SurvivalBestTime()), 58, 34, 13, Palette::cyan);
+    } else {
+        Gui::Text(level->subtitle, 58, 34, 13, Palette::muted);
+    }
 
     auto chip = [](float x, float w, const std::string& value, Color color, float pulse) {
         Draw::RoundedPanel({x, 12, w, 36}, 10, {8, 12, 28, 200}, WithAlpha(color, 0.5f + pulse * 0.5f), 1.5f);
         Gui::TextShadow(value, x + 38, 18 - pulse * 2, 21 + pulse * 3, Mix(Palette::text, color, pulse));
     };
-    chip(236, 108, TextFormat("%d", lives), {255, 90, 110, 255}, livesPulse);
-    Gui::Heart({256, 30}, 10 * (1 + livesPulse * 0.3f));
+    if (Siege()) {
+        float ratio = citadelMax > 0 ? Clamp(citadel / citadelMax, 0.0f, 1.0f) : 0;
+        chip(236, 108, TextFormat("%d%%", (int)std::ceil(ratio * 100)), ratio > 0.3f ? Palette::cyan : Palette::red, livesPulse);
+        Vector2 c{256, 30};
+        Draw::Quad({c.x - 5, c.y + 9}, {c.x + 5, c.y + 9}, {c.x + 2, c.y - 6}, {c.x - 2, c.y - 6}, {200, 222, 250, 255});
+        Draw::BlendAdd();
+        Draw::Glow({c.x, c.y - 9}, 8, WithAlpha({255, 220, 150, 255}, 0.9f));
+        Draw::BlendNormal();
+    } else {
+        chip(236, 108, TextFormat("%d", lives), {255, 90, 110, 255}, livesPulse);
+        Gui::Heart({256, 30}, 10 * (1 + livesPulse * 0.3f));
+    }
     chip(354, 118, TextFormat("%d", gold), Palette::gold, goldPulse);
     Gui::Coin({374, 30}, 10 * (1 + goldPulse * 0.2f));
     int total = (int)level->waves.size();
-    chip(482, 128, TextFormat("%d / %d", std::max(0, waveIndex + 1), total), Palette::cyan, 0);
+    chip(482, 128, Endless() ? TextFormat("第 %d 波", std::max(0, waveIndex + 1)) : TextFormat("%d / %d", std::max(0, waveIndex + 1), total),
+         Palette::cyan, 0);
     {
         Vector2 c{502, 30};
         for (int i = 0; i < 3; ++i) Draw::Arc({c.x - 6, c.y}, 5.0f + i * 4, 2, -PI / 3, PI / 3, Palette::cyan, 8);
@@ -1786,9 +2575,9 @@ void BattleScene::DrawPanel() {
     Gui::Header({kPanelX + 8, kMapY + 6, kPanelW - 16, 26}, "光之巨人", Palette::gold);
     Gui::Text("按 1-6 快速选择", kPanelX + kPanelW - 10, kMapY + 12, 11, Palette::muted, Gui::Align::Right);
     hoverCard = -1;
-    for (int i = 0; i < (int)level->heroes.size(); ++i) {
+    for (int i = 0; i < (int)roster.size(); ++i) {
         Rectangle r = CardRect(i);
-        if (Gui::Hover(r)) hoverCard = (int)level->heroes[i];
+        if (Gui::Hover(r)) hoverCard = (int)roster[i];
         DrawHeroCard(i, r);
     }
     DrawSkills();
@@ -1797,7 +2586,7 @@ void BattleScene::DrawPanel() {
 }
 
 void BattleScene::DrawHeroCard(int slot, Rectangle r) {
-    HeroId id = level->heroes[slot];
+    HeroId id = roster[slot];
     const HeroDef& def = HeroInfo(id);
     bool afford = gold >= def.cost;
     bool active = placing == (int)id;
@@ -1839,7 +2628,7 @@ void BattleScene::DrawHeroCard(int slot, Rectangle r) {
 void BattleScene::DrawFusion() {
     Rectangle r = FusionRect();
     int have = RosterCount();
-    int need = (int)level->heroes.size();
+    int need = (int)roster.size();
     bool assembled = have >= need;
     bool ready = assembled && fusionCooldown <= 0 && waveIndex >= 0 && outcome == Outcome::None;
     bool charging = assembled && fusionCooldown > 0 && outcome == Outcome::None;
@@ -1870,7 +2659,7 @@ void BattleScene::DrawFusion() {
     const float slot = 24, gap = 4;
     float sx = r.x + (r.width - need * slot - (need - 1) * gap) / 2;
     for (int i = 0; i < need; ++i) {
-        HeroId id = level->heroes[i];
+        HeroId id = roster[i];
         bool placed = std::any_of(heroes.begin(), heroes.end(), [id](const Ref<HeroActor>& h) { return h->hero == id; });
         Rectangle s{sx + i * (slot + gap), r.y + 5, slot, slot};
         Color ring = ready ? Color{255, 250, 220, 255} : placed ? WithAlpha(HeroInfo(id).beam, 0.9f) : Color{56, 60, 72, 255};
@@ -1926,7 +2715,7 @@ void BattleScene::DrawSkills() {
             if (ready) Draw::BlendAdd();
             for (int k = 0; k < 5; ++k) {
                 float a = -PI / 2 + (k - 2) * 0.36f;
-                Color beam = HeroInfo(level->heroes[k % level->heroes.size()]).beam;
+                Color beam = HeroInfo(roster[k % roster.size()]).beam;
                 Draw::Line(c, Add(c, Mul(Dir(a), 20)), 3, WithAlpha(ink(beam), 0.9f));
             }
             if (ready) Draw::Glow(c, 16, WithAlpha(WHITE, 0.8f));
@@ -1980,6 +2769,12 @@ void BattleScene::DrawInfo(Rectangle area) {
         Gui::Text(TextFormat("射程 %.1f", HeroRange(t->hero, t->level) / kTile), x, y, 13, Palette::text);
         Gui::Text(TextFormat("输出 %.0f", t->dealt), x + w, y, 13, Palette::text, Gui::Align::Right);
         y += 18;
+        if (Assault() > 0) {
+            bool down = t->disabled == HeroActor::Disable::Exhausted;
+            Gui::Text(down ? TextFormat("能量耗尽 · %.0f 秒后站起", std::ceil(t->disabledTime)) : TextFormat("能量 %.0f / %.0f", t->hp, t->maxHp), x, y,
+                      13, down || t->hp < t->maxHp * 0.35f ? Palette::red : Palette::cyan);
+            y += 18;
+        }
         Gui::Paragraph(def.perk, x, y, w, 11, t->level >= 2 ? Palette::gold : Palette::muted, 1.35f);
         float by = area.y + area.height - 34;
         Rectangle modeBtn{x - 2, by, 54, 28}, upBtn{x + 56, by, 70, 28}, sellBtn{x + 130, by, 52, 28};
@@ -2016,6 +2811,7 @@ void BattleScene::DrawInfo(Rectangle area) {
         "芝顿会展开护盾，护盾期间受到的伤害降低，可等护盾消失再集火。",
         "巴尔坦星人被击倒后会分裂，记得在后方保留火力。",
         "本关英雄全员上场后，右侧「究极合体」开始蓄能，按 E 发动。",
+        "后期关卡的怪兽会攻击英雄。彩色计时器闪红时说明能量不足，升级可以补满能量。",
     };
     constexpr int kTips = (int)(sizeof(tips) / sizeof(tips[0]));
     int tip = ((int)(RealTime() / 6)) % kTips;
@@ -2135,7 +2931,8 @@ void BattleScene::DrawPauseMenu() {
         Sfx::ApplySettings();
         Progress::Save();
     }
-    if (Gui::Button({bx, by + 174, bw, 46}, "返回关卡选择", Gui::Style::Red, true, 19)) GoToMenu(MenuPage::Levels);
+    if (Gui::Button({bx, by + 174, bw, 46}, Endless() ? "返回主页" : "返回关卡选择", Gui::Style::Red, true, 19))
+        GoToMenu(Endless() ? MenuPage::Title : MenuPage::Levels);
     Gui::Text("Esc / P 继续", r.x + r.width / 2, r.y + r.height - 34, 14, Palette::muted, Gui::Align::Center);
 }
 
@@ -2152,6 +2949,25 @@ void BattleScene::DrawResult() {
     Draw::Glow({r.x + r.width / 2, r.y + 40}, 260, WithAlpha(accent, 0.2f * a));
     Draw::BlendNormal();
     Gui::Panel(r, {14, 20, 42, (unsigned char)(245 * a)}, 18);
+    if (Endless()) {
+        auto clock = [](float s) { return std::string(TextFormat("%d 分 %02d 秒", (int)s / 60, (int)s % 60)); };
+        Color tone = newRecord ? Palette::gold : Palette::cyan;
+        Gui::Text("SURVIVAL", r.x + r.width / 2, r.y + 22, 14, WithAlpha(Palette::muted, a), Gui::Align::Center, true);
+        Gui::TextOutline(newRecord ? "新纪录！" : Siege() ? "灯塔被摧毁" : "防线崩溃", r.x + r.width / 2, r.y + 42, 52, WithAlpha(tone, a),
+                         WithAlpha({20, 8, 0, 255}, a), 2.5f);
+        if (newRecord && Siege())
+            Gui::Text("守护灯塔最终还是熄灭了", r.x + r.width / 2, r.y + 100, 15, WithAlpha(Palette::muted, a), Gui::Align::Center);
+        Gui::Text("坚持了 " + clock(surviveTime), r.x + r.width / 2, r.y + 130, 28, WithAlpha(Palette::text, a), Gui::Align::Center, true);
+        Gui::Text(TextFormat("到达第 %d 波    击败怪兽 %d", std::max(0, waveIndex + 1), kills), r.x + r.width / 2, r.y + 184, 18,
+                  WithAlpha(Palette::text, a), Gui::Align::Center);
+        Gui::Text(TextFormat("最佳纪录  %s · 第 %d 波", clock(Progress::SurvivalBestTime()).c_str(), Progress::SurvivalBestWave()), r.x + r.width / 2,
+                  r.y + 222, 16, WithAlpha(Palette::muted, a), Gui::Align::Center);
+        if (t < 0.6f) return;
+        float by = r.y + r.height - 86;
+        if (Gui::Button({r.x + 60, by, 200, 50}, "返回主页", Gui::Style::Dark, true, 18)) GoToMenu(MenuPage::Title);
+        if (Gui::Button({r.x + 280, by, 200, 50}, "再来一次", Gui::Style::Gold, true, 20)) restartRequested = true;
+        return;
+    }
     Gui::Text(win ? "MISSION COMPLETE" : "MISSION FAILED", r.x + r.width / 2, r.y + 22, 14, WithAlpha(Palette::muted, a),
               Gui::Align::Center, true);
     Gui::TextOutline(win ? "守护成功！" : "基地失守", r.x + r.width / 2, r.y + 42, 52, WithAlpha(accent, a), WithAlpha({20, 8, 0, 255}, a),
@@ -2180,7 +2996,10 @@ void BattleScene::DrawResult() {
     if (win && hasNext) {
         if (Gui::Button({r.x + 30, by, 150, 50}, "关卡选择", Gui::Style::Dark, true, 18)) GoToMenu(MenuPage::Levels);
         if (Gui::Button({r.x + 195, by, 150, 50}, "再来一次", Gui::Style::Blue, true, 18)) restartRequested = true;
-        if (Gui::Button({r.x + 360, by, 150, 50}, "下一关", Gui::Style::Gold, true, 20)) GoToBattle(levelIndex + 1);
+        if (Gui::Button({r.x + 360, by, 150, 50}, "下一关", Gui::Style::Gold, true, 20)) {
+            PrepareLevel(levelIndex + 1);
+            GoToMenu(MenuPage::Prepare);
+        }
     } else {
         if (Gui::Button({r.x + 60, by, 200, 50}, "关卡选择", Gui::Style::Dark, true, 18)) GoToMenu(MenuPage::Levels);
         if (Gui::Button({r.x + 280, by, 200, 50}, win ? "再来一次" : "再试一次", Gui::Style::Gold, true, 20)) restartRequested = true;

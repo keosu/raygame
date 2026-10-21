@@ -1,0 +1,31 @@
+# 月面基地：一条长月面车道来回折返（格式说明见 01_tokyo.level）。
+id       moonbase
+name     月面基地
+subtitle 宇宙决战篇 · 月之暗面
+arc      宇宙决战篇
+desc     怪兽军团登陆月球，直扑防卫队的月面基地。路很长，但每只怪兽都会边走边攻击沿途的英雄。
+theme    moon
+gold     650
+lives    20
+hp       2.2
+assault  1.2
+seed     4101
+base     18 3
+heroes   z orb trigger geed arc decker
+path     -1,2 3,2 3,9 7,9 7,4 11,4 11,10 15,10 15,3 18,3
+
+wave     baltan x10 every 0.8
+wave     gomora x8 every 1 | eleking x6 every 0.7 after 4
+wave     metron x3 every 1.8 | baltan x8 every 0.7 after 2
+wave     redking x3 every 2.2 | gomora x8 every 0.85 after 3
+wave     kingjoe x2 every 3 | eleking x8 every 0.6 after 3
+wave     zetton x1 | metron x3 every 2 after 3
+wave     baltan x14 every 0.5 | redking x2 every 2 after 3
+wave     kingjoe x3 every 2.4 | gomora x8 every 0.8 after 3
+wave     eleking x14 every 0.5 | metron x3 every 1.8 after 3
+wave     tregear x1 | redking x4 every 1.6 after 4
+wave     baltan x12 every 0.5 | kingjoe x3 every 2.2 after 3
+wave     redking x5 every 1.4 | eleking x10 every 0.5 after 3
+wave     zetton x1 | tregear x1 after 10 | gomora x10 every 0.7 after 3
+wave     metron x5 every 1.4 | kingjoe x3 every 2.2 after 3 | baltan x12 every 0.5 after 6
+wave     gatanothor x1 | redking x4 every 1.6 after 6 | eleking x12 every 0.5 after 8

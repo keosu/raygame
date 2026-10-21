@@ -1,5 +1,5 @@
 #include "Assets.h"
-#include "Data.h"
+#include <sstream>
 
 namespace UG {
 
@@ -72,10 +72,16 @@ void Load() {
     ApplySettings();
 }
 
+namespace {
+float effectScale = 1;
+} // namespace
+
 void Play(const char* name, float volume, float pitchJitter) {
     float pitch = 1.0f + (pitchJitter > 0 ? Rand(-pitchJitter, pitchJitter) : 0.0f);
-    AudioManager::PlaySound(name, volume, pitch);
+    AudioManager::PlaySound(name, volume * effectScale, pitch);
 }
+
+void SetEffectScale(float scale) { effectScale = scale; }
 
 void PlayMusic(const char* name) {
     if (currentMusic == name) return;
@@ -155,6 +161,35 @@ Settings& Options() { return settings; }
 int TotalKills() { return store.GetInt("kills", 0); }
 
 void AddKills(int kills) { store.SetInt("kills", TotalKills() + kills); }
+
+std::vector<HeroId> Roster(const LevelDef& level) {
+    std::istringstream keys(store.GetString("roster." + level.id, ""));
+    std::vector<HeroId> roster;
+    for (std::string key; keys >> key;) {
+        HeroId id{};
+        if (HeroByKey(key, id) && std::find(roster.begin(), roster.end(), id) == roster.end()) roster.push_back(id);
+    }
+    if (roster.size() != level.heroes.size()) return level.heroes; // stale or hand-edited save
+    return roster;
+}
+
+void SetRoster(const LevelDef& level, const std::vector<HeroId>& roster) {
+    std::string keys;
+    for (HeroId id : roster) keys += std::string(keys.empty() ? "" : " ") + HeroInfo(id).key;
+    store.SetString("roster." + level.id, keys);
+    Save();
+}
+
+float SurvivalBestTime() { return store.GetInt("survival.time", 0) / 10.0f; }
+int SurvivalBestWave() { return store.GetInt("survival.wave", 0); }
+
+bool RecordSurvival(float seconds, int wave) {
+    bool best = seconds > SurvivalBestTime();
+    if (best) store.SetInt("survival.time", (int)(seconds * 10));
+    store.SetInt("survival.wave", std::max(SurvivalBestWave(), wave));
+    Save();
+    return best;
+}
 } // namespace Progress
 
 } // namespace UG

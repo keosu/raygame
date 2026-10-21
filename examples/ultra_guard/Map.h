@@ -30,6 +30,8 @@ struct LandmarkSpot {
     Rectangle Area() const { return {kMapX + col * kTile, kMapY + row * kTile, w * kTile, h * kTile}; }
 };
 
+constexpr Vector2 kLanternOffset{0, -84}; // siege lighthouse lamp, relative to the base position
+
 struct MapData {
     const LevelDef* level = nullptr;
     std::array<std::array<Cell, kCols>, kRows> cells{};
@@ -42,6 +44,10 @@ struct MapData {
     void PlaceLandmarks();
     bool InGrid(int col, int row) const { return col >= 0 && row >= 0 && col < kCols && row < kRows; }
     bool Buildable(int col, int row) const { return InGrid(col, row) && cells[row][col] == Cell::Open; }
+    bool InCastle(int col, int row) const {
+        return level->HasCastle() && col >= level->castleMin.col && col <= level->castleMax.col && row >= level->castleMin.row &&
+               row <= level->castleMax.row;
+    }
 };
 
 // Static background in canvas coordinates, rendered at `scale` for supersampling. A skin's

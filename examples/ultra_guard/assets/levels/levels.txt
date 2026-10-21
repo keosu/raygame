@@ -6,3 +6,9 @@
 04_chimelong.level
 05_ultrapark.level
 06_universal.level
+07_island.level
+08_canyon.level
+09_crater.level
+10_moonbase.level
+11_tranquility.level
+12_landoflight.level

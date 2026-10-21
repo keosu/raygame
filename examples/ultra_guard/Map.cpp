@@ -86,7 +86,12 @@ void MapData::Build(const LevelDef& def) {
         PathLine line;
         for (size_t i = 0; i < waypoints.size(); ++i) {
             Vector2 p = TileCenter(waypoints[i].col, waypoints[i].row);
-            if (i == 0 && waypoints[i].col < 0) p.x = kMapX - kTile * 0.8f;
+            if (i == 0) {
+                if (waypoints[i].col < 0) p.x = kMapX - kTile * 0.8f;
+                else if (waypoints[i].col >= kCols) p.x = kMapX + kMapW + kTile * 0.8f;
+                else if (waypoints[i].row < 0) p.y = kMapY - kTile * 0.8f;
+                else if (waypoints[i].row >= kRows) p.y = kMapY + kMapH + kTile * 0.8f;
+            }
             line.points.push_back(p);
             if (i == 0) continue;
             GridPoint a = waypoints[i - 1], b = waypoints[i];
@@ -106,12 +111,17 @@ void MapData::Build(const LevelDef& def) {
     for (int r = def.base.row - 1; r <= def.base.row + 1; ++r)
         for (int c = def.base.col; c <= def.base.col + 1; ++c)
             if (InGrid(c, r)) cells[r][c] = Cell::Base;
+    if (def.HasCastle())
+        for (GridPoint corner : {def.castleMin, def.castleMax, GridPoint{def.castleMin.col, def.castleMax.row},
+                                 GridPoint{def.castleMax.col, def.castleMin.row}})
+            if (cells[corner.row][corner.col] == Cell::Open) cells[corner.row][corner.col] = Cell::Blocked; // corner towers
     PlaceLandmarks();
 
     Rng rng(def.seed);
     for (int r = 0; r < kRows; ++r) {
         for (int c = 0; c < kCols; ++c) {
             if (cells[r][c] != Cell::Open) continue;
+            if (InCastle(c, r)) continue; // walls and courtyard stay clear for heroes
             bool nearPath = false;
             for (int dr = -1; dr <= 1; ++dr)
                 for (int dc = -1; dc <= 1; ++dc)
@@ -318,6 +328,65 @@ void TimerLamp(Vector2 p, float s) {
     DrawCircleV(Add(c, {-1.4f * s, -1.4f * s}), 1.6f * s, {220, 246, 255, 255});
     Draw::BlendAdd();
     Draw::Glow(c, 14 * s, WithAlpha({90, 190, 255, 255}, 0.5f));
+    Draw::BlendNormal();
+}
+
+void Vent(Vector2 p, float s, std::uint32_t seed) {
+    Rng rng(seed);
+    Draw::GlowStretched(Add(p, {4, 10}), 20 * s, 8 * s, 0, WithAlpha(BLACK, 0.45f));
+    Draw::Shaded(Add(p, {0, 4 * s}), 16 * s, 9 * s, {54, 40, 38, 255}, 0, 1.5f);
+    Draw::Ellipse(Add(p, {0, 3 * s}), 9 * s, 4 * s, {255, 120, 30, 255}, 0);
+    Draw::Ellipse(Add(p, {0, 3 * s}), 5 * s, 2 * s, {255, 220, 120, 255}, 0);
+    Draw::BlendAdd();
+    Draw::Glow(Add(p, {0, 2 * s}), 22 * s, WithAlpha({255, 110, 30, 255}, 0.45f));
+    Draw::BlendNormal();
+    for (int i = 0; i < 3; ++i)
+        Draw::Glow(Add(p, {rng.Range(-4, 4) * s, -(8 + i * 8) * s}), (6 + i * 3) * s, WithAlpha({90, 80, 86, 255}, 0.35f - i * 0.08f));
+}
+
+void Dish(Vector2 p, float s) {
+    Draw::GlowStretched(Add(p, {4, 14}), 16 * s, 6 * s, 0, WithAlpha(BLACK, 0.45f));
+    DrawRectangleRec({p.x - 2 * s, p.y - 4 * s, 4 * s, 16 * s}, {150, 156, 170, 255});
+    DrawRectangleRec({p.x - 8 * s, p.y + 10 * s, 16 * s, 4 * s}, {110, 116, 130, 255});
+    Draw::Ellipse(Add(p, {0, -8 * s}), 14 * s, 6 * s, {214, 220, 232, 255}, -0.5f);
+    Draw::Ellipse(Add(p, {-1 * s, -9 * s}), 10 * s, 3.6f * s, {170, 178, 194, 255}, -0.5f);
+    Draw::Line(Add(p, {0, -8 * s}), Add(p, {6 * s, -18 * s}), 1.4f, {200, 206, 220, 255});
+    Draw::BlendAdd();
+    Draw::Glow(Add(p, {6 * s, -18 * s}), 7 * s, WithAlpha({255, 80, 80, 255}, 0.8f));
+    Draw::BlendNormal();
+}
+
+void SolarPanel(Vector2 p, float s) {
+    Draw::GlowStretched(Add(p, {4, 12}), 18 * s, 6 * s, 0, WithAlpha(BLACK, 0.45f));
+    DrawRectangleRec({p.x - 1.5f * s, p.y - 2 * s, 3 * s, 12 * s}, {150, 156, 170, 255});
+    Draw::Quad(Add(p, {-16 * s, -10 * s}), Add(p, {12 * s, -14 * s}), Add(p, {16 * s, -2 * s}), Add(p, {-12 * s, 2 * s}), {40, 70, 150, 255});
+    for (int i = 1; i < 4; ++i) {
+        float u = i / 4.0f;
+        Draw::Line(Lerp(Add(p, {-16 * s, -10 * s}), Add(p, {12 * s, -14 * s}), u), Lerp(Add(p, {-12 * s, 2 * s}), Add(p, {16 * s, -2 * s}), u), 1,
+                   {120, 160, 230, 255});
+    }
+}
+
+void Crater(Vector2 p, float r, Color ground) {
+    Draw::Ellipse(Add(p, {0, r * 0.08f}), r, r * 0.62f, Lighten(ground, 0.12f), 0);
+    Draw::Ellipse(p, r * 0.86f, r * 0.52f, Darken(ground, 0.22f), 0);
+    Draw::Ellipse(Add(p, {r * 0.1f, r * 0.08f}), r * 0.7f, r * 0.4f, Darken(ground, 0.1f), 0);
+}
+
+void MoonBase(Vector2 p, float time, float flash) {
+    Draw::GlowStretched(Add(p, {6, 44}), 74, 24, 0, WithAlpha(BLACK, 0.5f));
+    DrawRectangleRec({p.x - 56, p.y + 18, 112, 22}, {96, 104, 122, 255});
+    DrawRectangleRec({p.x - 56, p.y + 18, 112, 5}, {150, 158, 176, 255});
+    DrawCircleSector({p.x, p.y + 20}, 46, 180, 360, 40, {190, 200, 218, 255});
+    DrawCircleSector({p.x - 10, p.y + 12}, 30, 180, 360, 32, {222, 230, 244, 255});
+    for (int i = 0; i < 4; ++i) DrawRing({p.x, p.y + 20}, 18.0f + i * 8, 19.5f + i * 8, 180, 360, 32, {150, 160, 182, 255});
+    Draw::Line({p.x + 24, p.y - 18}, {p.x + 34, p.y - 52}, 2.5f, {170, 178, 196, 255});
+    Draw::BlendAdd();
+    float blink = std::fmod(time, 1.4f) < 0.7f ? 1.0f : 0.3f;
+    Draw::Glow({p.x + 34, p.y - 54}, 14, WithAlpha({110, 200, 255, 255}, 0.9f * blink));
+    for (int i = 0; i < 5; ++i) Draw::Glow({p.x - 44 + i * 22.0f, p.y + 32}, 5, WithAlpha({120, 220, 255, 255}, 0.7f));
+    Draw::Glow({p.x, p.y - 4}, 50, WithAlpha({120, 190, 255, 255}, 0.18f));
+    if (flash > 0) Draw::Glow(p, 90, WithAlpha({255, 60, 60, 255}, flash * 0.8f));
     Draw::BlendNormal();
 }
 
@@ -820,6 +889,89 @@ void Ground(const MapData& map) {
         }
         break;
     }
+    case Theme::Volcano: {
+        DrawRectangleRec(area, {62, 46, 44, 255});
+        Speckle(rng, 4200, {44, 32, 32, 255}, {96, 72, 64, 255}, 0.6f, 2.0f);
+        // Glowing fissures between cooled lava plates.
+        Draw::BlendAdd();
+        for (int i = 0; i < 16; ++i) {
+            Vector2 a{kMapX + rng.Float() * kMapW, kMapY + rng.Float() * kMapH};
+            float heading = rng.Range(0, 2 * PI);
+            for (int k = 0; k < 5; ++k) {
+                heading += rng.Range(-0.7f, 0.7f);
+                Vector2 b = Add(a, Mul(Dir(heading), rng.Range(14, 30)));
+                Draw::Line(a, b, 3.2f, WithAlpha({255, 90, 20, 255}, 0.35f));
+                Draw::Line(a, b, 1.2f, WithAlpha({255, 200, 90, 255}, 0.6f));
+                a = b;
+            }
+        }
+        for (int i = 0; i < 5; ++i) {
+            int c = rng.Int(0, kCols - 1), r = rng.Int(0, kRows - 1);
+            if (map.cells[r][c] != Cell::Open) continue;
+            Draw::Glow(TileCenter(c, r), 70, WithAlpha({255, 90, 30, 255}, 0.18f));
+        }
+        Draw::BlendNormal();
+        break;
+    }
+    case Theme::Moon: {
+        Color dust{126, 128, 140, 255};
+        DrawRectangleRec(area, dust);
+        Speckle(rng, 4600, {100, 102, 114, 255}, {160, 162, 174, 255}, 0.5f, 1.8f);
+        for (int i = 0; i < 26; ++i) {
+            Vector2 p{kMapX + rng.Float() * kMapW, kMapY + rng.Float() * kMapH};
+            Crater(p, rng.Range(10, i < 4 ? 46.0f : 22.0f), dust);
+        }
+        Draw::BlendAdd();
+        Draw::Glow({kMapX + kMapW - 60, kMapY + 50}, 140, WithAlpha({80, 150, 255, 255}, 0.18f));
+        Draw::BlendNormal();
+        break;
+    }
+    case Theme::Citadel: {
+        // Land of Light: crystal paving radiating from the Plasma Spark Tower.
+        Draw::VerticalGradientRect(area, {40, 62, 118, 255}, {22, 34, 76, 255});
+        for (int r = 0; r < kRows; ++r)
+            for (int c = 0; c < kCols; ++c) {
+                Rectangle t{kMapX + c * kTile + 2, kMapY + r * kTile + 2, kTile - 4, kTile - 4};
+                Color fill = (r + c) % 2 == 0 ? Color{56, 84, 150, 200} : Color{46, 70, 132, 200};
+                Draw::RoundedPanel(t, 4, fill, {150, 200, 255, 50}, 1.0f);
+            }
+        Vector2 core = map.basePos;
+        if (map.level->HasCastle()) {
+            const LevelDef& def = *map.level;
+            Rectangle outer{kMapX + def.castleMin.col * kTile, kMapY + def.castleMin.row * kTile,
+                            (def.castleMax.col - def.castleMin.col + 1) * kTile, (def.castleMax.row - def.castleMin.row + 1) * kTile};
+            // Moat of light hugging the walls; roads cross it as bridges.
+            Rectangle moat{outer.x - 10, outer.y - 10, outer.width + 20, outer.height + 20};
+            Draw::RoundedPanel(moat, 14, {18, 40, 96, 255}, {150, 210, 255, 160}, 2);
+            Draw::RoundedPanel({moat.x + 6, moat.y + 6, moat.width - 12, moat.height - 12}, 10, {26, 58, 128, 255}, BLANK, 0);
+            Rectangle yard{outer.x + kTile * 0.5f, outer.y + kTile * 0.5f, outer.width - kTile, outer.height - kTile};
+            Draw::VerticalGradientRect(outer, {150, 168, 210, 255}, {118, 136, 186, 255});
+            Draw::VerticalGradientRect(yard, {158, 174, 214, 255}, {132, 150, 198, 255});
+            for (int r = def.castleMin.row + 1; r < def.castleMax.row; ++r)
+                for (int c = def.castleMin.col + 1; c < def.castleMax.col; ++c) {
+                    Rectangle t{kMapX + c * kTile + 3, kMapY + r * kTile + 3, kTile - 6, kTile - 6};
+                    Draw::RoundedPanel(t, 3, (r + c) % 2 == 0 ? Color{172, 188, 226, 255} : Color{152, 170, 214, 255}, {255, 255, 255, 60}, 1);
+                }
+            for (int i = 1; i <= 2; ++i) DrawRing(core, i * 1.3f * kTile - 1.5f, i * 1.3f * kTile + 1.5f, 0, 360, 96, {214, 172, 70, 150});
+            Draw::Star(core, kTile * 1.2f, kTile * 0.45f, -PI / 2, {214, 172, 70, 90}, 8);
+        } else {
+            for (int i = 1; i <= 4; ++i) DrawRing(core, i * 2.6f * kTile - 1, i * 2.6f * kTile + 1, 0, 360, 96, {190, 225, 255, 40});
+            for (int i = 0; i < 12; ++i) {
+                Vector2 d = Dir(i * PI / 6);
+                Draw::Line(Add(core, Mul(d, kTile * 1.8f)), Add(core, Mul(d, kTile * 12)), 1.4f, {190, 225, 255, 26});
+            }
+        }
+        Draw::BlendAdd();
+        Draw::Glow(core, 420, WithAlpha({255, 220, 150, 255}, 0.16f));
+        Draw::Glow({kMapX + 80, kMapY + 60}, 260, WithAlpha({90, 160, 255, 255}, 0.18f));
+        Draw::Glow({kMapX + kMapW - 80, kMapY + kMapH - 60}, 260, WithAlpha({90, 160, 255, 255}, 0.18f));
+        for (int i = 0; i < 160; ++i) {
+            Vector2 p{kMapX + rng.Float() * kMapW, kMapY + rng.Float() * kMapH};
+            Draw::Glow(p, rng.Range(1.5f, 3.5f), WithAlpha({220, 236, 255, 255}, rng.Range(0.25f, 0.7f)));
+        }
+        Draw::BlendNormal();
+        break;
+    }
     }
 }
 
@@ -870,6 +1022,34 @@ void Paths(const MapData& map) {
         PathStars(map, kTile * 1.4f, {255, 150, 190, 255}, {214, 172, 70, 255});
         PathArrows(map, kTile * 1.4f, {255, 214, 60, 160});
         break;
+    case Theme::Volcano:
+        Draw::BlendAdd();
+        for (const auto& path : map.paths)
+            for (float d = 0; d < path.length; d += 16) Draw::Glow(path.Sample(d), kTile * 0.9f, WithAlpha({255, 90, 20, 255}, 0.07f));
+        Draw::BlendNormal();
+        PathStroke(map, kTile * 1.0f, {214, 84, 28, 255});
+        PathStroke(map, kTile * 0.88f, {44, 32, 32, 255});
+        PathStroke(map, kTile * 0.72f, {78, 60, 56, 255});
+        PathPebbles(map, rng, 12, {52, 40, 38, 255}, {120, 96, 84, 255});
+        PathArrows(map, kTile * 1.3f, {255, 150, 70, 170});
+        break;
+    case Theme::Moon:
+        PathStroke(map, kTile * 1.0f, {84, 88, 102, 255});
+        PathStroke(map, kTile * 0.9f, {176, 180, 192, 255});
+        PathStroke(map, kTile * 0.74f, {150, 154, 168, 255});
+        PathDashes(map, 6, 10, 2.0f, {110, 104, 98, 255});
+        PathArrows(map, kTile * 1.2f, {110, 200, 255, 190});
+        break;
+    case Theme::Citadel:
+        Draw::BlendAdd();
+        for (const auto& path : map.paths)
+            for (float d = 0; d < path.length; d += 14) Draw::Glow(path.Sample(d), kTile * 0.9f, WithAlpha({255, 200, 120, 255}, 0.06f));
+        Draw::BlendNormal();
+        PathStroke(map, kTile * 0.98f, {255, 222, 150, 255});
+        PathStroke(map, kTile * 0.88f, {150, 70, 60, 255});
+        PathStroke(map, kTile * 0.7f, {190, 92, 76, 255});
+        PathArrows(map, kTile * 1.2f, {255, 226, 160, 190});
+        break;
     }
 }
 
@@ -908,6 +1088,20 @@ void DecorLayer(const MapData& map) {
             else if (d.kind == 1) SpotLight(d.pos, d.size);
             else SetWall(d.pos, d.size, d.seed);
             break;
+        case Theme::Volcano:
+            if (d.kind == 0) Rock(d.pos, d.size, {74, 60, 58, 255});
+            else if (d.kind == 1) Vent(d.pos, d.size, d.seed);
+            else Crystal(d.pos, d.size * 0.85f, {255, 110, 40, 255}, d.seed);
+            break;
+        case Theme::Moon:
+            if (d.kind == 0) Rock(d.pos, d.size, {150, 150, 160, 255});
+            else if (d.kind == 1) Dish(d.pos, d.size);
+            else SolarPanel(d.pos, d.size);
+            break;
+        case Theme::Citadel:
+            if (d.kind == 0) LightTower(d.pos, d.size);
+            else Crystal(d.pos, d.size * 0.9f, d.kind == 1 ? Color{120, 200, 255, 255} : Color{255, 214, 130, 255}, d.seed);
+            break;
         }
     }
 }
@@ -932,6 +1126,15 @@ void Lighting(const MapData& map) {
     case Theme::Studio:
         DrawRectangleGradientH((int)area.x, (int)area.y, (int)area.width, (int)area.height, {40, 80, 140, 36}, {255, 180, 60, 24});
         break;
+    case Theme::Volcano:
+        DrawRectangleGradientV((int)area.x, (int)area.y, (int)area.width, (int)area.height, {60, 20, 40, 50}, {255, 100, 30, 40});
+        break;
+    case Theme::Moon:
+        DrawRectangleGradientH((int)area.x, (int)area.y, (int)area.width, (int)area.height, {10, 16, 40, 60}, {140, 180, 255, 24});
+        break;
+    case Theme::Citadel:
+        DrawRectangleGradientV((int)area.x, (int)area.y, (int)area.width, (int)area.height, {120, 180, 255, 26}, {255, 210, 140, 20});
+        break;
     }
     // Vignette
     for (int i = 0; i < 18; ++i) {
@@ -942,6 +1145,115 @@ void Lighting(const MapData& map) {
         DrawRectangleRec({area.x + i * 2.0f, area.y, 2, area.height}, c);
         DrawRectangleRec({area.x + area.width - (i + 1) * 2.0f, area.y, 2, area.height}, c);
     }
+}
+
+constexpr Color kWallTop{226, 234, 252, 255}, kWallFace{122, 140, 196, 255}, kWallEdge{40, 52, 104, 255};
+
+void CastleTower(Vector2 c, float radius, Color roof, Color roofLit) {
+    float body = radius * 0.7f;
+    Draw::GlowStretched(Add(c, {5, radius * 0.75f}), radius * 1.5f, radius * 0.55f, 0, WithAlpha(BLACK, 0.45f));
+    Draw::Ellipse({c.x, c.y + body * 0.4f}, radius + 1.5f, radius * 0.42f + 1.5f, kWallEdge);
+    DrawRectangleRec({c.x - radius - 1.5f, c.y - body * 0.6f, radius * 2 + 3, body}, kWallEdge);
+    Draw::Ellipse({c.x, c.y + body * 0.4f}, radius, radius * 0.42f, kWallFace);
+    DrawRectangleRec({c.x - radius, c.y - body * 0.6f, radius * 2, body}, kWallFace);
+    DrawRectangleRec({c.x - radius, c.y - body * 0.6f, radius * 0.6f, body}, Lighten(kWallFace, 0.2f));
+    Vector2 top{c.x, c.y - body * 0.6f};
+    Draw::Ellipse(top, radius + 1.5f, radius * 0.42f + 1.5f, kWallEdge);
+    Draw::Ellipse(top, radius, radius * 0.42f, kWallTop);
+    for (int i = 0; i < 8; ++i) {
+        float a = i * PI / 4 + PI / 8;
+        Vector2 m = Add(top, {std::cos(a) * radius * 0.86f, std::sin(a) * radius * 0.36f});
+        DrawRectangleRec({m.x - 3, m.y - 6, 6, 6}, kWallEdge);
+        DrawRectangleRec({m.x - 2.2f, m.y - 5.2f, 4.4f, 4.4f}, kWallTop);
+    }
+    float h = radius * 1.7f;
+    Draw::Tri({top.x - radius * 0.72f, top.y}, {top.x + radius * 0.72f, top.y}, {top.x, top.y - h}, roof);
+    Draw::Tri({top.x - radius * 0.72f, top.y}, {top.x, top.y}, {top.x, top.y - h}, roofLit);
+    Draw::Ellipse(top, radius * 0.74f, radius * 0.22f, Darken(roof, 0.25f));
+    Draw::BlendAdd();
+    Draw::Glow({top.x, top.y - h}, radius * 0.55f, WithAlpha({255, 220, 140, 255}, 0.7f));
+    Draw::BlendNormal();
+}
+
+// Land of Light castle: walls along the border cells, a gatehouse wherever a road crosses, towers at the corners.
+void CastleWalls(const MapData& map) {
+    const LevelDef& def = *map.level;
+    const float w = 24, h = 12;
+    auto gate = [&](int c, int r) { return map.cells[r][c] == Cell::Path; };
+    float left = TileCenter(def.castleMin.col, 0).x, right = TileCenter(def.castleMax.col, 0).x;
+    float top = TileCenter(0, def.castleMin.row).y, bottom = TileCenter(0, def.castleMax.row).y;
+    auto merlons = [](Vector2 a, Vector2 b, Vector2 out) {
+        float length = Len(Sub(b, a));
+        Vector2 d = Normalize(Sub(b, a));
+        for (float s = 7; s < length - 4; s += 13) {
+            Vector2 m = Add(Add(a, Mul(d, s)), out);
+            DrawRectangleRec({m.x - 4, m.y - 7, 8, 8}, kWallEdge);
+            DrawRectangleRec({m.x - 3, m.y - 6, 6, 4}, kWallTop);
+            DrawRectangleRec({m.x - 3, m.y - 2, 6, 2}, kWallFace);
+        }
+    };
+    auto horizontal = [&](int row, float y, float outSide) {
+        int c = def.castleMin.col;
+        while (c <= def.castleMax.col) {
+            if (gate(c, row)) {
+                ++c;
+                continue;
+            }
+            int end = c;
+            while (end + 1 <= def.castleMax.col && !gate(end + 1, row)) ++end;
+            float x0 = c == def.castleMin.col ? left : kMapX + c * kTile, x1 = end == def.castleMax.col ? right : kMapX + (end + 1) * kTile;
+            Rectangle face{x0, y - w / 2 + w - h / 2, x1 - x0, h}, topFace{x0, y - w / 2 - h / 2, x1 - x0, w};
+            DrawRectangleRec({x0 - 1.5f, topFace.y - 1.5f, x1 - x0 + 3, w + h + 3}, kWallEdge);
+            Draw::VerticalGradientRect(face, kWallFace, Darken(kWallFace, 0.3f));
+            DrawRectangleRec(topFace, kWallTop);
+            DrawRectangleRec({x0, topFace.y + w / 2 - 1, x1 - x0, 2}, {180, 196, 236, 255});
+            for (float x = x0 + 10; x < x1 - 6; x += 18) DrawRectangleRec({x, face.y + 3, 1.5f, h - 6}, Darken(kWallFace, 0.4f));
+            float edge = outSide < 0 ? topFace.y + 2 : topFace.y + w - 2;
+            merlons({x0, edge}, {x1, edge}, {0, 0});
+            c = end + 1;
+        }
+    };
+    auto vertical = [&](int col, float x, float outSide) {
+        int r = def.castleMin.row;
+        while (r <= def.castleMax.row) {
+            if (gate(col, r)) {
+                ++r;
+                continue;
+            }
+            int end = r;
+            while (end + 1 <= def.castleMax.row && !gate(col, end + 1)) ++end;
+            float y0 = r == def.castleMin.row ? top : kMapY + r * kTile, y1 = end == def.castleMax.row ? bottom : kMapY + (end + 1) * kTile;
+            bool open = end != def.castleMax.row; // a gate below shows the wall's front face
+            DrawRectangleRec({x - w / 2 - 1.5f, y0 - h / 2 - 1.5f, w + 3, y1 - y0 + (open ? h : 0) + 3}, kWallEdge);
+            DrawRectangleRec({x - w / 2, y0 - h / 2, w, y1 - y0}, kWallTop);
+            DrawRectangleRec({x - w / 2, y0 - h / 2, 3, y1 - y0}, WHITE);
+            DrawRectangleRec({x + w / 2 - 3, y0 - h / 2, 3, y1 - y0}, {180, 196, 236, 255});
+            if (open) Draw::VerticalGradientRect({x - w / 2, y1 - h / 2, w, h}, kWallFace, Darken(kWallFace, 0.3f));
+            float edge = x + outSide * (w / 2 - 3);
+            merlons({edge, y0 - h / 2 + 4}, {edge, y1 - h / 2 + 4}, {0, 4});
+            r = end + 1;
+        }
+    };
+    horizontal(def.castleMin.row, top, -1);
+    vertical(def.castleMin.col, left, -1);
+    vertical(def.castleMax.col, right, 1);
+    horizontal(def.castleMax.row, bottom, 1);
+    Color red{206, 44, 54, 255}, redLit{240, 96, 96, 255};
+    auto gateTowers = [&](Vector2 a, Vector2 b) {
+        CastleTower(a, 13, red, redLit);
+        CastleTower(b, 13, red, redLit);
+    };
+    for (int c = def.castleMin.col + 1; c < def.castleMax.col; ++c) {
+        if (gate(c, def.castleMin.row)) gateTowers({kMapX + c * kTile - 3, top}, {kMapX + (c + 1) * kTile + 3, top});
+        if (gate(c, def.castleMax.row)) gateTowers({kMapX + c * kTile - 3, bottom}, {kMapX + (c + 1) * kTile + 3, bottom});
+    }
+    for (int r = def.castleMin.row + 1; r < def.castleMax.row; ++r) {
+        if (gate(def.castleMin.col, r)) gateTowers({left, kMapY + r * kTile - 6}, {left, kMapY + (r + 1) * kTile + 2});
+        if (gate(def.castleMax.col, r)) gateTowers({right, kMapY + r * kTile - 6}, {right, kMapY + (r + 1) * kTile + 2});
+    }
+    Color blue{70, 130, 226, 255}, blueLit{140, 196, 255, 255};
+    for (Vector2 corner : {Vector2{left, top}, Vector2{right, top}, Vector2{left, bottom}, Vector2{right, bottom}})
+        CastleTower(corner, 21, blue, blueLit);
 }
 
 void Portal(Vector2 p, float time, Color tone) {
@@ -958,6 +1270,60 @@ void Portal(Vector2 p, float time, Color tone) {
     Draw::BlendNormal();
 }
 
+// The castle's guardian lighthouse: a white tower banded in Ultra red, its lantern sweeping two beams.
+void Lighthouse(Vector2 p, float time, float flash) {
+    Draw::GlowStretched(Add(p, {8, 50}), 84, 24, 0, WithAlpha(BLACK, 0.5f));
+    Draw::Ellipse({p.x, p.y + 42}, 52, 18, kWallEdge);
+    Draw::Ellipse({p.x, p.y + 40}, 50, 16, kWallFace);
+    Draw::Ellipse({p.x, p.y + 35}, 48, 15, kWallTop);
+    Draw::Ellipse({p.x, p.y + 31}, 36, 11, kWallFace);
+    Draw::Ellipse({p.x, p.y + 27}, 35, 10, {236, 242, 255, 255});
+    const float base = p.y + 28, crown = p.y - 72;
+    auto half = [&](float y) { return 21 - (base - y) / (base - crown) * 8; };
+    auto band = [&](float y0, float y1, Color c, Color shade) {
+        Draw::Quad({p.x - half(y0), y0}, {p.x + half(y0), y0}, {p.x + half(y1), y1}, {p.x - half(y1), y1}, c);
+        Draw::Quad({p.x + half(y0) * 0.4f, y0}, {p.x + half(y0), y0}, {p.x + half(y1), y1}, {p.x + half(y1) * 0.4f, y1}, shade);
+        Draw::Quad({p.x - half(y0), y0}, {p.x - half(y0) * 0.6f, y0}, {p.x - half(y1) * 0.6f, y1}, {p.x - half(y1), y1}, Lighten(c, 0.25f));
+    };
+    band(base, crown, {236, 240, 250, 255}, {176, 188, 220, 255});
+    for (int i = 0; i < 3; ++i) {
+        float y0 = base - 16 - i * 30.0f;
+        band(y0, y0 - 11, {214, 46, 52, 255}, {156, 28, 40, 255});
+    }
+    for (float y : {base - 32.0f, base - 62.0f}) DrawRectangleRec({p.x - 2.5f, y - 7, 5, 8}, {40, 52, 104, 255});
+    Draw::BlendAdd();
+    Draw::Glow({p.x, base - 90}, 7, WithAlpha({90, 200, 255, 255}, 0.9f)); // colour timer
+    Draw::BlendNormal();
+    DrawCircleV({p.x, base - 90}, 3, {170, 230, 255, 255});
+    Draw::Ellipse({p.x, crown}, 22, 6, kWallEdge);
+    Draw::Ellipse({p.x, crown - 1}, 20, 5, {200, 210, 236, 255});
+    Vector2 lamp = Add(p, kLanternOffset);
+    DrawRectangleRec({p.x - 11, crown - 22, 22, 20}, kWallEdge);
+    DrawRectangleRec({p.x - 9.5f, crown - 21, 19, 18}, {255, 232, 160, 255});
+    for (float x : {-4.0f, 4.0f}) DrawRectangleRec({p.x + x - 0.75f, crown - 21, 1.5f, 18}, {120, 96, 60, 255});
+    for (int i = 0; i < 10; ++i) DrawRectangleRec({p.x - 20 + i * 4.2f, crown - 6, 1.2f, 5}, kWallEdge); // gallery rail
+    DrawCircleSector({p.x, crown - 22}, 13, 180, 360, 20, {196, 40, 50, 255});
+    DrawCircleSector({p.x - 3, crown - 23}, 7, 180, 360, 14, {240, 100, 100, 255});
+    Draw::Line({p.x, crown - 34}, {p.x, crown - 42}, 2, kWallEdge);
+    DrawCircleV({p.x, crown - 43}, 2.6f, {255, 214, 120, 255});
+    Draw::BlendAdd();
+    float pulse = 0.85f + 0.15f * std::sin(time * 2.6f);
+    for (int k = 0; k < 2; ++k) {
+        float a = time * 0.9f + k * PI;
+        Vector2 far = Add(lamp, {std::cos(a) * 300, std::sin(a) * 300 * 0.4f});
+        Vector2 side = Normalize({lamp.y - far.y, far.x - lamp.x});
+        for (int j = 0; j < 3; ++j) {
+            float spread = 16.0f + j * 16;
+            Draw::Tri(lamp, Add(far, Mul(side, spread)), Sub(far, Mul(side, spread)), WithAlpha({255, 236, 180, 255}, 0.09f - j * 0.025f));
+        }
+    }
+    Draw::Glow(lamp, 80 * pulse, WithAlpha({255, 214, 140, 255}, 0.5f));
+    Draw::Glow(lamp, 30, WithAlpha({255, 246, 210, 255}, 0.9f));
+    Draw::Glow(lamp, 12, WithAlpha(WHITE, 1.0f));
+    if (flash > 0) Draw::Glow(p, 110, WithAlpha({255, 60, 60, 255}, flash * 0.8f));
+    Draw::BlendNormal();
+}
+
 void Base(const MapData& map, float time, float flash) {
     Vector2 p = map.basePos;
     Theme theme = map.level->theme;
@@ -971,6 +1337,14 @@ void Base(const MapData& map, float time, float flash) {
     }
     if (theme == Theme::Studio) {
         StudioGlobe(p, time, flash);
+        return;
+    }
+    if (theme == Theme::Moon) {
+        MoonBase(p, time, flash);
+        return;
+    }
+    if (theme == Theme::Citadel) {
+        Lighthouse(p, time, flash);
         return;
     }
     bool nebula = theme == Theme::Nebula;
@@ -1034,6 +1408,7 @@ RenderTexture2D RenderMap(const MapData& map, float scale, bool builtinGroundOnl
     }
     if (!builtinGroundOnly) {
         if (!ground.id || Skins::MapPaths()) Paths(map);
+        if (map.level->HasCastle()) CastleWalls(map);
         if (!ground.id || Skins::MapDecor()) DecorLayer(map);
         if (withLandmarks)
             for (const auto& spot : map.landmarks) DrawLandmark(spot, 0, true);
@@ -1053,7 +1428,8 @@ void DrawMapLive(const MapData& map, float time, float baseDamageFlash) {
     std::vector<Vector2> drawn;
     for (const auto& path : map.paths) {
         Vector2 p = path.Sample(kTile * 0.9f);
-        p.x = std::max(p.x, kMapX + 18);
+        p.x = std::clamp(p.x, kMapX + 18, kMapX + kMapW - 18);
+        p.y = std::clamp(p.y, kMapY + 18, kMapY + kMapH - 18);
         bool dup = false;
         for (auto& q : drawn) dup |= Len(Sub(q, p)) < 4;
         if (dup) continue;

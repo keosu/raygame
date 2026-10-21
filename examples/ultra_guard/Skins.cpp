@@ -3,6 +3,7 @@
 #include "Assets.h"
 #include "Map.h"
 #include <cstdlib>
+#include <iterator>
 #include <map>
 #include <sstream>
 
@@ -238,10 +239,8 @@ const KaijuSprite* Kaiju(EnemyId id) {
 }
 
 Texture2D MapGround(const LevelDef& level) {
-    // Same order as Theme in Data.h. An out-of-range index crashes on launch.
-    static const char* themes[] = {"city", "mountain", "nebula", "park", "plaza", "studio"};
     int theme = (int)level.theme;
-    std::string themeName = theme >= 0 && theme < (int)(sizeof(themes) / sizeof(themes[0])) ? themes[theme] : "";
+    std::string themeName = theme >= 0 && theme < (int)std::size(kThemeKeys) ? kThemeKeys[theme] : "";
     for (const std::string& name : {level.id, themeName}) {
         if (name.empty()) continue;
         std::string path = Find("maps/" + name + ".png");
@@ -278,7 +277,9 @@ bool ExportTemplate(const std::string& dir) {
             "#   feet 脚底在图片高度中的位置（0-1）。导出的帧条为 12 帧、每帧 384x320（4 倍），与下列数值对应。\n";
     for (int i = 0; i < kEnemyCount; ++i)
         text += TextFormat("kaiju %-12s frames 12 fps 12 size 80 feet 0.94\n", EnemyInfo((EnemyId)i).key);
-    text += "\n# maps/<关卡 id>.png 或 maps/<city|mountain|nebula|park|plaza|studio>.png：地面（20x12 格，导出为 2160x1296）。\n"
+    std::string themes;
+    for (const char* key : kThemeKeys) themes += std::string(themes.empty() ? "" : "|") + key;
+    text += "\n# maps/<关卡 id>.png 或 maps/<" + themes + ">.png：地面（20x12 格，导出为 2160x1296）。\n"
             "# 是否在替换的地面上继续绘制内置道路与装饰：\n"
             "map_paths on\nmap_decor on\n";
     ok &= SaveFileText((dir + "/skin.txt").c_str(), text.data());

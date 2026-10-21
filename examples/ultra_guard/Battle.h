@@ -23,8 +23,10 @@ public:
     float phaseTime = 0; // Tregear inside a dimension gate: untargetable and immune
     float buffTime = 0;  // driven berserk by Tregear: faster and tougher
     float abilityA = 0, abilityB = 0;
+    float strikeTimer = 0, strikePause = 0; // attacks on heroes; ordinary kaiju halt briefly to swing
     float flash = 0, face = 1, anim = 0, appear = 0;
-    bool dead = false, enraged = false;
+    float siegeReach = 0, siegeSide = 0, siegeTimer = 0; // siege maps: stop this far from the tower and batter it
+    bool dead = false, enraged = false, sieging = false;
 
     const EnemyDef& Def() const { return EnemyInfo(type); }
     float Scale() const { return Def().size * 1.05f; }
@@ -46,7 +48,13 @@ public:
     float cooldown = 0.35f, recoil = 0, flash = 0, build = 0, dealt = 0;
     float nextCooldownScale = 1; // set by Fire for one shot, e.g. Trigger's rapid Sky Type
     float disabledTime = 0;
-    enum class Disable { None, Confused, Petrified } disabled = Disable::None; // Metron / Gatanothor
+    // Metron / Gatanothor / energy drained by kaiju strikes
+    enum class Disable { None, Confused, Petrified, Exhausted } disabled = Disable::None;
+    float hp = 1, maxHp = 1, calm = 0, hurt = 0; // calm: seconds since the last strike, for regeneration
+    const MonsterActor* focusTarget = nullptr;    // Teo: compared only, never dereferenced
+    int focus = 0;
+    float lunge = 0; // Leo's flying kick throws the figure toward lungeTo
+    Vector2 lungeTo{};
 
     Vector2 Pos() const { return gameObject->transform->position; }
     float RenderDepth() const override { return Pos().y + 10; } // pedestal base
@@ -75,9 +83,18 @@ struct ActiveSpawn {
     float timer = 0;
 };
 
+// Nexus's Meta Field: a lingering dome that burns and slows whatever stands inside.
+struct Zone {
+    Vector2 at;
+    float radius = 0, dps = 0, slow = 0, time = 0, life = 0;
+    int tower = -1;
+    bool vuln = false;
+};
+
 class BattleScene : public Scene {
 public:
     explicit BattleScene(int levelIndex);
+    explicit BattleScene(HeroId demoHero); // skill preview on the database page and in --balance
     void OnLoad() override;
     void OnUnload() override;
     void Update() override;
@@ -90,6 +107,7 @@ public:
         int lives, wave, towers, gold, kills, firstLeakWave;
         std::array<int, kEnemyCount> leaks;
         float minutes;
+        int exhausted; // heroes drained by kaiju strikes
     };
     void DebugAutoplay(int startWave = 0);
     void DebugCast();
@@ -97,7 +115,15 @@ public:
     void DebugInspect(bool pause);
     // casual: no skills, slower decisions and one purchase at a time.
     BotResult RunBot(bool casual = false);
+    // Demo scenes only: damage per second the hero deals to the passing parade.
+    float BenchmarkDemo(int star, float seconds);
     bool headless = false;
+    // Skill preview on the database page: the menu owns the clock and draws only the attack effects,
+    // so the scene never touches music, game speed or input.
+    bool embedded = false;
+    void TickEmbedded(float real);
+    void DrawEmbedded(Rectangle clip, Vector2 heroAt);
+    void ReleaseEmbedded();
 
 private:
     friend class MonsterActor;
@@ -106,7 +132,16 @@ private:
     enum class Fx { Spark, Glow, Smoke, Ember, Count };
 
     int levelIndex;
+    bool demo = false;
+    HeroId demoHero = HeroId::Ultraman;
+    int demoStar = 2;
+    float demoSpawn = 0, demoClock = 0, demoDealt = 0, embedClock = 0;
+    int demoCount = 0;
     const LevelDef* level = nullptr;
+    LevelDef endless;           // survival copy whose waves grow as they are needed; also the demo level
+    std::vector<HeroId> roster; // the six battle cards, chosen on the preparation page
+    float surviveTime = 0;
+    bool newRecord = false;
     MapData map;
     RenderTexture2D mapTexture{};
     std::array<std::array<int, kCols>, kRows> towerGrid{};
@@ -117,8 +152,10 @@ private:
     Ref<EffectLayer> effects;
     std::vector<Airstrike> strikes;
     std::vector<ActiveSpawn> spawning;
+    std::vector<Zone> zones;
 
     int gold = 0, lives = 0, kills = 0;
+    float citadel = 0, citadelMax = 0, citadelShot = 0, citadelPulse = 0; // siege: the central tower
     int waveIndex = -1;
     int pathToggle = 0;
     float nextWaveTimer = -1;
@@ -152,6 +189,7 @@ private:
     std::vector<GridPoint> botTiles;
     std::array<int, kEnemyCount> leakCount{};
     int leakWave = -1;
+    int exhaustions = 0;
 
     // simulation
     void StepEffects(float dt);
@@ -162,7 +200,16 @@ private:
     void DamageEnemy(MonsterActor& e, float amount, int towerId, bool ignoreArmor = false);
     void KillEnemy(MonsterActor& e, int towerId);
     void Leak(MonsterActor& e);
+    bool Siege() const { return level->siege > 0; }
+    void SiegeHit(MonsterActor& e);
+    void StepSiege(float dt);
+    void StepZones(float dt);
+    void StepDemo(float dt);
+    void SetDemoStar(int star);
+    void Knock(MonsterActor& e, float tiles);
+    MonsterActor* NearestKaiju(Vector2 at, float radius, const std::vector<const MonsterActor*>& skip) const;
     void Fire(HeroActor& t, MonsterActor& target);
+    void FireSignature(HeroActor& t, MonsterActor& target, float dmg, float range, Vector2 origin, Vector2 aim);
     void PierceBeam(HeroActor& t, Vector2 origin, Vector2 toward, float damage, float range, Color glow, bool burn);
     void Explode(Vector2 at, float radius, float damage, int towerId, bool burn, bool stun, Color hue);
     void CastBrothers();
@@ -179,6 +226,11 @@ private:
     HeroActor* FindTower(int id);
     HeroActor* NearestHero(Vector2 at, float radius, bool skipDisabled = true);
     void DisableHero(HeroActor& hero, HeroActor::Disable kind, float seconds, Vector2 from);
+    float Assault() const; // kaiju strike multiplier for the current wave; 0 = they never attack
+    void KaijuAttack(MonsterActor& e, HeroActor& target);
+    void DamageHero(HeroActor& hero, float amount);
+    bool Endless() const { return level->endless; }
+    void EnsureWaves(int count);
     void Banner(const std::string& title, const std::string& sub, Color color, bool warning = false);
     void SetOutcome(Outcome value);
     void Restart();
@@ -211,6 +263,8 @@ private:
 
     // drawing
     void DrawWorld();
+    void DrawZones();
+    void DrawSiege();
     void DrawHealthBar(const MonsterActor& e);
     void DrawPlacement();
     void DrawHud();

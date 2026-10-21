@@ -1,6 +1,7 @@
 #include "Menu.h"
 #include "Art.h"
 #include "Assets.h"
+#include "Battle.h"
 #include "Draw.h"
 #include "Gui.h"
 #include "Skins.h"
@@ -9,14 +10,13 @@
 namespace UG {
 
 namespace {
-bool openCodexOnLoad = false;
-int codexIndexOnLoad = 0;
+int heroIndexOnLoad = 0;
+int prepareOnLoad = 0;
 } // namespace
 
-void PreviewCodex(int index) {
-    openCodexOnLoad = true;
-    codexIndexOnLoad = index;
-}
+void PreviewHero(int hero) { heroIndexOnLoad = hero; }
+
+void PrepareLevel(int level) { prepareOnLoad = level; }
 
 namespace {
 constexpr float W = (float)kCanvasW, Hh = (float)kCanvasH;
@@ -51,11 +51,37 @@ void TokyoTower(Vector2 base, float h, Color c) {
 } // namespace
 
 MenuScene::MenuScene(MenuPage start) : Scene("Menu"), page(start) {
-    if (start == MenuPage::Heroes && openCodexOnLoad) {
-        codex = true;
-        codexIndex = codexIndexOnLoad;
-        openCodexOnLoad = false;
+    if (start == MenuPage::Heroes) heroIndex = std::clamp(heroIndexOnLoad, 0, kHeroCount - 1);
+
+    if (start == MenuPage::Prepare) OpenPrepare(prepareOnLoad);
+}
+
+void MenuScene::OpenPrepare(int level) {
+    prepareLevel = level;
+    const LevelDef* def = PreparedLevel();
+    if (!def) {
+        page = MenuPage::Levels;
+        return;
     }
+    picks = Progress::Roster(*def);
+    pickWarning = 0;
+    SetPage(MenuPage::Prepare);
+}
+
+const LevelDef* MenuScene::PreparedLevel() const {
+    if (prepareLevel == kSurvivalIndex) return SurvivalLevel();
+    return prepareLevel >= 0 && prepareLevel < (int)Levels().size() ? &Levels()[prepareLevel] : nullptr;
+}
+
+bool MenuScene::LineupReady() const {
+    const LevelDef* def = PreparedLevel();
+    return def && picks.size() == def->heroes.size();
+}
+
+void MenuScene::Launch() {
+    if (!LineupReady()) return;
+    Progress::SetRoster(*PreparedLevel(), picks);
+    GoToBattle(prepareLevel);
 }
 
 void MenuScene::OnLoad() {
@@ -104,6 +130,10 @@ void MenuScene::OnLoad() {
             previews.push_back(RenderMap(maps.back(), 1.0f / 3.0f));
         }
     }
+    if (!survivalPreview.id && SurvivalLevel()) {
+        survivalMap.Build(*SurvivalLevel());
+        survivalPreview = RenderMap(survivalMap, 0.5f);
+    }
     pageTime = 0;
     Sfx::PlayMusic("menu");
 }
@@ -114,6 +144,32 @@ void MenuScene::OnUnload() {
     for (auto& p : previews) UnloadRenderTexture(p);
     previews.clear();
     maps.clear();
+    if (survivalPreview.id) UnloadRenderTexture(survivalPreview);
+    survivalPreview = {};
+    DropPreview();
+}
+
+// The database page runs one demo battle for the selected hero. It is created and stepped
+// from Update because loading bakes a map texture, which cannot happen mid-draw.
+void MenuScene::SyncPreview(float dt) {
+    if (page != MenuPage::Heroes) return DropPreview();
+    if (!preview || previewHero != heroIndex) {
+        DropPreview();
+        preview = CreateRef<BattleScene>((HeroId)heroIndex);
+        preview->embedded = true;
+        preview->Load();
+        previewHero = heroIndex;
+        Sfx::SetEffectScale(0.35f);
+    }
+    preview->TickEmbedded(dt);
+}
+
+void MenuScene::DropPreview() {
+    if (!preview) return;
+    preview->ReleaseEmbedded();
+    preview.reset();
+    previewHero = -1;
+    Sfx::SetEffectScale(1);
 }
 
 void MenuScene::SetPage(MenuPage next) {
@@ -137,22 +193,22 @@ void MenuScene::Update() {
         m.life -= dt;
     }
     meteors.erase(std::remove_if(meteors.begin(), meteors.end(), [](const Meteor& m) { return m.life <= 0; }), meteors.end());
+    pickWarning = std::max(0.0f, pickWarning - dt);
+    bool confirm = Input::GetKeyDown(KEY_ENTER) || Input::GetKeyDown(KEY_SPACE);
     if (Input::GetKeyDown(KEY_ESCAPE) || Input::GetKeyDown(KEY_BACK)) {
         if (page == MenuPage::Title) QuitGame();
+        else if (page == MenuPage::Prepare && prepareLevel != kSurvivalIndex) SetPage(MenuPage::Levels);
         else SetPage(MenuPage::Title);
+    } else if (page == MenuPage::Title && confirm) {
+        SetPage(MenuPage::Levels);
+    } else if (page == MenuPage::Prepare && confirm) {
+        Launch();
     }
-    if (page == MenuPage::Title && (Input::GetKeyDown(KEY_ENTER) || Input::GetKeyDown(KEY_SPACE))) SetPage(MenuPage::Levels);
     if (page == MenuPage::Heroes) {
-        if (Input::GetKeyDown(KEY_C)) codex = !codex;
-        if (codex) {
-            int count = std::max(1, (int)UltraCodex().size());
-            if (Input::GetKeyDown(KEY_DOWN) || Input::GetKeyDown(KEY_S)) codexIndex = (codexIndex + 1) % count;
-            if (Input::GetKeyDown(KEY_UP) || Input::GetKeyDown(KEY_W)) codexIndex = (codexIndex + count - 1) % count;
-        } else {
-            if (Input::GetKeyDown(KEY_DOWN) || Input::GetKeyDown(KEY_S)) heroIndex = (heroIndex + 1) % kHeroCount;
-            if (Input::GetKeyDown(KEY_UP) || Input::GetKeyDown(KEY_W)) heroIndex = (heroIndex + kHeroCount - 1) % kHeroCount;
-        }
+        if (Input::GetKeyDown(KEY_DOWN) || Input::GetKeyDown(KEY_S)) heroIndex = (heroIndex + 1) % kHeroCount;
+        if (Input::GetKeyDown(KEY_UP) || Input::GetKeyDown(KEY_W)) heroIndex = (heroIndex + kHeroCount - 1) % kHeroCount;
     }
+    SyncPreview(dt);
     if (page == MenuPage::Levels) {
         int pages = std::max(1, ((int)Levels().size() + kLevelsPerPage - 1) / kLevelsPerPage);
         if (Input::GetKeyDown(KEY_RIGHT) || Input::GetKeyDown(KEY_D)) levelPage = std::min(levelPage + 1, pages - 1);
@@ -182,6 +238,9 @@ void MenuScene::Render() {
         break;
     case MenuPage::Help:
         DrawHelp();
+        break;
+    case MenuPage::Prepare:
+        DrawPrepare();
         break;
     }
 }
@@ -240,33 +299,41 @@ void MenuScene::DrawTitle() {
     Gui::TextOutline("光之守护者", W / 2, 64 + bounce, 92, WithAlpha({255, 236, 180, 255}, a), WithAlpha({170, 40, 30, 255}, a), 3.5f);
     Gui::Text("奥特曼塔防  ·  集结光之巨人，守护地球", W / 2, 174, 21, WithAlpha(Palette::text, a), Gui::Align::Center);
 
-    // Hero lineup
-    float gap = 22;
-    float size = std::min(150.0f, (W - 80 - (kHeroCount - 1) * gap) / kHeroCount);
-    float total = kHeroCount * size + (kHeroCount - 1) * gap;
-    for (int i = 0; i < kHeroCount; ++i) {
-        const HeroDef& def = HeroInfo((HeroId)i);
-        float appear = EaseOut((pageTime - 0.15f - i * 0.08f) / 0.5f);
+    // Hero lineup: the 2026 popularity top ten, in ranking order.
+    static const HeroId kTopTen[] = {HeroId::Tiga,  HeroId::Mebius, HeroId::Leo,  HeroId::Cosmos, HeroId::Seven,
+                                     HeroId::Ginga, HeroId::Gaia,   HeroId::Zero, HeroId::Nexus,  HeroId::Ultraman};
+    constexpr int kShown = (int)std::size(kTopTen);
+    float gap = 12;
+    float size = std::min(150.0f, (W - 70 - (kShown - 1) * gap) / kShown);
+    float total = kShown * size + (kShown - 1) * gap;
+    for (int i = 0; i < kShown; ++i) {
+        HeroId id = kTopTen[i];
+        const HeroDef& def = HeroInfo(id);
+        float appear = EaseOut((pageTime - 0.15f - i * 0.06f) / 0.5f);
         if (appear <= 0) continue;
-        float arc = std::fabs(i - (kHeroCount - 1) * 0.5f) * 5.0f / (kHeroCount - 1);
+        float arc = std::fabs(i - (kShown - 1) * 0.5f) * 5.0f / (kShown - 1);
         float x = W / 2 - total / 2 + i * (size + gap);
-        float y = 222 + arc * arc * 6 + std::sin(t * 1.6f + i) * 5 + (1 - appear) * 60;
+        float y = 226 + arc * arc * 5 + std::sin(t * 1.6f + i) * 5 + (1 - appear) * 60;
         Vector2 c{x + size / 2, y + size * 0.62f};
         Draw::BlendAdd();
         Draw::Glow(c, size * 0.7f, WithAlpha(def.primary, 0.45f * appear));
         Draw::Glow(c, size * 0.38f, WithAlpha(def.beam, 0.25f * appear));
         Draw::BlendNormal();
         Draw::GlowStretched({c.x, y + size + 4}, size * 0.5f, 12, 0, WithAlpha(BLACK, 0.5f * appear));
-        Art::DrawPortrait((HeroId)i, {x, y, size, size}, WithAlpha(WHITE, appear));
-        Gui::TextShadow(def.name, c.x, y + size + 6, size < 130 ? 15.0f : 17.0f, WithAlpha(Palette::text, appear), Gui::Align::Center);
+        Art::DrawPortrait(id, {x, y, size, size}, WithAlpha(WHITE, appear));
+        std::string name = def.name;
+        const std::string suffix = "奥特曼";
+        if (name.size() > suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0)
+            name.resize(name.size() - suffix.size());
+        Gui::TextShadow(name, c.x, y + size + 6, 15, WithAlpha(Palette::text, appear), Gui::Align::Center);
+        Gui::Text(TextFormat("%d", i + 1), x + 8, y + 4, 14, WithAlpha(i < 3 ? Palette::gold : Palette::muted, appear), Gui::Align::Left, true);
     }
+    Gui::Text("2026 奥特曼人气榜 TOP 10", W / 2, 208, 13, WithAlpha(Palette::muted, a), Gui::Align::Center);
 
     float by = 470 + (1 - a) * 30;
-    if (Gui::Button({W / 2 - 160, by, 320, 60}, "开始作战", Gui::Style::Gold, true, 26)) SetPage(MenuPage::Levels);
-    if (Gui::Button({W / 2 - 300, by + 76, 190, 46}, "奥特数据库", Gui::Style::Blue, true, 19)) {
-        codex = true;
-        SetPage(MenuPage::Heroes);
-    }
+    if (Gui::Button({W / 2 - 300, by, 290, 60}, "开始作战", Gui::Style::Gold, true, 26)) SetPage(MenuPage::Levels);
+    if (Gui::Button({W / 2 + 10, by, 290, 60}, "生存模式", Gui::Style::Red, SurvivalLevel() != nullptr, 26)) OpenPrepare(kSurvivalIndex);
+    if (Gui::Button({W / 2 - 300, by + 76, 190, 46}, "奥特数据库", Gui::Style::Blue, true, 19)) SetPage(MenuPage::Heroes);
     if (Gui::Button({W / 2 - 95, by + 76, 190, 46}, "怪兽图鉴", Gui::Style::Red, true, 19)) SetPage(MenuPage::Kaiju);
     if (Gui::Button({W / 2 + 110, by + 76, 190, 46}, "操作说明", Gui::Style::Dark, true, 19)) SetPage(MenuPage::Help);
 
@@ -294,14 +361,16 @@ void MenuScene::DrawTitle() {
 
     int stars = 0;
     for (int i = 0; i < (int)Levels().size(); ++i) stars += Progress::Stars(i);
-    Gui::Text(TextFormat("已获得星星 %d / %d     累计击败怪兽 %d", stars, (int)Levels().size() * 3, Progress::TotalKills()), W / 2, Hh - 50,
-              15, Palette::muted, Gui::Align::Center);
+    float best = Progress::SurvivalBestTime();
+    Gui::Text(TextFormat("已获得星星 %d / %d     累计击败怪兽 %d     生存最佳 %02d:%02d", stars, (int)Levels().size() * 3, Progress::TotalKills(),
+                         (int)best / 60, (int)best % 60),
+              W / 2, Hh - 50, 15, Palette::muted, Gui::Align::Center);
     Gui::Text("Enter 开始   F11 全屏   Esc 退出", W / 2, Hh - 28, 12, WithAlpha(Palette::muted, 0.7f), Gui::Align::Center);
 }
 
 void MenuScene::DrawLevels() {
     DrawBack();
-    DrawPageTitle("选择关卡", "点选缩略图出击");
+    DrawPageTitle("选择关卡", "点选缩略图，挑好出战阵容后出击");
     const auto& levels = Levels();
     const auto& errors = LevelErrors();
     if (!errors.empty()) {
@@ -352,46 +421,175 @@ void MenuScene::DrawLevels() {
         DrawMapTexture(previews[i], pv);
         if (!unlocked) DrawRectangleRec(pv, {18, 20, 28, 150});
         DrawRectangleLinesEx(pv, 2, WithAlpha(unlocked ? accent : Palette::muted, 0.85f));
+        Rectangle badge{pv.x + 6, pv.y + 6, 52, 26};
+        Draw::RoundedPanel(badge, 7, {8, 10, 24, 220}, WithAlpha(unlocked ? accent : Palette::muted, 0.9f), 1.5f);
+        Gui::Text(def.tag, badge.x + badge.width / 2, badge.y + 3, 16, unlocked ? Palette::text : Palette::muted, Gui::Align::Center, true);
+        if (def.assault > 0) {
+            Rectangle warn{pv.x + pv.width - 112, pv.y + 6, 106, 26};
+            Draw::RoundedPanel(warn, 7, {70, 10, 18, 220}, WithAlpha(Palette::red, 0.9f), 1.5f);
+            Gui::Text("怪兽会反击", warn.x + warn.width / 2, warn.y + 4, 14, {255, 200, 200, 255}, Gui::Align::Center, true);
+        }
         Gui::TextShadow(def.name, r.x + r.width / 2, r.y + 186, 26, unlocked ? Palette::text : Palette::muted, Gui::Align::Center);
         if (unlocked) {
             int stars = Progress::Stars(i);
             for (int s = 0; s < 3; ++s) Gui::StarIcon({r.x + r.width / 2 - 36 + s * 36.0f, r.y + 220}, 12, s < stars);
-            if (Gui::Clicked(r)) GoToBattle(i);
+            if (Gui::Clicked(r)) OpenPrepare(i);
         } else {
             Gui::LockIcon({pv.x + pv.width / 2, pv.y + pv.height / 2}, 26, {170, 176, 188, 255});
         }
     }
 }
 
+void MenuScene::DrawPrepare() {
+    const LevelDef* def = PreparedLevel();
+    if (!def) return;
+    bool survival = prepareLevel == kSurvivalIndex;
+    int need = (int)def->heroes.size();
+    if (Gui::Button({30, 28, 120, 44}, "返回", Gui::Style::Dark, true, 18)) SetPage(survival ? MenuPage::Title : MenuPage::Levels);
+    DrawPageTitle("出战准备", TextFormat("选择 %d 位光之巨人，卡片顺序就是战斗中的 1-%d 号键", need, need));
+
+    // Mission briefing
+    Rectangle info{40, 128, 420, 562};
+    Gui::Panel(info, {12, 18, 40, 240}, 16);
+    Color accent = ThemeAccent(def->theme);
+    Rectangle pv{info.x + 14, info.y + 14, info.width - 28, (info.width - 28) * 0.6f};
+    DrawMapTexture(survival ? survivalPreview : previews[prepareLevel], pv);
+    DrawRectangleLinesEx(pv, 2, WithAlpha(accent, 0.85f));
+    float y = pv.y + pv.height + 12;
+    Gui::Text(survival ? "生存模式" : def->tag + "  " + def->arc, info.x + 18, y, 15, accent, Gui::Align::Left, true);
+    Gui::TextShadow(def->name, info.x + 18, y + 22, 30, Palette::text);
+    y += 66;
+    y += Gui::Paragraph(def->desc, info.x + 18, y, info.width - 36, 14, Palette::muted, 1.55f);
+    y += 10;
+    struct Row {
+        const char* label;
+        std::string value;
+        Color tone;
+    };
+    std::vector<Row> rows;
+    if (survival) {
+        float best = Progress::SurvivalBestTime();
+        rows.push_back({"波次", "无尽，越来越强", Palette::text});
+        if (def->siege > 0) rows.push_back({"灯塔耐久", TextFormat("%.0f · 每波修复 5%%", def->siege), Palette::cyan});
+        rows.push_back({"最佳纪录", TextFormat("%02d:%02d · 第 %d 波", (int)best / 60, (int)best % 60, Progress::SurvivalBestWave()), Palette::gold});
+        rows.push_back({"怪兽反击", "第 3 波起，逐波增强", Palette::red});
+    } else {
+        rows.push_back({"波次", TextFormat("%d 波", (int)def->waves.size()), Palette::text});
+        rows.push_back({"初始金币", TextFormat("%d", def->gold), Palette::gold});
+        rows.push_back({"怪兽反击", def->assault > 0 ? TextFormat("强度 %.0f%%", def->assault * 100) : "无", def->assault > 0 ? Palette::red : Palette::muted});
+    }
+    for (const auto& row : rows) {
+        Gui::Text(row.label, info.x + 18, y, 15, Palette::muted);
+        Gui::Text(row.value, info.x + info.width - 18, y, 15, row.tone, Gui::Align::Right, true);
+        y += 26;
+    }
+    if (def->assault > 0)
+        Gui::Paragraph("怪兽会用光线、岩石和火球攻击附近的英雄。能量耗尽的英雄倒下 8 秒，脱离攻击后能量会慢慢恢复，升级可以立刻补满。",
+                       info.x + 18, std::min(y + 4, info.y + info.height - 64), info.width - 36, 12.5f, {255, 190, 180, 255}, 1.5f);
+
+    // Hero pool: five compact cards per row (room for twenty), picked heroes show their card number.
+    float t = RealTime();
+    constexpr int kPoolCols = 5;
+    constexpr float kPoolW = 755, kPoolH = 418, kGap = 7;
+    const int poolRows = (kHeroCount + kPoolCols - 1) / kPoolCols;
+    const float kCardW = (kPoolW - (kPoolCols - 1) * kGap) / kPoolCols;
+    const float kCardH = std::min(132.0f, (kPoolH - (poolRows - 1) * kGap) / poolRows);
+    float gx = 485, gy = 128;
+    for (int i = 0; i < kHeroCount; ++i) {
+        HeroId id = (HeroId)i;
+        const HeroDef& hero = HeroInfo(id);
+        Rectangle r{gx + (i % kPoolCols) * (kCardW + kGap), gy + (i / kPoolCols) * (kCardH + kGap), kCardW, kCardH};
+        auto at = std::find(picks.begin(), picks.end(), id);
+        bool picked = at != picks.end();
+        bool hover = Gui::Hover(r);
+        bool recommended = std::find(def->heroes.begin(), def->heroes.end(), id) != def->heroes.end();
+        Color fill = picked ? Mix(hero.primary, {10, 14, 30, 255}, 0.55f) : Color{14, 20, 44, 230};
+        Color border = picked ? Palette::gold : hover ? Lighten(hero.primary, 0.4f) : Palette::line;
+        if (picked) {
+            Draw::BlendAdd();
+            Draw::GlowStretched({r.x + r.width / 2, r.y + r.height / 2}, 140, 80, 0, WithAlpha(hero.beam, 0.12f + 0.05f * std::sin(t * 4 + i)));
+            Draw::BlendNormal();
+        }
+        Draw::RoundedPanel(r, 10, fill, border, picked ? 2.4f : 1.2f);
+        float face = kCardH - 36;
+        Art::DrawPortrait(id, {r.x + r.width / 2 - face / 2, r.y + 2, face, face}, picked || hover ? WHITE : Color{200, 204, 216, 255});
+        Gui::Text(hero.name, r.x + r.width / 2, r.y + kCardH - 36, 13, Palette::text, Gui::Align::Center, true);
+        Gui::Text(hero.role, r.x + 8, r.y + kCardH - 17, 11, hero.beam, Gui::Align::Left, true);
+        Gui::Coin({r.x + r.width - 38, r.y + kCardH - 10}, 5);
+        Gui::Text(TextFormat("%d", hero.cost), r.x + r.width - 8, r.y + kCardH - 18, 12, Palette::gold, Gui::Align::Right, true);
+        if (recommended) Gui::Text("推荐", r.x + 8, r.y + 6, 11, Palette::cyan, Gui::Align::Left, true);
+        if (picked) {
+            Vector2 c{r.x + r.width - 16, r.y + 16};
+            DrawCircleV(c, 11, Palette::gold);
+            Gui::Text(TextFormat("%d", (int)(at - picks.begin()) + 1), c.x, c.y - 8, 14, {50, 24, 0, 255}, Gui::Align::Center, true);
+        }
+        if (hover)
+            Gui::Text(TextFormat("%s · %s", hero.name, hero.move), gx, gy + kPoolH + 3, 13, Palette::gold, Gui::Align::Left, true);
+        if (Gui::Clicked(r)) {
+            if (picked) {
+                picks.erase(at);
+                Sfx::Play("sell", 0.4f);
+            } else if ((int)picks.size() < need) {
+                picks.push_back(id);
+                Sfx::Play("build", 0.4f);
+            } else {
+                pickWarning = 1.6f;
+                Sfx::Play("error", 0.5f);
+            }
+        }
+    }
+
+    // Lineup strip in card order; clicking a slot removes that hero.
+    Rectangle strip{gx, 568, kPoolW, 122};
+    Gui::Panel(strip, {12, 18, 40, 240}, 14);
+    Gui::Text(TextFormat("出战阵容  %d / %d", (int)picks.size(), need), strip.x + 16, strip.y + 10, 16,
+              LineupReady() ? Palette::gold : Palette::text, Gui::Align::Left, true);
+    if (pickWarning > 0)
+        Gui::Text("阵容已满，先点掉一位再换", strip.x + 200, strip.y + 11, 14, WithAlpha(Palette::red, std::min(1.0f, pickWarning)));
+    const float slot = 62, slotGap = 10;
+    for (int i = 0; i < need; ++i) {
+        Rectangle s{strip.x + 16 + i * (slot + slotGap), strip.y + 40, slot, slot};
+        bool filled = i < (int)picks.size();
+        Draw::RoundedPanel(s, 10, filled ? Mix(HeroInfo(picks[i]).primary, {10, 14, 30, 255}, 0.5f) : Color{8, 10, 22, 220},
+                           filled ? WithAlpha(HeroInfo(picks[i]).beam, 0.9f) : Palette::line, 1.5f);
+        Gui::Text(TextFormat("%d", i + 1), s.x + 9, s.y + 3, 12, Palette::muted, Gui::Align::Center, true);
+        if (!filled) continue;
+        Art::DrawPortrait(picks[i], {s.x - 4, s.y - 6, slot + 8, slot + 8});
+        if (Gui::Clicked(s)) {
+            picks.erase(picks.begin() + i);
+            Sfx::Play("sell", 0.4f);
+            break;
+        }
+    }
+    float bx = strip.x + strip.width - 214;
+    if (Gui::Button({bx, strip.y + 14, 196, 40}, "推荐阵容", Gui::Style::Dark, picks != def->heroes, 16)) picks = def->heroes;
+    if (Gui::Button({bx, strip.y + 64, 196, 46}, survival ? "开始生存" : "出击", Gui::Style::Gold, LineupReady(), 20)) Launch();
+}
+
 void MenuScene::DrawHeroes() {
     DrawBack();
-    if (Gui::Button({W - 250, 28, 210, 44}, codex ? "出战英雄" : "光之档案", Gui::Style::Blue, true, 18)) codex = !codex;
-    if (codex) {
-        DrawCodex();
-        return;
-    }
-    DrawPageTitle("出战英雄", "可上阵的光之巨人，每关阵容不同");
-    float rowH = std::min(92.0f, 566.0f / kHeroCount);
+    DrawPageTitle("奥特曼数据库", "可上阵的光之巨人，每关阵容不同");
+    // Two columns so the roster can grow to twenty.
+    const int perColumn = (kHeroCount + 1) / 2;
+    float rowH = std::min(92.0f, 566.0f / perColumn);
     for (int i = 0; i < kHeroCount; ++i) {
         const HeroDef& def = HeroInfo((HeroId)i);
-        Rectangle r{60, 134 + i * rowH, 270, rowH - 6};
+        Rectangle r{30 + (i / perColumn) * 180.0f, 128 + (i % perColumn) * rowH, 174, rowH - 5};
         bool active = heroIndex == i;
         if (Gui::Clicked(r)) heroIndex = i;
         bool hover = Gui::Hover(r);
-        Draw::RoundedPanel(r, 12, active ? Mix(def.primary, {10, 14, 30, 255}, 0.55f) : Color{14, 20, 44, 230},
+        Draw::RoundedPanel(r, 10, active ? Mix(def.primary, {10, 14, 30, 255}, 0.55f) : Color{14, 20, 44, 230},
                            active  ? Palette::gold
                            : hover ? Lighten(def.primary, 0.3f)
                                    : Palette::line,
-                           active ? 2.5f : 1.5f);
+                           active ? 2.5f : 1.3f);
         float s = r.height + 2;
-        Art::DrawPortrait((HeroId)i, {r.x + 4, r.y - 2, s, s});
-        Gui::Text(def.name, r.x + s + 12, r.y + r.height * 0.5f - 19, 18, Palette::text, Gui::Align::Left, true);
-        Gui::Text(def.role, r.x + s + 12, r.y + r.height * 0.5f + 3, 13, def.beam);
-        Gui::Coin({r.x + r.width - 52, r.y + r.height * 0.5f}, 7);
-        Gui::Text(TextFormat("%d", def.cost), r.x + r.width - 40, r.y + r.height * 0.5f - 9, 16, Palette::gold, Gui::Align::Left, true);
+        Art::DrawPortrait((HeroId)i, {r.x + 2, r.y - 2, s, s});
+        Gui::Text(def.name, r.x + s + 6, r.y + r.height * 0.5f - 17, 14, Palette::text, Gui::Align::Left, true);
+        Gui::Text(def.role, r.x + s + 6, r.y + r.height * 0.5f + 2, 11.5f, def.beam);
     }
     const HeroDef& def = HeroInfo((HeroId)heroIndex);
-    Rectangle panel{360, 130, 870, 560};
+    Rectangle panel{396, 128, 856, 562};
     Gui::Panel(panel, {12, 18, 40, 240}, 18);
     float t = RealTime();
     Vector2 c{panel.x + 210, panel.y + 250};
@@ -406,8 +604,10 @@ void MenuScene::DrawHeroes() {
     DrawRing(c, 150, 154, 0, 360, 64, WithAlpha(def.beam, 0.5f));
     float s = 340;
     Art::DrawPortrait((HeroId)heroIndex, {c.x - s / 2, c.y - s / 2 - 10 + std::sin(t * 1.5f) * 4, s, s});
-    if (Art::HasCustomAvatar((HeroId)heroIndex))
-        Gui::Text("自定义头像", c.x, panel.y + panel.height - 40, 13, Palette::muted, Gui::Align::Center);
+    // The hero's real attack effects play over the portrait, fired at invisible passing kaiju.
+    if (preview && previewHero == heroIndex)
+        preview->DrawEmbedded({panel.x + 6, panel.y + 6, 428, panel.height - 12}, {c.x - 20, c.y - 10});
+    if (Art::HasCustomAvatar((HeroId)heroIndex)) Gui::Text("自定义头像", panel.x + 20, panel.y + 16, 13, Palette::muted);
 
     float x = panel.x + 440, y = panel.y + 36, w = panel.width - 470;
     Gui::Text(def.role, x, y, 16, def.beam, Gui::Align::Left, true);
@@ -422,6 +622,7 @@ void MenuScene::DrawHeroes() {
         std::string text;
     };
     float dps = HeroDamage((HeroId)heroIndex, 0) / def.cooldown;
+    if (def.kind == AttackKind::Field) dps *= 3.5f; // the field ticks its damage every second for 3.5 s
     Stat stats[] = {
         {"单次伤害", def.damage, 120, TextFormat("%.0f", def.damage)},
         {"每秒伤害", dps, 80, TextFormat("%.0f", dps)},
@@ -439,69 +640,6 @@ void MenuScene::DrawHeroes() {
     py += 8;
     Draw::RoundedPanel({x - 10, py, w + 20, 48}, 10, {40, 30, 10, 200}, WithAlpha(Palette::gold, 0.6f), 1.5f);
     Gui::Paragraph(def.perk, x + 4, py + 14, w - 8, 15, Palette::gold);
-}
-
-void MenuScene::DrawCodex() {
-    DrawPageTitle("奥特曼数据库", "招式名按中文常用译名，游戏里的攻击方式是改编");
-    const auto& entries = UltraCodex();
-    const auto& errors = UltraErrors();
-    if (!errors.empty()) Gui::Text("档案有误：" + errors[0], W / 2, 112, 14, Palette::red, Gui::Align::Center);
-    if (entries.empty()) {
-        Gui::Text("还没有可读的档案", W / 2, 360, 22, Palette::muted, Gui::Align::Center);
-        return;
-    }
-    codexIndex = std::clamp(codexIndex, 0, (int)entries.size() - 1);
-    constexpr int kVisible = 7;
-    int page = codexIndex / kVisible;
-    int first = page * kVisible;
-    for (int i = first; i < std::min(first + kVisible, (int)entries.size()); ++i) {
-        const UltraEntry& entry = entries[i];
-        Rectangle r{48, 132 + (i - first) * 68.0f, 360, 62};
-        bool active = codexIndex == i;
-        if (Gui::Clicked(r)) codexIndex = i;
-        Draw::RoundedPanel(r, 10, active ? Color{46, 28, 48, 235} : Color{14, 20, 44, 220},
-                           active          ? Palette::gold
-                           : Gui::Hover(r) ? Palette::muted
-                                           : Palette::line,
-                           active ? 2.2f : 1.4f);
-        Texture2D face = Art::CodexPortrait(entry.id);
-        float tx = r.x + 14;
-        if (face.id) {
-            DrawTexturePro(face, {0, 0, (float)face.width, (float)face.height}, {r.x + 6, r.y + 1, 60, 60}, {0, 0}, 0, WHITE);
-            tx = r.x + 74;
-        }
-        Gui::Text(entry.name, tx, r.y + 8, 18, Palette::text, Gui::Align::Left, true);
-        Gui::Text(entry.move, tx, r.y + 34, 14, Palette::gold);
-    }
-    int pages = ((int)entries.size() + kVisible - 1) / kVisible;
-    if (pages > 1) {
-        if (Gui::Button({48, 626, 175, 46}, "上一页", Gui::Style::Dark, page > 0, 17)) codexIndex = (page - 1) * kVisible;
-        if (Gui::Button({233, 626, 175, 46}, "下一页", Gui::Style::Dark, page + 1 < pages, 17))
-            codexIndex = std::min((page + 1) * kVisible, (int)entries.size() - 1);
-    }
-    const UltraEntry& entry = entries[codexIndex];
-    Rectangle panel{430, 132, 800, 540};
-    Gui::Panel(panel, {12, 18, 40, 240}, 18);
-    HeroId hero{};
-    bool playable = HeroByKey(entry.id, hero);
-    Texture2D face = Art::CodexPortrait(entry.id);
-    if (face.id) {
-        Color aura = playable ? HeroInfo(hero).primary : Color{120, 160, 255, 255};
-        Draw::BlendAdd();
-        Draw::Glow({panel.x + 150, panel.y + 210}, 180, WithAlpha(aura, 0.4f));
-        Draw::BlendNormal();
-        DrawTexturePro(face, {0, 0, (float)face.width, (float)face.height}, {panel.x + 30, panel.y + 70, 250, 250}, {0, 0}, 0, WHITE);
-    }
-    float x = panel.x + (face.id ? 300 : 36);
-    float w = panel.width - (x - panel.x) - 28;
-    Gui::Text(entry.title, x, panel.y + 28, 16, Palette::cyan, Gui::Align::Left, true);
-    Gui::TextShadow(entry.name, x, panel.y + 52, 40, Palette::text);
-    Gui::Text(TextFormat("必杀 · %s", entry.move.c_str()), x, panel.y + 112, 20, Palette::gold, Gui::Align::Left, true);
-    float py = panel.y + 156;
-    py += Gui::Paragraph(entry.desc, x, py, w, 17, Palette::muted, 1.6f);
-    py += 18;
-    Draw::RoundedPanel({x - 8, py, w + 16, 64}, 10, {36, 28, 12, 210}, WithAlpha(Palette::gold, 0.55f), 1.4f);
-    Gui::Paragraph(entry.note, x, py + 12, w, 15, Palette::gold, 1.45f);
 }
 
 void MenuScene::DrawKaiju() {
@@ -573,40 +711,39 @@ void MenuScene::DrawKaiju() {
 void MenuScene::DrawHelp() {
     DrawBack();
     DrawPageTitle("操作说明", "成为优秀的防卫队指挥官");
-    Rectangle panel{90, 130, W - 180, 560};
+    Rectangle panel{90, 116, W - 180, 584};
     Gui::Panel(panel, {12, 18, 40, 240}, 18);
     struct Section {
         const char* title;
         const char* body;
     };
     Section sections[] = {
-        {"基本玩法", "怪兽会沿着道路冲向基地，每有一只怪兽抵达基地就会损失生命。在道路两侧的空地上"
-                     "放置奥特曼英雄来消灭它们，"
-                     "撑过所有波次即可获胜。剩余生命越多，获得的星星越多。"},
-        {"放置与升级", "点击右侧英雄卡片或按数字键 1-6 选择英雄，再点击地图空地放置；按住 Shift "
-                       "可连续放置。点击已放置的英雄"
-                       "可升级（最高三级，三级解锁特殊能力）、出售（返还 70%）或切换攻击目标：最前 "
-                       "/ 最强 / 最近。"},
-        {"波次", "按空格或点击「开始进攻」召唤第一波。之后每波结束会自动倒计时，提前召唤可获得额外金币，"
-                 "每开启新一波还会获得波次奖励。"},
-        {"必杀技", "Q：奥特兄弟合体光线，对全场造成伤害。W：喷气甲虫号空中支援，选区轰炸并眩晕。E：究极合体。"
-                   "六位奥特曼全部上场后先蓄能约 25 秒，右侧「究极合体」点亮即可发动，伤害极高，冷却 75 秒。"},
-        {"快捷键", "F / Tab 切换 1x-3x 倍速    P / Esc 暂停    U 升级    T 切换目标    Delete 出售 "
-                   "   右键 取消    F11 全屏"},
+        {"基本玩法", "怪兽沿道路冲向基地，每有一只抵达就会损失生命。在道路两侧的空地上放置奥特曼英雄消灭它们，"
+                     "撑过所有波次即可获胜，剩余生命越多星星越多。出击前可以在「出战准备」里挑选本关的阵容。"},
+        {"放置与升级", "点击右侧英雄卡片或按数字键选择英雄，再点击空地放置，按住 Shift 可连续放置。点击已放置的英雄可升级"
+                       "（最高三级，三级解锁特殊能力）、出售（返还 70%）或切换攻击目标：最前 / 最强 / 最近。"},
+        {"波次与反击", "按空格或「开始进攻」召唤第一波，之后自动倒计时，提前召唤有额外金币。后期关卡的怪兽会攻击附近英雄，"
+                       "能量耗尽的英雄倒下 8 秒，升级可以立刻补满能量。"},
+        {"必杀技", "Q：奥特兄弟合体光线，全场伤害。W：喷气甲虫号空中支援，选区轰炸并眩晕。E：究极合体，"
+                   "阵容全部上场后蓄能约 25 秒即可发动，冷却 75 秒。"},
+        {"生存模式 · 守城", "光之城堡四面各有一座城门，怪兽从四个方向攻进庭院，围攻正中央的守护灯塔。英雄可以站上城墙，"
+                            "灯塔会放光束反击，每波修复少许，耐久归零即结束，看你能守多久。"},
+        {"技能演示", "在「奥特数据库」里选中一位奥特曼，头像上会循环播放他的招式粒子效果。"},
+        {"快捷键", "F / Tab 倍速    P / Esc 暂停    U 升级    T 切换目标    Delete 出售    右键 取消    F11 全屏"},
     };
-    float y = panel.y + 28;
+    float y = panel.y + 22;
     for (const auto& s : sections) {
-        Draw::Diamond({panel.x + 40, y + 11}, 6, 8, Palette::gold);
-        Gui::Text(s.title, panel.x + 58, y, 21, Palette::gold, Gui::Align::Left, true);
-        y += 32;
-        y += Gui::Paragraph(s.body, panel.x + 58, y, panel.width - 110, 16, Palette::text, 1.55f);
-        y += 14;
+        Draw::Diamond({panel.x + 40, y + 10}, 5, 7, Palette::gold);
+        Gui::Text(s.title, panel.x + 58, y, 18, Palette::gold, Gui::Align::Left, true);
+        y += 26;
+        y += Gui::Paragraph(s.body, panel.x + 58, y, panel.width - 110, 14, Palette::text, 1.45f);
+        y += 9;
     }
     std::string keys;
     for (int i = 0; i < kHeroCount; ++i) keys += std::string(i ? "、" : "") + HeroInfo((HeroId)i).key;
     Gui::Paragraph("自定义头像：将正方形 PNG 图片放入游戏目录 assets/avatars/ 下，文件名为 " + keys +
                        "（.png），重启游戏即可替换对应英雄的头像。",
-                   panel.x + 58, panel.y + panel.height - 58, panel.width - 110, 13, Palette::muted, 1.5f);
+                   panel.x + 58, panel.y + panel.height - 50, panel.width - 110, 12.5f, Palette::muted, 1.45f);
 }
 
 } // namespace UG
