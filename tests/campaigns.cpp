@@ -180,7 +180,7 @@ static void GardenRules() {
         // Collect, plant and defend through normal actions with real costs and cooldowns.
         for (int step = 0; step < 24000 && !m.outcome; ++step) {
             while (!m.suns.empty())
-                m.Collect(m.suns.back().position);
+                m.Collect(m.suns.back().At());
             int producers = static_cast<int>(
                 std::count_if(m.plants.begin(), m.plants.end(), [](const Garden::Plant& p) {
                     return p.kind == Garden::Kind::Sunflower;

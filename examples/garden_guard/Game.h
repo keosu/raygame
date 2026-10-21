@@ -5,10 +5,28 @@
 namespace Garden {
 using Campaign::UI;
 inline constexpr Color Leaf{90, 163, 66, 255};
-inline void DrawPlant(Vector2 p, Kind kind, float time = 0, bool small = false) {
+inline constexpr Vector2 SunCounter{74, 140}; // the HUD token collected sun flies into
+inline constexpr float FlightTime = 0.6f;
+inline float BackOut(float t) {
+    t = std::clamp(t, 0.0f, 1.0f) - 1;
+    return 1 + 2.70158f * t * t * t + 1.70158f * t * t;
+}
+inline void DrawSun(Vector2 p, float time, float scale = 1, float alpha = 1) {
+    DrawCircleV(p, 31 * scale, Fade({249, 217, 90, 255}, (0.2f + 0.06f * std::sin(time * 4)) * alpha));
+    for (int i = 0; i < 8; ++i) {
+        float a = i * PI / 4 + time * 0.5f;
+        Campaign::Triangle({p.x + std::cos(a) * 28 * scale, p.y + std::sin(a) * 28 * scale},
+                           {p.x + std::cos(a + 0.18f) * 18 * scale, p.y + std::sin(a + 0.18f) * 18 * scale},
+                           {p.x + std::cos(a - 0.18f) * 18 * scale, p.y + std::sin(a - 0.18f) * 18 * scale},
+                           Fade({246, 199, 61, 255}, alpha));
+    }
+    DrawCircleV(p, 18 * scale, Fade({251, 211, 93, 255}, alpha));
+    DrawCircleV({p.x - 4 * scale, p.y - 5 * scale}, 9 * scale, Fade({255, 236, 157, 255}, alpha));
+}
+inline void DrawPlant(Vector2 p, Kind kind, float time = 0, bool small = false, float size = 1) {
     float bounce = small ? 0 : std::sin(time * 3 + p.x) * 2;
-    p.y += bounce;
-    float scale = small ? 0.67f : 1;
+    p.y += bounce + 28 * (1 - size); // grow from the soil line
+    float scale = (small ? 0.67f : 1) * size;
     auto ellipse = [&](float x, float y, float w, float h, Color color) {
         DrawEllipse(static_cast<int>(p.x + x * scale), static_cast<int>(p.y + y * scale), w * scale,
                     h * scale, color);
@@ -121,7 +139,9 @@ class Game : public Campaign::Game {
 public:
     static constexpr const char* AppId = "raygame.garden_guard";
     Model model;
-    int heardShot = 0, heardHit = 0, heardPlant = 0;
+    int heardShot = 0, heardHit = 0, heardPlant = 0, heardCollect = 0;
+    std::vector<std::pair<Vector2, float>> flights; // collected sun on its way to the counter
+    float counterPulse = 0;
     std::string feedback;
     float feedbackTime = 0;
     int dragSeed = -1;
@@ -172,7 +192,9 @@ public:
     }
     void StartLevel(int selected) override {
         model.Reset(selected);
-        heardShot = heardHit = heardPlant = 0;
+        heardShot = heardHit = heardPlant = heardCollect = 0;
+        flights.clear();
+        counterPulse = 0;
         feedback.clear();
         auto scene = RayGame::CreateRef<RayGame::Scene>("Garden Guard");
         scene->CreateGameObject("garden world")->AddComponent<World>(this);
@@ -222,6 +244,19 @@ public:
             heardPlant = model.soundPlant;
             Sound("clear");
         }
+        if (model.collected != heardCollect) {
+            heardCollect = model.collected;
+            flights.push_back({model.lastPickup, 0.0f});
+            Sound("click");
+        }
+        counterPulse = std::max(0.0f, counterPulse - dt * 4);
+        for (auto& f : flights)
+            f.second += dt;
+        auto landed = std::remove_if(flights.begin(), flights.end(),
+                                     [](const auto& f) { return f.second >= FlightTime; });
+        if (landed != flights.end())
+            counterPulse = 1;
+        flights.erase(landed, flights.end());
     }
     void DrawHUD() override {
         using Campaign::UI;
@@ -238,8 +273,13 @@ public:
                   16, {187, 212, 164, 255});
         UI::Title(867, 28, TextFormat("%05d", model.score), 36, {251, 211, 111, 255});
         DrawRectangleRounded({40, 99, 175, 86}, 0.16f, 8, {80, 98, 52, 255});
-        DrawCircleV({74, 140}, 18, {247, 199, 72, 255});
-        UI::Title(102, 120, std::to_string(model.sun), 36, Campaign::Cream);
+        float pop = std::sin(counterPulse * PI) * counterPulse;
+        if (counterPulse > 0)
+            DrawCircleV(SunCounter, 18 + 16 * counterPulse, Fade({255, 226, 120, 255}, 0.35f * counterPulse));
+        DrawCircleV(SunCounter, 18 * (1 + 0.25f * pop), {247, 199, 72, 255});
+        // Tokens still in flight are counted when they land.
+        int shown = std::max(0, model.sun - 25 * static_cast<int>(flights.size()));
+        UI::Title(102, 120 - 3 * pop, std::to_string(shown), 36 + 4 * pop, Campaign::Cream);
         UI::Label(57, 164, "SUN TO SPEND", 15, Campaign::Cream);
         if (feedbackTime > 0 && !feedback.empty())
             UI::LabelCentered(640, 685, feedback, 16, {224, 228, 190, 255});
@@ -304,6 +344,14 @@ public:
                               28, {249, 234, 178, 255});
         if (model.waveFlash > 0 && model.spawned > 0)
             UI::LabelCentered(715, 198, "VISITORS APPROACH!", 20, {255, 219, 119, 255});
+        for (const auto& [from, age] : flights) {
+            // Ease in and out along a curve that lifts before swooping into the counter.
+            float t = age / FlightTime, e = t * t * (3 - 2 * t);
+            Vector2 lift{(from.x + SunCounter.x) / 2, std::min(from.y, SunCounter.y) - 90};
+            Vector2 a{from.x + (lift.x - from.x) * e, from.y + (lift.y - from.y) * e};
+            Vector2 b{lift.x + (SunCounter.x - lift.x) * e, lift.y + (SunCounter.y - lift.y) * e};
+            DrawSun({a.x + (b.x - a.x) * e, a.y + (b.y - a.y) * e}, model.elapsed, 1 - 0.45f * e);
+        }
         rlPopMatrix();
     }
     void DrawHelp() override {
@@ -358,7 +406,13 @@ public:
         }
         for (const auto& p : model.plants) {
             auto center = Center(p.row, p.col);
-            DrawPlant(center, p.kind, model.elapsed);
+            if (p.age < 0.45f) // soil kicked up by planting
+                for (int i = 0; i < 6; ++i) {
+                    float a = PI + i * PI / 5, d = 14 + p.age * 70;
+                    DrawCircleV({center.x + std::cos(a) * d, center.y + 28 + std::sin(a) * d * 0.45f},
+                                5 * (1 - p.age / 0.45f), Fade({120, 86, 52, 255}, 1 - p.age / 0.45f));
+                }
+            DrawPlant(center, p.kind, model.elapsed, false, BackOut(p.age / 0.3f));
             float maxHp = p.kind == Kind::Wallnut ? 520 : 110;
             if (p.hp < maxHp) {
                 DrawRectangle(static_cast<int>(center.x - 25), static_cast<int>(center.y + 34), 50,
@@ -369,6 +423,27 @@ public:
         }
         for (const auto& z : model.zombies)
             DrawZombie(z, model.elapsed);
+        for (const auto& f : model.fallen) {
+            // Topple backwards about the feet, then sink into a puff of dust.
+            Vector2 feet{f.zombie.x, Center(f.zombie.row, 0).y + 30};
+            float tip = std::min(1.0f, f.age / 0.4f), sink = std::max(0.0f, f.age - 0.4f);
+            if (sink < 0.3f) {
+                rlPushMatrix();
+                rlTranslatef(feet.x, feet.y + sink * 90, 0);
+                rlRotatef(80 * tip * tip, 0, 0, 1);
+                rlTranslatef(-feet.x, -feet.y, 0);
+                auto z = f.zombie;
+                z.flash = 0;
+                DrawZombie(z, model.elapsed);
+                rlPopMatrix();
+            }
+            if (f.age > 0.3f) {
+                float puff = (f.age - 0.3f) / 0.5f;
+                for (int i = 0; i < 5; ++i)
+                    DrawCircleV({feet.x + 20 + (i - 2) * 18 * (0.6f + puff), feet.y - 6 - puff * 14 * (i % 2)},
+                                (10 + i % 3 * 3) * (0.5f + puff), Fade({196, 186, 160, 255}, 0.6f * (1 - puff)));
+            }
+        }
         for (const auto& pea : model.peas) {
             auto center = Center(pea.row, 0);
             DrawCircleV({pea.x + 1, center.y - 5}, 9, {44, 77, 32, 80});
@@ -376,18 +451,12 @@ public:
                         pea.ice ? Color{159, 233, 247, 255} : Color{193, 223, 103, 255});
         }
         for (const auto& sun : model.suns) {
-            auto p = sun.position;
-            DrawCircleV(p, 31,
-                        Fade({249, 217, 90, 255}, 0.2f + 0.06f * std::sin(model.elapsed * 4)));
-            for (int i = 0; i < 8; ++i) {
-                float a = i * PI / 4 + model.elapsed * 0.5f;
-                Campaign::Triangle({p.x + std::cos(a) * 28, p.y + std::sin(a) * 28},
-                                   {p.x + std::cos(a + 0.18f) * 18, p.y + std::sin(a + 0.18f) * 18},
-                                   {p.x + std::cos(a - 0.18f) * 18, p.y + std::sin(a - 0.18f) * 18},
-                                   {246, 199, 61, 255});
-            }
-            DrawCircleV(p, 18, {251, 211, 93, 255});
-            DrawCircleV({p.x - 4, p.y - 5}, 9, {255, 236, 157, 255});
+            float alpha = std::clamp((sun.Lifetime() - sun.age) / 1.5f, 0.0f, 1.0f); // fades before expiring
+            if (sun.age < sun.travel) // the spot it will land on
+                DrawEllipse(static_cast<int>(sun.position.x), static_cast<int>(sun.position.y + 22), 16, 5,
+                            Fade({40, 70, 30, 255}, 0.35f * sun.age / sun.travel));
+            float grow = sun.hop ? BackOut(sun.age / 0.25f) : 1;
+            DrawSun(sun.At(), model.elapsed, grow, alpha);
         }
         for (const auto& b : model.blasts) {
             DrawCircleV(b.position, 115 * b.age / 0.6f + 15,

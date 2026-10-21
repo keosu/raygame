@@ -9,6 +9,11 @@ inline constexpr Color Colors[] = {{226, 83, 72, 255},
                                    {74, 172, 123, 255},
                                    {65, 148, 207, 255},
                                    {164, 102, 196, 255}};
+// 0 → 1 with a small overshoot, for marbles popping into view.
+inline float PopIn(float t) {
+    t = std::clamp(t, 0.0f, 1.0f) - 1;
+    return 1 + 2.70158f * t * t * t + 1.70158f * t * t;
+}
 inline std::array<RayGame::TextureHandle, 5> BallTextures;
 inline RayGame::TextureHandle BallShadow;
 inline void DrawBall(Vector2 p, int color, float radius = 17, bool blast = false) {
@@ -41,6 +46,8 @@ public:
     std::array<RayGame::TextureHandle, 3> backdrops;
     RayGame::TextureHandle launcherTexture;
     int heardShot = 0, heardClear = 0;
+    float ammoChange = 1; // 0..1 after a swap or a new next marble, for the pop-in
+    int shownNext = -1;
     explicit Game(std::filesystem::path directory)
         : Campaign::Game(
               "marble_temple", "MARBLE TEMPLE", "Aim. Match three. Keep the ancient gate sealed.",
@@ -75,6 +82,8 @@ public:
     void StartLevel(int selected) override {
         model.Reset(selected);
         heardShot = heardClear = 0;
+        ammoChange = 1;
+        shownNext = model.next;
         auto scene = RayGame::CreateRef<RayGame::Scene>("Marble Temple");
         scene->CreateGameObject("marble world")->AddComponent<World>(this);
         LoadScene(scene);
@@ -83,14 +92,21 @@ public:
         model.Fire(p);
     }
     void PlayCommand(int command) override {
-        if (command == 30)
+        if (command == 30) {
             model.Swap();
+            ammoChange = 0;
+        }
     }
     void ExtraButtons() override {
         Add(30, {526, 630, 228, 42}, "SWAP COLOURS");
     }
     void Advance(float dt) override {
         model.Update(dt);
+        if (model.next != shownNext) {
+            shownNext = model.next;
+            ammoChange = 0;
+        }
+        ammoChange = std::min(1.0f, ammoChange + dt / 0.18f);
         if (model.soundShot != heardShot) {
             heardShot = model.soundShot;
             Sound("shot");
@@ -122,7 +138,7 @@ public:
                               {250, 153, 104, 255});
         }
         UI::Label(36, 647, "NEXT", 18, Campaign::Cream);
-        DrawBall({112, 654}, model.next, 17);
+        DrawBall({112, 654}, model.next, 17 * PopIn(ammoChange));
         UI::Label(814, 645,
                   (model.shotsFired + 1) % 9 == 0
                       ? "BLAST SHOT READY"
@@ -154,8 +170,14 @@ public:
         DrawCircleSector({gate.x, gate.y + 3}, 34, 0, 360, 96, {13, 23, 21, 255});
         DrawRing(gate, 33, 35, 0, 360, 128, {214, 167, 86, 255});
         UI::LabelCentered(gate.x, gate.y + 39, "GATE", 15, Campaign::Cream);
-        for (const auto& b : model.balls)
-            DrawBall(model.path.At(b.distance), b.color);
+        // New marbles grow out of a well at the start of the track.
+        auto well = model.path.At(0);
+        DrawCircleSector({well.x, well.y + 2}, 22, 0, 360, 64, {13, 23, 21, 230});
+        DrawRing(well, 21, 23, 0, 360, 96, Fade({214, 167, 86, 255}, 0.7f));
+        for (const auto& b : model.balls) {
+            float emerge = std::clamp((b.distance - b.lag) / Spacing, 0.0f, 1.0f);
+            DrawBall(model.Visible(b), b.color, 17 * (0.35f + 0.65f * emerge));
+        }
         for (const auto& s : model.shots) {
             DrawLineEx({s.position.x - s.velocity.x * 0.025f, s.position.y - s.velocity.y * 0.025f},
                        s.position, 8, Fade(Colors[s.color], 0.28f));
@@ -168,6 +190,14 @@ public:
                     {s.position.x + std::cos(a) * distance, s.position.y + std::sin(a) * distance},
                     4 * (1 - s.age / 0.7f), Fade(Colors[s.color], 1 - s.age / 0.7f));
             }
+        for (const auto& p : model.popups) {
+            float fade = std::clamp((1 - p.age) / 0.4f, 0.0f, 1.0f), rise = 50 * (1 - (1 - p.age) * (1 - p.age));
+            UI::TitleCentered(p.position.x, p.position.y - 30 - rise, TextFormat("+%d", p.points),
+                              30 + 4 * std::min(p.combo, 4), Fade({255, 226, 140, 255}, fade));
+            if (p.combo > 1)
+                UI::LabelCentered(p.position.x, p.position.y + 6 - rise, TextFormat("COMBO x%d", p.combo), 18,
+                                  Fade(Campaign::Cream, fade));
+        }
         auto p = model.launcher;
         float angle = std::atan2(aim.y - p.y, aim.x - p.x);
         if (screen == Campaign::Screen::Play) {
@@ -178,7 +208,8 @@ public:
         DrawTexturePro(*launcherTexture, {0, 0, 256, 256}, {p.x, p.y, 128, 128}, {64, 64},
                        angle * RAD2DEG, WHITE);
         Vector2 nozzle{p.x + std::cos(angle) * 35, p.y + std::sin(angle) * 35};
-        DrawBall(nozzle, model.current, 13, (model.shotsFired + 1) % 9 == 0);
+        float reload = PopIn(1 - model.cooldown / 0.2f) * PopIn(ammoChange);
+        DrawBall(nozzle, model.current, 13 * reload, (model.shotsFired + 1) % 9 == 0);
         rlPopMatrix();
     }
     int Smoke();

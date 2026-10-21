@@ -291,7 +291,9 @@ inline void World::Render() {
                 DrawLineEx({p.x - 24, p.y + 23}, {p.x + 24, p.y + 23}, 3, Fade(Gold, 0.6f));
             } else {
                 Vector2 look = Vector2Normalize(Vector2Subtract(game->aim, p));
-                Ball(p, Radius + (model.dragged == i ? 2 : 0), t, Mint, look);
+                float grow = std::clamp(model.nodes[i].age / 0.25f, 0.0f, 1.0f) - 1; // pops in when placed
+                grow = 1 + 2.70158f * grow * grow * grow + 1.70158f * grow * grow;
+                Ball(p, (Radius + (model.dragged == i ? 2 : 0)) * grow, t, Mint, look);
             }
         }
     for (const auto& traveler : model.travelers)
@@ -301,6 +303,36 @@ inline void World::Render() {
             DrawCircleV(p, 17, Fade(Gold, 0.2f));
             Ball(p, 8, t, Gold);
         }
+    for (const auto& b : model.bursts) {
+        float k = b.age / 0.8f, fade = 1 - k;
+        Vector2 c = b.position;
+        if (b.kind == Effect::Snap) {
+            for (int i = 0; i < 8; ++i) {
+                float a = i * PI / 4 + 0.4f, d = 6 + k * 46;
+                Vector2 s{c.x + std::cos(a) * d, c.y + std::sin(a) * d + k * k * 30};
+                DrawLineEx(s, {s.x - std::cos(a) * 7, s.y - std::sin(a) * 7}, 3, Fade({248, 126, 84, 255}, fade));
+            }
+            DrawCircleV(c, 10 * fade, Fade({255, 214, 150, 255}, fade));
+        } else if (b.kind == Effect::Rescue) {
+            DrawCircleV(c, 30 + k * 60, Fade(Gold, 0.35f * fade));
+            DrawRing(c, 26 + k * 70, 30 + k * 70, 0, 360, 64, Fade({255, 246, 211, 255}, fade));
+            for (int i = 0; i < 10; ++i) {
+                float a = i * PI / 5 + k * 2;
+                DrawCircleV({c.x + std::cos(a) * (20 + k * 80), c.y + std::sin(a) * (20 + k * 80)}, 3 * fade + 1,
+                            Fade(Gold, fade));
+            }
+        } else if (b.kind == Effect::Splash) {
+            for (int i = 0; i < 7; ++i) {
+                float spread = (i - 3) * 9.0f, up = 70 * k - 110 * k * k;
+                DrawCircleV({c.x + spread * (1 + k * 2), std::min(670.0f, c.y - up * (1 - std::fabs(i - 3.0f) / 5))},
+                            4 * fade + 1, Fade({196, 235, 230, 255}, fade));
+            }
+            DrawEllipseLines(static_cast<int>(c.x), 668, 12 + k * 40, 3 + k * 6, Fade({196, 235, 230, 255}, fade));
+        } else {
+            DrawRing(c, Radius * (1 - k) - 2, Radius * (1 - k) + 2, 0, 360, 48, Fade(Mint, fade));
+            DrawCircleV(c, 6 * fade, Fade({255, 249, 221, 255}, fade));
+        }
+    }
     if (game->screen == Campaign::Screen::Play) {
         Vector2 p = game->placing ? game->preview : game->aim;
         if (!game->removeMode && model.dragged < 0 && p.y > 185 && p.y < 615 && model.Pick(p) < 0) {

@@ -71,6 +71,30 @@ inline int Game::Smoke() {
     for (int i = 0; i < 60; ++i)
         Step();
     Capture("courtyard");
+    {
+        // An inserted marble glides in from the impact; the balls ahead slide instead of jumping.
+        size_t hit = model.balls.size() / 2;
+        int color = 0;
+        while (color == model.balls[hit - 1].color || color == model.balls[hit].color ||
+               color == model.balls[hit + 1].color)
+            ++color;
+        auto impact = model.path.At(model.balls[hit].distance);
+        model.Insert(hit, color, {impact.x + 40, impact.y - 40});
+        auto gliding = [&] {
+            return std::any_of(model.balls.begin(), model.balls.end(), [](const Ball& b) { return b.settle < 1; });
+        };
+        Step();
+        check(model.balls[0].lag > 1 && gliding(), "insertion animates the chain");
+        Capture("insert-glide");
+        for (int i = 0; i < 40; ++i)
+            Step();
+        check(model.balls[0].lag == 0 && !gliding(), "insertion settles");
+        model.Erase(0, 3, true);
+        for (int i = 0; i < 10; ++i)
+            Step();
+        check(!model.popups.empty(), "cleared group shows its points");
+        Capture("clear-popup");
+    }
     float elapsed = model.elapsed;
     Click({1090, 49}, true);
     for (int i = 0; i < 20; ++i)

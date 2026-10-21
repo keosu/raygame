@@ -167,7 +167,7 @@ public:
             float a = (float)i / trail.size();
             DrawCircleV(trail[i], radius * a, Fade(Color{120, 240, 255, 255}, a * 0.4f));
         }
-        DrawGlowCircle(p, radius, Color{140, 240, 255, 255});
+        DrawGlowCircle(p, radius * gameObject->transform->GetRenderScale().x, Color{140, 240, 255, 255});
     }
 
     void OnTriggerEnter(Collider* other) override;  // defined after scene
@@ -183,6 +183,7 @@ public:
     int bricksLeft = 0;
     int highscore = 0;
     bool gameOver = false;
+    float overTime = 0; // real seconds since the round ended, for the result panel's entrance
     bool won = false;
     bool restartRequested = false;
     std::filesystem::path savePath;
@@ -287,6 +288,13 @@ public:
         b->game = this;
         auto col = ball->AddComponent<CircleCollider>(10.0f);
         col->isTrigger = true;
+        // The served ball pops onto the paddle instead of appearing at full size.
+        std::weak_ptr<GameObject> weakBall = ball;
+        ball->transform->scale = {0, 0};
+        Tween::To(0.0f, 1.0f, 0.35f, Ease::BackOut, [weakBall](float value) {
+            auto object = weakBall.lock();
+            if (object && !object->IsDestroyed()) object->transform->scale = {value, value};
+        });
     }
 
     void OnBrickDestroyed(Vector2 pos, Color color, int points) {
@@ -318,12 +326,13 @@ public:
 
     void Restart() {
         Clear();
-        score = 0; lives = 3; gameOver = false; won = false; restartRequested = false;
+        score = 0; lives = 3; gameOver = false; overTime = 0; won = false; restartRequested = false;
         Load();
     }
 
     void Update() override {
         Scene::Update();
+        if (gameOver) overTime += GameTime::UnscaledDeltaTime();
         if (gameOver && (restartRequested || Input::GetKeyDown(KEY_R))) Restart();
     }
 
@@ -340,7 +349,8 @@ public:
             UI::TitleCentered(ExampleUI::Width() / 2, ExampleUI::Height() - 180, "READY TO LAUNCH", 32);
             UI::LabelCentered(ExampleUI::Width() / 2, ExampleUI::Height() - 142, "Press Space or click to begin", 20, ExampleUI::muted);
         }
-        if (gameOver && ExampleUI::Result(ExampleUI::Width(), ExampleUI::Height(), won ? "ALL CLEAR" : "GAME OVER", score, won)) {
+        if (gameOver && ExampleUI::Result(ExampleUI::Width(), ExampleUI::Height(), won ? "ALL CLEAR" : "GAME OVER", score, won,
+                                          ExampleUI::ResultAppear(overTime, 0.6f))) {
             restartRequested = true;
         }
     }

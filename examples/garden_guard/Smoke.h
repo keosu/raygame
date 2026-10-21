@@ -99,10 +99,25 @@ inline int Game::Smoke() {
     Click({458, 140});
     Click(Center(2, 2));
     check(model.PlantAt(2, 2) >= 0, "peashooter placed");
+    Capture("plant-pop");
     model.suns.push_back({100, {985, 420}});
     int sun = model.sun;
     Click({985, 420}, true);
     check(model.sun == sun + 25, "real sun token collection");
+    check(flights.size() == 1, "collected sun flies toward the counter");
+    for (int i = 0; i < 12; ++i)
+        Step();
+    Capture("sun-flight");
+    for (int i = 0; i < 22 && !flights.empty(); ++i)
+        Step();
+    check(flights.empty() && counterPulse > 0.8f, "sun lands on the counter and pulses it");
+    Step();
+    Capture("sun-landed");
+    model.suns.push_back({101, {700, 420}, 0, {700, Top - 130}, 3});
+    for (int i = 0; i < 60; ++i)
+        Step();
+    check(model.suns.back().At().y < 420 - 50, "sky sun drifts down before resting");
+    Capture("sky-sun");
     Click({1180, 140});
     Click(Center(0, 0));
     check(model.PlantAt(0, 0) < 0, "shovel removes plant");

@@ -14,7 +14,7 @@ inline const char* Names[] = {"SUNFLOWER", "PEASHOOTER", "WALLNUT",
 struct Plant {
     int row, col;
     Kind kind;
-    float hp = 100, timer = 0, flash = 0;
+    float hp = 100, timer = 0, flash = 0, age = 0;
 };
 struct Zombie {
     int id, row, type;
@@ -27,7 +27,28 @@ struct Pea {
 };
 struct Sun {
     int id;
-    Vector2 position;
+    Vector2 position; // where it comes to rest
+    float age = 0;
+    Vector2 origin{}; // where its entrance starts
+    float travel = 0; // entrance length in seconds; 0 means already resting
+    bool hop = false; // tossed in an arc by a sunflower instead of drifting down from the sky
+    float Lifetime() const { return travel + 10; }
+    // Where the token is drawn and clicked.
+    Vector2 At() const {
+        if (travel <= 0 || age >= travel)
+            return position;
+        float t = age / travel, e = hop ? t : 1 - (1 - t) * (1 - t);
+        Vector2 p{origin.x + (position.x - origin.x) * e, origin.y + (position.y - origin.y) * e};
+        if (hop)
+            p.y -= std::sin(t * PI) * 46;
+        else
+            p.x += std::sin(age * 2.4f + id) * 10 * (1 - t);
+        return p;
+    }
+};
+// A defeated visitor topples over before it disappears.
+struct Fallen {
+    Zombie zombie;
     float age = 0;
 };
 struct Blast {
@@ -48,12 +69,14 @@ public:
     std::vector<Pea> peas;
     std::vector<Sun> suns;
     std::vector<Blast> blasts;
+    std::vector<Fallen> fallen;
     std::vector<Spawn> schedule;
     std::array<float, 6> cooldown{};
     std::array<bool, 5> mowerReady{true, true, true, true, true};
     std::array<float, 5> mowerX{-1, -1, -1, -1, -1};
     int stage = 0, sun = 200, selected = 1, score = 0, defeated = 0, spawned = 0, outcome = 0;
-    int nextId = 1, soundShot = 0, soundHit = 0, soundPlant = 0;
+    int nextId = 1, soundShot = 0, soundHit = 0, soundPlant = 0, collected = 0;
+    Vector2 lastPickup{}; // where the latest collected token was, for its flight to the counter
     float elapsed = 0, skyTimer = 3, waveFlash = 0;
     std::uint32_t random = 1;
     unsigned Random() {
@@ -112,10 +135,13 @@ public:
         if (outcome || !std::isfinite(point.x) || !std::isfinite(point.y))
             return false;
         for (auto it = suns.rbegin(); it != suns.rend(); ++it) {
-            float x = point.x - it->position.x, y = point.y - it->position.y;
+            Vector2 at = it->At();
+            float x = point.x - at.x, y = point.y - at.y;
             if (x * x + y * y < 34 * 34) {
                 sun += 25;
                 score += 25;
+                lastPickup = at;
+                ++collected;
                 suns.erase(std::next(it).base());
                 return true;
             }
@@ -158,17 +184,20 @@ public:
         skyTimer -= dt;
         if (skyTimer <= 0) {
             skyTimer += 6;
-            suns.push_back({nextId++,
-                            {Left + 40 + static_cast<float>(Random() % 830),
-                             Top + 20 + static_cast<float>(Random() % 370)}});
+            Vector2 rest{Left + 40 + static_cast<float>(Random() % 830),
+                         Top + 20 + static_cast<float>(Random() % 370)};
+            Vector2 from{rest.x, Top - 130};
+            suns.push_back({nextId++, rest, 0, from, 1.5f + (rest.y - from.y) / 160});
         }
         for (auto& p : plants) {
             p.timer -= dt;
+            p.age += dt;
             p.flash = std::max(0.0f, p.flash - dt);
             if (p.kind == Kind::Sunflower && p.timer <= 0) {
                 p.timer += 8;
                 auto center = Center(p.row, p.col);
-                suns.push_back({nextId++, {center.x + 15, center.y + 5}});
+                suns.push_back({nextId++, {center.x + 15, center.y + 5}, 0, {center.x, center.y - 10},
+                                0.55f, true});
             } else if (p.kind == Kind::Cherry && p.timer <= 0) {
                 auto center = Center(p.row, p.col);
                 blasts.push_back({center});
@@ -248,10 +277,16 @@ public:
                 if (mowerX[row] > 1260)
                     mowerX[row] = -1;
             }
+        for (auto& f : fallen)
+            f.age += dt;
+        fallen.erase(std::remove_if(fallen.begin(), fallen.end(),
+                                    [](const Fallen& f) { return f.age > 0.8f; }),
+                     fallen.end());
         for (const auto& z : zombies)
             if (z.hp <= 0) {
                 ++defeated;
                 score += z.type == 1 ? 150 : 100;
+                fallen.push_back({z});
             }
         zombies.erase(std::remove_if(zombies.begin(), zombies.end(),
                                      [](const Zombie& z) { return z.hp <= 0; }),
@@ -262,7 +297,7 @@ public:
         for (auto& s : suns)
             s.age += dt;
         suns.erase(
-            std::remove_if(suns.begin(), suns.end(), [](const Sun& s) { return s.age > 12; }),
+            std::remove_if(suns.begin(), suns.end(), [](const Sun& s) { return s.age > s.Lifetime(); }),
             suns.end());
         for (auto& b : blasts)
             b.age += dt;

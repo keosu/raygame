@@ -2,6 +2,31 @@
 
 更新时间：2026-10-20。
 
+## 工作包：示例动画打磨（2026-10-21）
+
+用户反馈 garden_guard 收集阳光没有动画、marble_temple 加球有突变，并要求检查其他示例。
+- garden_guard：
+  - `Sun` 新增 `origin/travel/hop` 和 `At()`。天降阳光从顶部飘落（左右轻摆，落点有阴影），向日葵阳光抛出一道弧线并弹出。
+    点击检测改用 `At()`（看到哪里点哪里）。快过期的阳光最后 1.5 秒渐隐，寿命改为入场时间 + 10 秒。
+  - 收集后阳光沿曲线飞向左上角计数器（0.6 秒，`Game::flights`），落下时数字才增加，图标放大发光；模型里的 `sun` 仍立即增加。
+  - 新种植物从土里弹出并扬起尘土（`Plant::age`、`DrawPlant` 的 `size`）。
+  - 被打倒的僵尸向后倒下、下沉，扬起一团尘土（`Model::fallen`，0.8 秒）。
+- marble_temple：
+  - `Ball` 新增 `lag/settle/from`，`Model::Visible` 计算绘制位置。射入的球从击中点滑进空位（0.12 秒），
+    前面的球按 lag 指数缓动让位，不再瞬间跳一个球位；碰撞和逻辑仍用真实 `distance`。
+  - 轨道起点画出洞口，新球从洞口长大出来。炮口装填、交换颜色、下一颗变化时有弹出缩放。
+  - 消除时在消除位置飘出 “+分数” 和 “COMBO xN”（`Model::popups`）。
+- goo_journey：`Burst` 效果（断裂火花、救援金光、落水水花、回收光环）；新放的粘球弹出（`Node::age`）。
+- 街机示例：`ExampleUI::Result` 新增 `appear` 参数和 `ResultAppear(秒, 延迟)`，结算面板在最后的爆炸之后延迟渐入、
+  上滑，完全出现前按钮不响应。space_shooter（延迟 0.8 秒）、bullet_hell、neon_breakout（0.6 秒）接入；
+  neon_breakout 丢球后新球在挡板上弹出（缩放缓动，`Ball::Render` 按缩放绘制）。
+- 测试：`tests/campaigns.cpp` 的 garden bot 改为点 `At()`。garden 冒烟新增 plant-pop、sun-flight、sun-landed、sky-sun
+  截图和检查；marble 冒烟新增 insert-glide、clear-popup 截图和检查。
+
+验证（全部通过）：全目标构建；`campaign_tests` 37 passed（bot 三关都照常打通）；`tests.exe` 499 passed；`smoke.exe`；
+engine_lab、garden_guard、marble_temple、goo_journey `--smoke` 0 failures。核对了新增截图。
+未核对画面：goo_journey 的救援、断裂、水花效果（冒烟流程里没有发生）；三个街机示例的结算渐入（没有截图流程）。
+
 ## 工作包：引擎新增场景时钟、脚本化运行、音量压低和画布裁剪（2026-10-20~21，已提交）
 
 2026-10-21 会话重新连接后补跑窗口检查，全部通过：`smoke.exe` 退出 0；engine_lab、garden_guard、marble_temple、

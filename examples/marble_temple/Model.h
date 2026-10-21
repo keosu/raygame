@@ -7,6 +7,15 @@ inline constexpr float Spacing = 36;
 struct Ball {
     float distance;
     int color;
+    float lag = 0;    // drawn this far behind its slot along the path, easing to zero
+    float settle = 1; // 0..1 while a newly inserted ball slides from where the shot struck
+    Vector2 from{};
+};
+// Points rising from a cleared group.
+struct Popup {
+    Vector2 position;
+    int points, combo;
+    float age = 0;
 };
 struct Shot {
     Vector2 position, velocity;
@@ -80,6 +89,7 @@ public:
     std::vector<Ball> balls;
     std::vector<Shot> shots;
     std::vector<Spark> sparks;
+    std::vector<Popup> popups;
     Vector2 launcher{640, 390};
     int stage = 0, remaining = 0, score = 0, combo = 0, shotsFired = 0, removed = 0, outcome = 0;
     int current = 0, next = 1, colors = 4;
@@ -138,6 +148,14 @@ public:
         cooldown = 0.20f;
         return true;
     }
+    // Where a ball is drawn: behind its slot by its lag, or on its way in from the impact.
+    Vector2 Visible(const Ball& b) const {
+        Vector2 slot = path.At(b.distance - b.lag);
+        if (b.settle >= 1)
+            return slot;
+        float e = 1 - (1 - b.settle) * (1 - b.settle);
+        return {b.from.x + (slot.x - b.from.x) * e, b.from.y + (slot.y - b.from.y) * e};
+    }
     void Erase(size_t first, size_t last, bool chain) {
         int count = static_cast<int>(last - first);
         combo = chain ? combo + 1 : 1;
@@ -145,8 +163,13 @@ public:
         score += count * 100 * combo;
         slow = std::max(slow, 1.2f);
         ++soundClear;
-        for (size_t i = first; i < last; ++i)
-            sparks.push_back({path.At(balls[i].distance), 0, balls[i].color});
+        Vector2 middle{};
+        for (size_t i = first; i < last; ++i) {
+            auto at = Visible(balls[i]);
+            sparks.push_back({at, 0, balls[i].color});
+            middle = {middle.x + at.x / count, middle.y + at.y / count};
+        }
+        popups.push_back({middle, count * 100 * combo, combo});
         balls.erase(balls.begin() + first, balls.begin() + last);
     }
     bool Match(size_t at, bool chain) {
@@ -176,14 +199,20 @@ public:
         bool front = (impact.x - center.x) * tangent.x + (impact.y - center.y) * tangent.y > 0;
         size_t at = front ? hit : hit + 1;
         float distance = balls[hit].distance + (front ? Spacing : 0);
-        for (size_t i = 0; i < at; ++i)
+        // Balls ahead make room at once but glide there (lag) instead of jumping.
+        for (size_t i = 0; i < at; ++i) {
             balls[i].distance += Spacing;
+            balls[i].lag += Spacing;
+        }
         if (front)
             distance = balls[hit].distance + Spacing;
-        balls.insert(balls.begin() + at, {distance, color});
+        balls.insert(balls.begin() + at, {distance, color, 0, 0, impact});
         // Restore strict order if the hit was beside a closing gap.
-        for (size_t i = balls.size() - 1; i > 0; --i)
-            balls[i - 1].distance = std::max(balls[i - 1].distance, balls[i].distance + Spacing);
+        for (size_t i = balls.size() - 1; i > 0; --i) {
+            float ordered = std::max(balls[i - 1].distance, balls[i].distance + Spacing);
+            balls[i - 1].lag += ordered - balls[i - 1].distance;
+            balls[i - 1].distance = ordered;
+        }
         if (!Match(at, false))
             combo = 0;
     }
@@ -195,8 +224,11 @@ public:
         cooldown = std::max(0.0f, cooldown - dt);
         slow = std::max(0.0f, slow - dt);
         float speed = (13 + stage * 3.5f) * (slow > 0 ? 0.28f : 1);
-        for (auto& b : balls)
+        for (auto& b : balls) {
             b.distance += speed * dt;
+            b.lag = b.lag > 0.05f ? b.lag * std::exp(-14 * dt) : 0;
+            b.settle = std::min(1.0f, b.settle + dt / 0.12f);
+        }
         if (remaining > 0 && (balls.empty() || balls.back().distance >= Spacing))
             Spawn(balls.empty() ? 0 : balls.back().distance - Spacing);
         for (size_t i = 0; i + 1 < balls.size(); ++i) {
@@ -248,6 +280,11 @@ public:
         sparks.erase(std::remove_if(sparks.begin(), sparks.end(),
                                     [](const Spark& s) { return s.age > 0.7f; }),
                      sparks.end());
+        for (auto& p : popups)
+            p.age += dt;
+        popups.erase(std::remove_if(popups.begin(), popups.end(),
+                                    [](const Popup& p) { return p.age > 1.0f; }),
+                     popups.end());
         if (balls.empty() && remaining == 0) {
             outcome = 1;
             score += 1000 + std::max(0, 240 - static_cast<int>(elapsed)) * 10;
