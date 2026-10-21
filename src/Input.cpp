@@ -58,7 +58,11 @@ void Input::CaptureFrame() {
                 device.axes[i] = GetGamepadAxisMovement(pad, i);
         }
     }
-    SetFrame(next);
+    CaptureFrame(next);
+}
+void Input::CaptureFrame(InputFrame raw) {
+    if (captureFilter) captureFilter(raw);
+    SetFrame(raw);
 }
 void Input::SetFrame(const InputFrame& value) {
     if (inFixedTick) throw std::logic_error("Cannot replace input inside a fixed tick");

@@ -2,6 +2,7 @@
 
 #include "Game.h"
 #include "Map.h"
+#include <optional>
 
 namespace UG {
 
@@ -25,6 +26,8 @@ private:
     // Skill effects on the database page: a demo battle the menu ticks, drawn without field or kaiju.
     Ref<BattleScene> preview;
     int previewHero = -1;
+    SceneClock previewClock;
+    std::optional<AudioManager::Duck> previewDuck;
     RenderTexture2D sky{};
     std::vector<RenderTexture2D> previews;
     std::vector<MapData> maps;

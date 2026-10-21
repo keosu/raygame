@@ -46,6 +46,23 @@ public:
     float GetInterpolationAlpha() const { return interpolationAlpha; }
     void ResetInterpolation();
 
+    // One fixed step in engine phase order, inside the scene's callback scope. Call it within a
+    // GameTime::FixedStepScope. `proceed` is checked between phases (the engine stops when paused),
+    // and a phase that clears or reloads the scene ends the step. Returns whether every phase ran.
+    template<typename Proceed>
+    bool RunFixedStep(float dt, Proceed&& proceed) {
+        ScopeActivation scope(GetCallbackScope());
+        auto stepGeneration = generation;
+        auto canContinue = [&] { return proceed() && generation == stepGeneration; };
+        BeginFixedStep();
+        if (canContinue()) FixedUpdate();
+        if (canContinue()) IntegratePhysics(dt);
+        if (canContinue()) physics.Step();
+        if (canContinue()) PostFixedUpdate();
+        return canContinue();
+    }
+    bool RunFixedStep(float dt) { return RunFixedStep(dt, [] { return true; }); }
+
     virtual void Update() {
         if (!started) Start();
         FlushPending();

@@ -20,7 +20,7 @@ xmake android --game=ultra_guard
 ```
 
 存档与日志位于 `raygame.ultra_guard` 用户数据目录。开发参数：`--capture <目录>`
-自动巡览所有页面并导出截图（可加 `--skin <皮肤目录>`）；`--balance <文件>` 无窗口运行
+在隐藏窗口里自动巡览所有页面并导出截图（引擎 `Automation`，可加 `--skin <皮肤目录>`）；`--balance <文件>` 无窗口运行
 平衡机器人（每关 3 次，同一版本结果逐字节一致）；`--export-skin <目录>` 把内置画面导出为
 皮肤模板。
 

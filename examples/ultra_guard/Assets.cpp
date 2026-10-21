@@ -72,16 +72,10 @@ void Load() {
     ApplySettings();
 }
 
-namespace {
-float effectScale = 1;
-} // namespace
-
 void Play(const char* name, float volume, float pitchJitter) {
     float pitch = 1.0f + (pitchJitter > 0 ? Rand(-pitchJitter, pitchJitter) : 0.0f);
-    AudioManager::PlaySound(name, volume * effectScale, pitch);
+    AudioManager::PlaySound(name, volume, pitch);
 }
-
-void SetEffectScale(float scale) { effectScale = scale; }
 
 void PlayMusic(const char* name) {
     if (currentMusic == name) return;

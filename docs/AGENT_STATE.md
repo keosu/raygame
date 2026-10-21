@@ -2,6 +2,48 @@
 
 更新时间：2026-10-20。
 
+## 工作包：引擎新增场景时钟、脚本化运行、音量压低和画布裁剪（2026-10-20~21，已提交）
+
+2026-10-21 会话重新连接后补跑窗口检查，全部通过：`smoke.exe` 退出 0；engine_lab、garden_guard、marble_temple、
+goo_journey 的 `--smoke` 均 0 failures；Ultra Guard `--capture build/ug-engine` 隐藏窗口 70 秒跑完，36 张截图 + 17 张头像。
+核对了 15_margins、28_survival（怪兽正常进攻）、31~33 预览（特效被裁在头像区域内）和引擎实验室 physics 视口。
+下面“未运行”和“下一步”中的窗口检查一项已完成；Linux 构建仍未跑。
+
+从 Ultra Guard 里抽出四项通用能力放进引擎，Ultra Guard 和引擎实验室改用引擎版本。
+- `Scene::RunFixedStep(dt, proceed)`：引擎固定步长的阶段顺序（位姿记录、FixedUpdate、积分、物理、PostFixedUpdate），
+  `GameEngine::Tick` 改为调用它，行为不变。新头文件 `SceneClock.h`：`Advance(scene, dt)` 按引擎帧顺序驱动
+  引擎之外的场景（自己的累加器、时间和时间倍率，每帧最多 8×倍率步），`Step(scene)` 给无窗口模拟用。
+  - Ultra Guard：菜单用 `SceneClock` 驱动技能预览，删除 `TickEmbedded`；`BattleScene::Update` 在 embedded 时只跑
+    `Scene::Update`。`RunBot` 和 `BenchmarkDemo` 改用 `clock.Step`，从“只调 FixedUpdate”变成完整固定步。
+- `AudioManager::Duck`：作用域内把某个频道再乘一个系数，可叠乘、任意顺序释放，不改玩家设置；音乐立即生效，音效对之后
+  播放的生效。Ultra Guard 删掉自己的 `Sfx::SetEffectScale`，预览期间持有 `Duck(Sfx, 0.35)`。
+- `Display::ClipScope`（画布单位裁剪，可嵌套求交）和纯函数 `CanvasToTargetPixels`。原来 Ultra Guard 预览直接用
+  `BeginScissorMode` 传画布坐标是错的：画布纹理按 64 像素取整并超采样，窗口模式下纵向偏约 7%，全屏会裁到错误区域。
+  引擎实验室的手写换算也改用 `ClipScope`。`Display::End` 拆成 `PreparePresentation` + `DrawPresentation`。
+- 新模块 `Automation.h/.cpp`：`Start(目录, {hiddenWindow})`、`At(帧, 动作)`、`Every(动作)`、`Click/PressKey/Tap`
+  （画布坐标，经 `Input` 的新捕获过滤器 `Input::SetCaptureFilter` 叠加在设备输入上，运行期间窗口始终视为有焦点）、
+  `SaveCanvas`（逻辑尺寸）、`SaveWindow`（含边距，复用 Display 的呈现步骤）。`GameEngine::Update` 在采集输入前
+  `BeginFrame`；`hiddenWindow` 时 Init 前设 `FLAG_WINDOW_HIDDEN`（与 `tests/smoke.cpp` 相同做法）。
+  - Ultra Guard `--capture` 改用 Automation：隐藏窗口，`Shot/ShotWindow` 换成 `SaveCanvas/SaveWindow`，
+    `Capture(frame)` 由 `Every` 驱动；删除 `captureDir`、`ScriptedCapture()`。
+- README 增加 ClipScope、Duck、SceneClock、脚本化运行的说明；`tests/scene_clock_and_automation.h` 新增 45 项检查。
+
+验证：
+- 通过：MSVC Release 全目标构建；`tests.exe` 499 passed、0 failed；`--balance`（`build/ug-bal-engine.txt`）与改动前
+  `build/ug-bal-castle5.txt` 212 行逐字相同（完整固定步没有改变任何结果）。
+- 未运行：所有需要窗口的检查。用户的 Windows 会话处于断开状态（`query user` 显示 Disc，只有 WinDisc 虚拟显示器），
+  GLFW 建窗时报 “Failed to determine Monitor to center Window” 后崩溃，未改动的 `smoke.exe` 和各示例 `--smoke` 也一样
+  （上午会话连接时 `smoke.exe` 和 `--capture` 都通过）。没有核对：Ultra Guard 隐藏窗口截图巡览、技能预览裁剪位置、
+  `SaveWindow` 边距截图、引擎实验室 ClipScope。Linux 构建未跑。
+
+下一步：
+- 会话重新连接后：跑 `smoke.exe`、`engine_lab --smoke --data build/smoke-engine_lab`、三个战役示例 `--smoke`、
+  Ultra Guard `--capture build/ug-engine`（应生成 36 张截图和 portraits），核对 15_margins 和 31~36 预览。
+  注意：巡览动作现在在 Tick 之前执行，场景切换比原来早一帧生效，个别截图时机可能要微调。
+- 都通过后提交这一工作包。
+- 其他示例（engine_lab、CampaignGame、forge_runner）仍各自实现截图和输入注入，可以逐步改用 `Automation::SaveCanvas`；
+  它们的 smoke 是自己驱动 Tick/Render，不走 `Run`，所以 `At/Every` 对它们不适用，只能用截图函数。
+
 ## 工作包：Ultra Guard 新关卡、守城生存、17 位英雄与技能演示（2026-10-19~20，已提交）
 
 三部分在 2026-10-20 按用户要求合成一个提交。第三部分覆盖了第二部分里的“技能演示”和守城地图。

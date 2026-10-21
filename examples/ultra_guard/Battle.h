@@ -118,10 +118,9 @@ public:
     // Demo scenes only: damage per second the hero deals to the passing parade.
     float BenchmarkDemo(int star, float seconds);
     bool headless = false;
-    // Skill preview on the database page: the menu owns the clock and draws only the attack effects,
-    // so the scene never touches music, game speed or input.
+    // Skill preview on the database page: the menu drives it with a SceneClock and draws only the
+    // attack effects, so the scene never touches music, game speed or input.
     bool embedded = false;
-    void TickEmbedded(float real);
     void DrawEmbedded(Rectangle clip, Vector2 heroAt);
     void ReleaseEmbedded();
 
@@ -135,7 +134,7 @@ private:
     bool demo = false;
     HeroId demoHero = HeroId::Ultraman;
     int demoStar = 2;
-    float demoSpawn = 0, demoClock = 0, demoDealt = 0, embedClock = 0;
+    float demoSpawn = 0, demoClock = 0, demoDealt = 0;
     int demoCount = 0;
     const LevelDef* level = nullptr;
     LevelDef endless;           // survival copy whose waves grow as they are needed; also the demo level

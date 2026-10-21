@@ -16,8 +16,6 @@ namespace Sfx {
 void Load();
 // Repeated triggers of one effect are throttled so dense fights stay readable.
 void Play(const char* name, float volume = 1.0f, float pitchJitter = 0.06f);
-// Multiplies every Play volume; the database page quiets its embedded skill preview.
-void SetEffectScale(float scale);
 void PlayMusic(const char* name);
 void StopMusic();
 void ApplySettings();

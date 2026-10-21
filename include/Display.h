@@ -136,19 +136,72 @@ public:
 
     static void End() {
         inFrame = false;
+        if (!clipStack.empty()) {
+            EndScissorMode();
+            clipStack.clear();
+        }
         EndTextureMode();
         Rectangle window{0, 0, (float)::GetScreenWidth(), (float)::GetScreenHeight()};
-        bool margins = viewport.bounds.width < window.width - 0.5f ||
-                       viewport.bounds.height < window.height - 0.5f;
-        if (margins && marginStyle == MarginStyle::BlurredCanvas)
-            PrepareMarginBlur(canvas.texture);
+        PreparePresentation(window);
         BeginDrawing();
-        ClearBackground(marginColor);
-        if (margins)
-            DrawMarginFill(window, viewport.bounds);
-        PresentOpaque(canvas.texture, viewport.bounds);
+        DrawPresentation(window);
         EndDrawing();
     }
+
+    // The two halves of presenting the canvas into `window`, also used to rebuild the presented
+    // frame off screen (window screenshots). Prepare must run outside any texture mode; Draw
+    // draws into the current target.
+    static void PreparePresentation(Rectangle window) {
+        if (HasMargins(window) && marginStyle == MarginStyle::BlurredCanvas)
+            PrepareMarginBlur(canvas.texture);
+    }
+    static void DrawPresentation(Rectangle window) {
+        ClearBackground(marginColor);
+        if (HasMargins(window))
+            DrawMarginFill(window, viewport.bounds);
+        PresentOpaque(canvas.texture, viewport.bounds);
+    }
+
+    // Maps a rectangle in canvas units to pixels of a `targetWidth`×`targetHeight` render target
+    // that shows `logical` canvas units, rounded outwards.
+    static Rectangle CanvasToTargetPixels(Rectangle r, int targetWidth, int targetHeight,
+                                          Vector2 logical) {
+        float sx = targetWidth / std::max(1.0f, logical.x),
+              sy = targetHeight / std::max(1.0f, logical.y);
+        float x0 = std::floor(r.x * sx), y0 = std::floor(r.y * sy);
+        float x1 = std::ceil((r.x + r.width) * sx), y1 = std::ceil((r.y + r.height) * sy);
+        return {x0, y0, std::max(0.0f, x1 - x0), std::max(0.0f, y1 - y0)};
+    }
+
+    // Clips drawing to a rectangle given in canvas units while the canvas is the target.
+    // raylib's scissor takes render-target pixels, and the canvas texture is supersampled and
+    // padded to 64-pixel steps, so canvas units would clip the wrong area. Nested scopes
+    // intersect. Outside a frame the rectangle is taken as pixels of the current target.
+    // Do not open an OffscreenScope inside a clip.
+    class ClipScope {
+    public:
+        explicit ClipScope(Rectangle canvasRect) {
+            Rectangle pixels = inFrame ? CanvasToTargetPixels(canvasRect, canvas.texture.width,
+                                                               canvas.texture.height, GetSize())
+                                       : canvasRect;
+            if (!clipStack.empty()) pixels = GetCollisionRec(pixels, clipStack.back());
+            clipStack.push_back(pixels);
+            Apply(pixels);
+        }
+        ~ClipScope() {
+            if (clipStack.empty()) return; // the frame ended inside the scope
+            clipStack.pop_back();
+            if (clipStack.empty()) EndScissorMode();
+            else Apply(clipStack.back());
+        }
+        ClipScope(const ClipScope&) = delete;
+        ClipScope& operator=(const ClipScope&) = delete;
+
+    private:
+        static void Apply(Rectangle r) {
+            BeginScissorMode((int)r.x, (int)r.y, (int)r.width, (int)r.height);
+        }
+    };
 
     // What fills the bars around a Fit canvas whose aspect differs from the window.
     // BlurredCanvas stretches a soft, dimmed copy of the current frame across the window,
@@ -259,10 +312,15 @@ public:
         viewport = {};
         failedWidth = failedHeight = 0;
         inFrame = false;
+        clipStack.clear();
         canvasQuality = CanvasQuality::Standard;
     }
 
 private:
+    static bool HasMargins(Rectangle window) {
+        return viewport.bounds.width < window.width - 0.5f ||
+               viewport.bounds.height < window.height - 0.5f;
+    }
     static void BeginCanvasMode() {
         BeginTextureMode(canvas);
         // Scale the projection so nested scene cameras keep working in game units.
@@ -286,6 +344,7 @@ private:
     static inline int failedWidth = 0, failedHeight = 0;
     static inline CanvasViewport viewport;
     static inline RenderTexture2D canvas = {};
+    static inline std::vector<Rectangle> clipStack;
 };
 
 } // namespace RayGame

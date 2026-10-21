@@ -164,6 +164,7 @@ static void TestPhysicsCallbacks() {
 #include "engine_extensions.h"
 #include "speech.h"
 #include "pointer_gesture.h"
+#include "scene_clock_and_automation.h"
 
 int main() {
     printf("RayGame tests\n=============\n");
@@ -182,6 +183,7 @@ int main() {
     extension_tests::Run();
     TestSpeech();
     TestPointerGesture();
+    clock_tests::Run();
 
     printf("=============\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

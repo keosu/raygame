@@ -12,7 +12,6 @@ namespace UG {
 namespace {
 class UltraGame;
 UltraGame* game = nullptr;
-std::string captureDir;
 std::string skinArg;   // --skin: use this skin folder without saving the choice
 std::string exportDir; // --export-skin: write the built-in art as a skin template and quit
 
@@ -44,8 +43,11 @@ protected:
         }
         UnloadImage(icon);
 #endif
-        if (Progress::Options().fullscreen && captureDir.empty()) SetFullscreen(true);
-        if (!captureDir.empty()) ExportPortraits();
+        if (Progress::Options().fullscreen && !Automation::Active()) SetFullscreen(true);
+        if (Automation::Active()) {
+            ExportPortraits();
+            Automation::Every([this](int frame) { Capture(frame); });
+        }
         LoadScene(CreateRef<MenuScene>(MenuPage::Title));
     }
 
@@ -54,53 +56,24 @@ protected:
         if (Input::GetKeyDown(KEY_F11) || (Input::GetKeyDown(KEY_ENTER) && (Input::GetKey(KEY_LEFT_ALT) || Input::GetKey(KEY_RIGHT_ALT))))
             ToggleFullscreenMode();
         if (Input::GetKeyDown(KEY_F1)) ToggleDebug();
-        if (!captureDir.empty()) Capture();
     }
 
 public:
     int exportResult = 0;
 
 private:
-    int frame = 0;
-
     void ExportPortraits() {
-        MakeDirectory((captureDir + "/portraits").c_str());
+        auto folder = Automation::Directory() / "portraits";
+        std::filesystem::create_directories(folder);
         for (int i = 0; i < kHeroCount; ++i) {
             Image image = LoadImageFromTexture(Art::Portrait((HeroId)i));
-            ExportImage(image, (captureDir + "/portraits/" + HeroInfo((HeroId)i).key + ".png").c_str());
+            ExportImage(image, (folder / (std::string(HeroInfo((HeroId)i).key) + ".png")).u8string().c_str());
             UnloadImage(image);
         }
     }
 
-    void Shot(const char* name) {
-        Image image = LoadImageFromTexture(Display::GetCanvasTexture());
-        ImageFlipVertical(&image);
-        ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8); // the window shows the canvas opaque
-        ImageResize(&image, kCanvasW, kCanvasH);
-        ExportImage(image, (captureDir + "/" + name + ".png").c_str());
-        UnloadImage(image);
-    }
-
-    // The presented window, margins included, rebuilt with the same steps as Display::End.
-    void ShotWindow(const char* name) {
-        Rectangle window{0, 0, (float)::GetScreenWidth(), (float)::GetScreenHeight()};
-        RenderTexture2D target = LoadRenderTexture((int)window.width, (int)window.height);
-        Display::PrepareMarginBlur(Display::GetCanvasTexture());
-        BeginTextureMode(target);
-        Display::DrawMarginFill(window, Display::GetViewport().bounds);
-        Display::PresentOpaque(Display::GetCanvasTexture(), Display::GetViewport().bounds);
-        EndTextureMode();
-        Image image = LoadImageFromTexture(target.texture);
-        ImageFlipVertical(&image);
-        ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8);
-        ExportImage(image, (captureDir + "/" + name + ".png").c_str());
-        UnloadImage(image);
-        UnloadRenderTexture(target);
-    }
-
     // Scripted tour used to verify rendering without manual play.
-    void Capture() {
-        ++frame;
+    void Capture(int frame) {
         int skin = Skins::Current(), skins = (int)Skins::All().size();
         switch (frame) {
         case 2:
@@ -112,59 +85,59 @@ private:
             GoToMenu(MenuPage::Title);
             break;
         case 50:
-            Shot("01_title");
+            Automation::SaveCanvas("01_title");
             GoToMenu(MenuPage::Levels);
             break;
         case 90:
-            Shot("02_levels");
+            Automation::SaveCanvas("02_levels");
             GoToMenu(MenuPage::Heroes);
             break;
         case 130:
-            Shot("03_heroes");
+            Automation::SaveCanvas("03_heroes");
             GoToMenu(MenuPage::Kaiju);
             break;
         case 170:
-            Shot("04_kaiju");
+            Automation::SaveCanvas("04_kaiju");
             GoToMenu(MenuPage::Help);
             break;
         case 200:
-            Shot("05_help");
+            Automation::SaveCanvas("05_help");
             GoToBattle(0);
             break;
         case 240:
-            Shot("06_battle_start");
+            Automation::SaveCanvas("06_battle_start");
             if (auto* b = Debug()) b->DebugAutoplay();
             break;
         case 330:
-            Shot("07_combat_city");
+            Automation::SaveCanvas("07_combat_city");
             GoToBattle(1);
             break;
         case 370:
             if (auto* b = Debug()) b->DebugAutoplay(3);
             break;
         case 490:
-            Shot("08_combat_mountain");
+            Automation::SaveCanvas("08_combat_mountain");
             GoToBattle(2);
             break;
         case 530:
             if (auto* b = Debug()) b->DebugAutoplay(4);
             break;
         case 720:
-            Shot("09_boss_nebula");
+            Automation::SaveCanvas("09_boss_nebula");
             if (auto* b = Debug()) b->DebugCast();
             break;
         case 732:
-            Shot("10_brothers_beam");
+            Automation::SaveCanvas("10_brothers_beam");
             break;
         case 770:
-            Shot("11_airstrike");
+            Automation::SaveCanvas("11_airstrike");
             GoToBattle(0);
             break;
         case 810:
             if (auto* b = Debug()) b->DebugFinish();
             break;
         case 950:
-            Shot("12_victory");
+            Automation::SaveCanvas("12_victory");
             GoToBattle(1);
             break;
         case 990:
@@ -174,126 +147,126 @@ private:
             if (auto* b = Debug()) b->DebugInspect(false);
             break;
         case 1104:
-            Shot("13_inspect");
+            Automation::SaveCanvas("13_inspect");
             if (auto* b = Debug()) b->DebugInspect(true);
             break;
         case 1110:
-            Shot("14_pause");
+            Automation::SaveCanvas("14_pause");
             SetWindowSize(1100, 860);
             break;
         case 1125:
-            ShotWindow("15_margins");
+            Automation::SaveWindow("15_margins");
             GoToMenu(MenuPage::Levels);
             break;
         case 1165:
-            Shot("16_levels");
+            Automation::SaveCanvas("16_levels");
             PreviewHero((int)HeroId::Tiga);
             GoToMenu(MenuPage::Heroes);
             break;
         case 1210:
-            Shot("17_codex");
+            Automation::SaveCanvas("17_codex");
             GoToBattle(3);
             break;
         case 1250:
             if (auto* b = Debug()) b->DebugAutoplay();
             break;
         case 1360:
-            Shot("18_park");
+            Automation::SaveCanvas("18_park");
             GoToBattle(4);
             break;
         case 1400:
             if (auto* b = Debug()) b->DebugAutoplay();
             break;
         case 1510:
-            Shot("19_plaza");
+            Automation::SaveCanvas("19_plaza");
             GoToBattle(5);
             break;
         case 1550:
             if (auto* b = Debug()) b->DebugAutoplay();
             break;
         case 1680:
-            Shot("20_studio");
+            Automation::SaveCanvas("20_studio");
             if (auto* b = Debug()) b->DebugCast();
             break;
         case 1745: // the fusion cut-in runs in real time: heroes slide in, the orb gathers, the pillar lands at 2.9 s
-            Shot("21_fusion_cutin");
+            Automation::SaveCanvas("21_fusion_cutin");
             break;
         case 1825:
-            Shot("22_fusion_orb");
+            Automation::SaveCanvas("22_fusion_orb");
             break;
         case 1862:
-            Shot("23_fusion_impact");
+            Automation::SaveCanvas("23_fusion_impact");
             PrepareLevel(6);
             GoToMenu(MenuPage::Prepare);
             break;
         case 1910:
-            Shot("24_prepare");
+            Automation::SaveCanvas("24_prepare");
             GoToBattle(6);
             break;
         case 1950:
             if (auto* b = Debug()) b->DebugAutoplay(5);
             break;
         case 2130:
-            Shot("25_volcano_strikes");
+            Automation::SaveCanvas("25_volcano_strikes");
             GoToBattle(9);
             break;
         case 2170:
             if (auto* b = Debug()) b->DebugAutoplay(4);
             break;
         case 2350:
-            Shot("26_moon");
+            Automation::SaveCanvas("26_moon");
             GoToBattle(11);
             break;
         case 2390:
             if (auto* b = Debug()) b->DebugAutoplay(6);
             break;
         case 2570:
-            Shot("27_land_of_light");
+            Automation::SaveCanvas("27_land_of_light");
             GoToBattle(kSurvivalIndex);
             break;
         case 2610:
             if (auto* b = Debug()) b->DebugAutoplay(6);
             break;
         case 2790:
-            Shot("28_survival");
+            Automation::SaveCanvas("28_survival");
             if (auto* b = Debug()) b->DebugFinish();
             break;
         case 2930:
-            Shot("29_survival_result");
+            Automation::SaveCanvas("29_survival_result");
             GoToMenu(MenuPage::Prepare);
             break;
         case 2970: // database page: the preview plays inside the panel, a few seconds per hero
-            Shot("30_prepare_pool");
+            Automation::SaveCanvas("30_prepare_pool");
             PreviewHero((int)HeroId::Man);
             GoToMenu(MenuPage::Heroes);
             break;
         case 3130:
-            Shot("31_preview_man");
+            Automation::SaveCanvas("31_preview_man");
             PreviewHero((int)HeroId::Nexus);
             GoToMenu(MenuPage::Heroes);
             break;
         case 3290:
-            Shot("32_preview_nexus");
+            Automation::SaveCanvas("32_preview_nexus");
             PreviewHero((int)HeroId::Ginga);
             GoToMenu(MenuPage::Heroes);
             break;
         case 3450:
-            Shot("33_preview_ginga");
+            Automation::SaveCanvas("33_preview_ginga");
             PreviewHero((int)HeroId::Gaia);
             GoToMenu(MenuPage::Heroes);
             break;
         case 3610:
-            Shot("34_preview_gaia");
+            Automation::SaveCanvas("34_preview_gaia");
             PreviewHero((int)HeroId::Leo);
             GoToMenu(MenuPage::Heroes);
             break;
         case 3770:
-            Shot("35_preview_leo");
+            Automation::SaveCanvas("35_preview_leo");
             PreviewHero((int)HeroId::Mebius);
             GoToMenu(MenuPage::Heroes);
             break;
         case 3930:
-            Shot("36_preview_mebius");
+            Automation::SaveCanvas("36_preview_mebius");
             Quit();
             break;
         default:
@@ -344,8 +317,6 @@ void QuitGame() {
     if (game) game->Quit();
 }
 
-bool ScriptedCapture() { return !captureDir.empty(); }
-
 int RunBalanceReport(const std::string& path);
 
 } // namespace UG
@@ -353,7 +324,8 @@ int RunBalanceReport(const std::string& path);
 int main(int argc, char** argv) {
     using namespace UG;
     for (int i = 1; i < argc; ++i) {
-        if (!std::strcmp(argv[i], "--capture") && i + 1 < argc) captureDir = argv[++i];
+        if (!std::strcmp(argv[i], "--capture") && i + 1 < argc && !Automation::Start(std::filesystem::u8path(argv[++i]), {true}))
+            return 1;
         if (!std::strcmp(argv[i], "--balance") && i + 1 < argc) return RunBalanceReport(argv[++i]);
         if (!std::strcmp(argv[i], "--skin") && i + 1 < argc) skinArg = argv[++i];
         if (!std::strcmp(argv[i], "--export-skin") && i + 1 < argc) exportDir = argv[++i];

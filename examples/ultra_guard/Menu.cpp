@@ -159,9 +159,10 @@ void MenuScene::SyncPreview(float dt) {
         preview->embedded = true;
         preview->Load();
         previewHero = heroIndex;
-        Sfx::SetEffectScale(0.35f);
+        previewClock.Reset();
+        previewDuck.emplace(AudioChannel::Sfx, 0.35f);
     }
-    preview->TickEmbedded(dt);
+    previewClock.Advance(*preview, dt);
 }
 
 void MenuScene::DropPreview() {
@@ -169,7 +170,7 @@ void MenuScene::DropPreview() {
     preview->ReleaseEmbedded();
     preview.reset();
     previewHero = -1;
-    Sfx::SetEffectScale(1);
+    previewDuck.reset();
 }
 
 void MenuScene::SetPage(MenuPage next) {

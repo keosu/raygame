@@ -515,6 +515,7 @@ void BattleScene::CreateEmitters() {
 
 void BattleScene::Update() {
     Scene::Update();
+    if (embedded) return; // the preview has no input, HUD or result screen
     if (restartRequested) {
         restartRequested = false;
         Restart();
@@ -560,7 +561,7 @@ bool BattleScene::CanStartWave() const {
 
 void BattleScene::HandleInput() {
     if (!Running()) return;
-    if (!Input::GetFrame().focused && !paused && !ScriptedCapture()) SetPaused(true); // e.g. app sent to background
+    if (!Input::GetFrame().focused && !paused) SetPaused(true); // e.g. app sent to background
     if (Input::GetKeyDown(KEY_ESCAPE) || Input::GetKeyDown(KEY_BACK)) {
         if (placing >= 0 || targetingStrike) {
             placing = -1;
@@ -2026,6 +2027,7 @@ void BattleScene::BotAct() {
 BattleScene::BotResult BattleScene::RunBot(bool casual) {
     botCasual = casual;
     float decide = 0;
+    SceneClock clock(kStep);
     while (Running() && simTime < 3600) {
         if (waveIndex < 0) {
             if (casual)
@@ -2037,8 +2039,7 @@ BattleScene::BotResult BattleScene::RunBot(bool casual) {
             decide = casual ? 2.5f : 0.5f;
             BotAct();
         }
-        GameTime::FixedStepScope step(kStep, simTime);
-        FixedUpdate();
+        clock.Step(*this);
     }
     return {outcome == Outcome::Victory, lives, waveIndex + 1, (int)heroes.size(), gold, kills, leakWave, leakCount, simTime / 60, exhaustions};
 }
@@ -2047,44 +2048,22 @@ float BattleScene::BenchmarkDemo(int star, float seconds) {
     if (!demo || heroes.empty()) return 0;
     SetDemoStar(star);
     float start = simTime;
-    while (simTime - start < seconds) {
-        GameTime::FixedStepScope step(kStep, simTime);
-        FixedUpdate();
-    }
+    SceneClock clock(kStep);
+    while (simTime - start < seconds) clock.Step(*this);
     return heroes.front()->dealt / seconds;
-}
-
-// Mirrors GameEngine's frame: variable update, fixed steps with pose capture and physics, then
-// interpolation, so projectiles render where they really are.
-void BattleScene::TickEmbedded(float real) {
-    ScopeActivation scope(GetCallbackScope());
-    Scene::Update();
-    embedClock += std::min(real, 0.1f);
-    while (embedClock >= kStep) {
-        embedClock -= kStep;
-        GameTime::FixedStepScope step(kStep, simTime);
-        BeginFixedStep();
-        FixedUpdate();
-        IntegratePhysics(kStep);
-        GetPhysicsWorld().Step();
-        PostFixedUpdate();
-    }
-    SetInterpolationAlpha(embedClock / kStep);
-    LateUpdate();
 }
 
 // Only the skill itself: beams, projectiles, fields and particles, shifted so the hero sits at heroAt.
 void BattleScene::DrawEmbedded(Rectangle clip, Vector2 heroAt) {
     if (heroes.empty()) return;
     Vector2 from = heroes.front()->Pos();
-    BeginScissorMode((int)clip.x, (int)clip.y, (int)clip.width, (int)clip.height);
+    Display::ClipScope clipScope(clip);
     rlPushMatrix();
     rlTranslatef(heroAt.x - from.x, heroAt.y - from.y, 0);
     ScopeActivation scope(GetCallbackScope());
     DrawZones();
     Scene::Render();
     rlPopMatrix();
-    EndScissorMode();
 }
 
 void BattleScene::ReleaseEmbedded() {
