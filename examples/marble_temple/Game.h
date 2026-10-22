@@ -53,6 +53,27 @@ public:
               "marble_temple", "MARBLE TEMPLE", "Aim. Match three. Keep the ancient gate sealed.",
               {"Mossy Courtyard", "Moonlit Ruins", "The Spiral Vault"}, std::move(directory)) {
         hint = "Swap colours to reach pairs. Every ninth shot is a blast.";
+        accent = {232, 186, 92, 255};
+    }
+    void DrawEmblem(Vector2 c, float time) override {
+        DrawRing(c, 50, 54, 0, 360, 96, Fade(accent, 0.6f));
+        int colors[] = {0, 3, 2};
+        for (int i = 0; i < 3; ++i) {
+            float a = -PI / 2 + i * 2 * PI / 3 + std::sin(time * 0.8f) * 0.08f;
+            DrawBall({c.x + std::cos(a) * 27, c.y + std::sin(a) * 27}, colors[i], 22);
+        }
+    }
+    void DrawLevelArt(int stage, Rectangle area, float time) override {
+        if (backdrops[stage]) { // centre crop of the stage's own temple backdrop
+            float w = 1440 * area.width / area.height;
+            DrawTexturePro(*backdrops[stage], {(2560 - w) / 2, 0, w, 1440}, area, {}, 0, WHITE);
+        }
+        for (int i = 0; i < 6; ++i) {
+            float t = i / 5.0f;
+            Vector2 p{area.x + 30 + t * (area.width - 60), area.y + area.height - 46 - std::sin(t * PI) * 40};
+            DrawBall(p, (i + stage) % (stage == 2 ? 5 : 4), 15);
+        }
+        (void)time;
     }
     void OnInit() override {
         Campaign::Game::OnInit();
@@ -118,6 +139,24 @@ public:
     }
     int Outcome() const override {
         return model.outcome;
+    }
+    void OnRender() override {
+        Campaign::Game::OnRender();
+        if (screen != Campaign::Screen::Play)
+            return;
+        // Points rise above the launcher and the HUD rather than slipping behind them.
+        auto o = Campaign::Origin();
+        rlPushMatrix();
+        rlTranslatef(o.x, o.y, 0);
+        for (const auto& p : model.popups) {
+            float fade = std::clamp((1 - p.age) / 0.4f, 0.0f, 1.0f), rise = 50 * (1 - (1 - p.age) * (1 - p.age));
+            UI::TitleCentered(p.position.x, p.position.y - 30 - rise, TextFormat("+%d", p.points),
+                              30 + 4 * std::min(p.combo, 4), Fade({255, 226, 140, 255}, fade));
+            if (p.combo > 1)
+                UI::LabelCentered(p.position.x, p.position.y + 6 - rise, TextFormat("COMBO x%d", p.combo), 18,
+                                  Fade(Campaign::Cream, fade));
+        }
+        rlPopMatrix();
     }
     int Score() const override {
         return model.score;
@@ -190,14 +229,6 @@ public:
                     {s.position.x + std::cos(a) * distance, s.position.y + std::sin(a) * distance},
                     4 * (1 - s.age / 0.7f), Fade(Colors[s.color], 1 - s.age / 0.7f));
             }
-        for (const auto& p : model.popups) {
-            float fade = std::clamp((1 - p.age) / 0.4f, 0.0f, 1.0f), rise = 50 * (1 - (1 - p.age) * (1 - p.age));
-            UI::TitleCentered(p.position.x, p.position.y - 30 - rise, TextFormat("+%d", p.points),
-                              30 + 4 * std::min(p.combo, 4), Fade({255, 226, 140, 255}, fade));
-            if (p.combo > 1)
-                UI::LabelCentered(p.position.x, p.position.y + 6 - rise, TextFormat("COMBO x%d", p.combo), 18,
-                                  Fade(Campaign::Cream, fade));
-        }
         auto p = model.launcher;
         float angle = std::atan2(aim.y - p.y, aim.x - p.x);
         if (screen == Campaign::Screen::Play) {

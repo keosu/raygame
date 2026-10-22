@@ -184,11 +184,43 @@ public:
         dragSeed = -1;
         dragActive = false;
     }
+    bool PlayGrab(Vector2 p) override {
+        return dragSeed < 0 && std::any_of(model.suns.begin(), model.suns.end(), [&](const Sun& s) {
+                   Vector2 at = s.At();
+                   return (p.x - at.x) * (p.x - at.x) + (p.y - at.y) * (p.y - at.y) < 34 * 34;
+               });
+    }
     explicit Game(std::filesystem::path directory)
         : Campaign::Game(
               "garden_guard", "GARDEN GUARD", "Grow a defence. Protect the little house.",
               {"Sunny Front Yard", "Armoured Visitors", "The Last Stand"}, std::move(directory)) {
         hint = "Grow sunflowers early. Cover every row before the waves arrive.";
+        accent = {247, 199, 72, 255};
+    }
+    void DrawEmblem(Vector2 c, float time) override {
+        DrawSun({c.x + 44, c.y - 38}, time, 0.75f);
+        DrawPlant({c.x - 6, c.y + 4}, Kind::Sunflower, 0, false, 1.35f);
+    }
+    void DrawLevelArt(int stage, Rectangle area, float time) override {
+        Color sky[] = {{122, 169, 150, 255}, {128, 150, 172, 255}, {180, 139, 116, 255}};
+        DrawRectangleRec(area, sky[stage]);
+        for (int i = 0; i < 4; ++i)
+            DrawCircleV({area.x + 20 + i * 78, area.y + 40}, 46, {86, 125, 68, 255});
+        float ground = area.y + area.height - 58;
+        for (int col = 0; col < 6; ++col)
+            DrawRectangleRec({area.x + col * 44, ground, 44, 58},
+                             col % 2 ? Color{102, 147, 70, 255} : Color{113, 159, 76, 255});
+        // Each stage shows the plants it calls for and the visitors it sends.
+        Kind kinds[3][2] = {{Kind::Sunflower, Kind::Peashooter}, {Kind::Wallnut, Kind::Iceflower},
+                            {Kind::Cherry, Kind::Repeater}};
+        for (int i = 0; i < 2; ++i)
+            DrawPlant({area.x + 40 + i * 64, ground + 4}, kinds[stage][i], time, false, 0.85f);
+        Zombie visitor{1, 0, stage, 0, 100};
+        visitor.x = area.x + area.width - 50;
+        rlPushMatrix();
+        rlTranslatef(0, ground - Center(0, 0).y - 4, 0);
+        DrawZombie(visitor, time);
+        rlPopMatrix();
     }
     void StartLevel(int selected) override {
         model.Reset(selected);
@@ -329,6 +361,19 @@ public:
                 DrawRectangleRec(cell, Fade(glow, 0.1f));
             }
         }
+        if (model.elapsed < 22)
+            UI::TitleCentered(715, 300,
+                              Tr("PLANT YOUR DEFENCE") +
+                                  TextFormat("  /  %.0fs", std::ceil(22 - model.elapsed)),
+                              28, {249, 234, 178, 255});
+        if (model.waveFlash > 0 && model.spawned > 0)
+            UI::LabelCentered(715, 198, "VISITORS APPROACH!", 20, {255, 219, 119, 255});
+        // Sun tokens sit above the whole board and HUD: they are what the player reaches for.
+        for (const auto& sun : model.suns) {
+            float alpha = std::clamp((sun.Lifetime() - sun.age) / 1.5f, 0.0f, 1.0f); // fades before expiring
+            float grow = sun.hop ? BackOut(sun.age / 0.25f) : 1;
+            DrawSun(sun.At(), model.elapsed, grow, alpha);
+        }
         if (dragActive) {
             Vector2 ghost{point.x, point.y - (pointer.IsTouch() ? 60 : 18)};
             DrawCircleV({ghost.x, ghost.y + 12}, 42, {20, 41, 28, 110});
@@ -337,13 +382,6 @@ public:
             else
                 RayGame::ButtonPainter::Icon(RayGame::ButtonIcon::Drop, ghost, 44, Campaign::Cream);
         }
-        if (model.elapsed < 22)
-            UI::TitleCentered(715, 300,
-                              Tr("PLANT YOUR DEFENCE") +
-                                  TextFormat("  /  %.0fs", std::ceil(22 - model.elapsed)),
-                              28, {249, 234, 178, 255});
-        if (model.waveFlash > 0 && model.spawned > 0)
-            UI::LabelCentered(715, 198, "VISITORS APPROACH!", 20, {255, 219, 119, 255});
         for (const auto& [from, age] : flights) {
             // Ease in and out along a curve that lifts before swooping into the counter.
             float t = age / FlightTime, e = t * t * (3 - 2 * t);
@@ -450,14 +488,10 @@ public:
             DrawCircleV({pea.x, center.y - 10}, 8,
                         pea.ice ? Color{159, 233, 247, 255} : Color{193, 223, 103, 255});
         }
-        for (const auto& sun : model.suns) {
-            float alpha = std::clamp((sun.Lifetime() - sun.age) / 1.5f, 0.0f, 1.0f); // fades before expiring
-            if (sun.age < sun.travel) // the spot it will land on
+        for (const auto& sun : model.suns)
+            if (sun.age < sun.travel) // the spot it will land on; the token itself is drawn above the HUD
                 DrawEllipse(static_cast<int>(sun.position.x), static_cast<int>(sun.position.y + 22), 16, 5,
                             Fade({40, 70, 30, 255}, 0.35f * sun.age / sun.travel));
-            float grow = sun.hop ? BackOut(sun.age / 0.25f) : 1;
-            DrawSun(sun.At(), model.elapsed, grow, alpha);
-        }
         for (const auto& b : model.blasts) {
             DrawCircleV(b.position, 115 * b.age / 0.6f + 15,
                         Fade({248, 184, 66, 255}, 1 - b.age / 0.6f));

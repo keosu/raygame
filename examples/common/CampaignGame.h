@@ -10,12 +10,20 @@ using ExampleUI::Triangle;
 using UI = TextUI;
 enum class Screen { Menu, Levels, Help, Settings, Play, Pause, Won, Lost };
 inline constexpr Color Ink{19, 29, 35, 255}, Cream{245, 235, 207, 255};
+// Plain: secondary actions; Primary: the one obvious next step; Card: drawn by its screen.
+enum class Look { Plain, Primary, Card };
 struct Button {
     int id;
     Rectangle rect;
     std::string label;
     bool enabled = true;
+    Look look = Look::Plain;
+    ButtonIcon icon = ButtonIcon::None;
 };
+inline float EaseOut(float t) {
+    t = std::clamp(t, 0.0f, 1.0f);
+    return 1 - (1 - t) * (1 - t) * (1 - t);
+}
 inline Vector2 Origin() {
     return {(Display::GetWidth() - 1280) / 2, (Display::GetHeight() - 720) / 2};
 }
@@ -41,6 +49,9 @@ public:
     PointerGesture pointer;
     Vector2 aim{640, 280};
     std::string storageError;
+    Color accent{176, 215, 126, 255}; // the game's signature colour for primary actions and highlights
+    float screenTime = 0, clock = 0;  // real seconds on this screen / since launch, for menu motion
+    bool newRecord = false;
 
     Game(std::string name, std::string heading, std::string subtitle,
          std::array<std::string, 3> stages, std::filesystem::path directory)
@@ -65,6 +76,18 @@ public:
         return false;
     }
     virtual void PointerCancel() {}
+    // Something drawn above the HUD (a falling token, say) claims this press before any button.
+    virtual bool PlayGrab(Vector2) { return false; }
+    // Title-screen mark drawn around `center` within about 60 units.
+    virtual void DrawEmblem(Vector2 center, float time) {
+        DrawCircleV(center, 46, accent);
+    }
+    // Level-card artwork filling `area` (already clipped).
+    virtual void DrawLevelArt(int stage, Rectangle area, float time) {
+        DrawRectangleGradientV(static_cast<int>(area.x), static_cast<int>(area.y), static_cast<int>(area.width),
+                               static_cast<int>(area.height), Fade(accent, 0.55f - stage * 0.12f), Ink);
+        DrawEmblem({area.x + area.width / 2, area.y + area.height / 2}, time);
+    }
     std::string Tr(const std::string& text) const {
         return UI::Tr(text);
     }
@@ -135,6 +158,8 @@ public:
         SetScreen(Screen::Menu);
     }
     void SetScreen(Screen next) {
+        if (next != screen)
+            screenTime = 0;
         screen = next;
         SetPaused(next != Screen::Play);
         capture = -1;
@@ -147,9 +172,12 @@ public:
         StartLevel(level);
         SetScreen(Screen::Play);
     }
-    void Add(int idValue, Rectangle rect, std::string label, bool enabled = true) {
-        buttons.push_back({idValue, rect, std::move(label), enabled});
+    void Add(int idValue, Rectangle rect, std::string label, bool enabled = true, Look look = Look::Plain,
+             ButtonIcon icon = ButtonIcon::None) {
+        buttons.push_back({idValue, rect, std::move(label), enabled, look, icon});
     }
+    // Menus are laid out in the 1280 × 720 design box but keep to its central 860 units, the width
+    // MenuScale guarantees on portrait screens.
     void BuildButtons() {
         buttons.clear();
         if (screen == Screen::Play) {
@@ -159,18 +187,16 @@ public:
             return;
         }
         if (screen == Screen::Menu) {
-            Add(1, {462, 352, 356, 54}, unlocked == 1 ? "START ADVENTURE" : "CONTINUE ADVENTURE");
-            Add(2, {462, 420, 356, 50}, "CHOOSE A LEVEL");
-            Add(3, {462, 484, 356, 50}, "HOW TO PLAY");
-            Add(12, {462, 548, 170, 46}, "SETTINGS");
-            Add(4, {646, 548, 172, 46}, "EXIT");
+            Add(1, {230, 388, 380, 64}, unlocked == 1 ? "START ADVENTURE" : "CONTINUE ADVENTURE", true,
+                Look::Primary, ButtonIcon::Right);
+            Add(2, {230, 466, 380, 54}, "CHOOSE A LEVEL");
+            Add(3, {230, 530, 380, 54}, "HOW TO PLAY");
+            Add(12, {230, 594, 186, 50}, "SETTINGS", true, Look::Plain, ButtonIcon::Settings);
+            Add(4, {424, 594, 186, 50}, "EXIT");
         } else if (screen == Screen::Levels) {
             for (int i = 0; i < 3; ++i)
-                Add(20 + i, {382, 290.0f + i * 82, 516, 64},
-                    std::to_string(i + 1) + "  " + Tr(levelNames[i]) +
-                        (i < unlocked ? "" : "   / " + Tr("LOCKED")),
-                    i < unlocked);
-            Add(5, {490, 560, 300, 48}, "BACK");
+                Add(20 + i, LevelCard(i), levelNames[i], i < unlocked, Look::Card);
+            Add(5, {210, 588, 200, 52}, "BACK", true, Look::Plain, ButtonIcon::Left);
         } else if (screen == Screen::Help)
             Add(5, {490, 605, 300, 48}, "BACK");
         else if (screen == Screen::Settings) {
@@ -188,18 +214,24 @@ public:
                 Tr("DISPLAY") + "    " + Tr(fullscreen ? "FULLSCREEN" : "WINDOWED"));
 #endif
             Add(5, {490, 600, 300, 48}, "SAVE & RETURN");
+        } else if (screen == Screen::Pause) {
+            Add(6, {460, 392, 360, 56}, "RESUME", true, Look::Primary, ButtonIcon::Right);
+            Add(7, {460, 460, 174, 48}, "RESTART");
+            Add(5, {646, 460, 174, 48}, "MAIN MENU");
+            Add(12, {460, 520, 360, 46}, "SETTINGS", true, Look::Plain, ButtonIcon::Settings);
         } else {
-            Add(6, {440, 392, 400, 52},
-                screen == Screen::Pause              ? "RESUME"
-                : screen == Screen::Won && level < 2 ? "NEXT LEVEL"
-                                                     : "PLAY AGAIN");
-            Add(7, {440, 458, 194, 48}, "RESTART");
-            Add(5, {646, 458, 194, 48}, "MAIN MENU");
-            if (screen == Screen::Pause)
-                Add(12, {440, 524, 400, 48}, "SETTINGS");
+            Add(6, {440, 466, 400, 58}, screen == Screen::Won && level < 2 ? "NEXT LEVEL" : "PLAY AGAIN", true,
+                Look::Primary, ButtonIcon::Right);
+            Add(7, {440, 536, 194, 48}, "RESTART");
+            Add(5, {646, 536, 194, 48}, "MAIN MENU");
         }
     }
-    int Hit(Vector2 p) const {
+    static Rectangle LevelCard(int stage) {
+        return {210.0f + stage * 295, 200, 270, 350};
+    }
+    int Hit(Vector2 p) {
+        if (screen == Screen::Play && PlayGrab(p))
+            return 100;
         for (const auto& b : buttons)
             if (b.enabled && CheckCollisionPointRec(p, b.rect))
                 return b.id;
@@ -261,6 +293,9 @@ public:
             PlayCommand(action);
     }
     void OnUnscaledUpdate() override {
+        float real = std::min(0.1f, GameTime::UnscaledDeltaTime());
+        screenTime += real;
+        clock += real;
         BuildButtons();
         const auto& frame = Input::GetFrame();
         if (!frame.focused) {
@@ -357,6 +392,7 @@ public:
         Advance(dt);
         int outcome = Outcome();
         if (outcome) {
+            newRecord = outcome > 0 && Score() > best[level];
             if (outcome > 0) {
                 best[level] = std::max(best[level], Score());
                 unlocked = std::max(unlocked, std::min(3, level + 2));
@@ -367,74 +403,254 @@ public:
             SetScreen(outcome > 0 ? Screen::Won : Screen::Lost);
         }
     }
+    // Each kind of screen has its own look: the title and level select own the whole screen,
+    // settings and help are sheets, pause is a small card over the frozen game, results a banner.
     void OnRender() override {
         auto o = Origin();
         float scale = MenuScale();
-        if (screen != Screen::Play)
-            DrawRectangleRec({0, 0, Display::GetWidth(), Display::GetHeight()}, {10, 18, 24, 205});
+        float width = Display::GetWidth(), height = Display::GetHeight();
+        bool front = screen == Screen::Menu || screen == Screen::Levels;
+        if (front) {
+            // Darken toward the left where the title sits; the scene stays visible on the right.
+            DrawRectangleGradientH(0, 0, static_cast<int>(width), static_cast<int>(height), {8, 14, 18, 238},
+                                   {8, 14, 18, 120});
+            DrawRectangleGradientV(0, static_cast<int>(height * 0.6f), static_cast<int>(width),
+                                   static_cast<int>(height * 0.4f + 1), {8, 14, 18, 0}, {8, 14, 18, 200});
+        } else if (screen == Screen::Pause)
+            DrawRectangleRec({0, 0, width, height}, {6, 10, 14, 215});
+        else if (screen != Screen::Play)
+            DrawRectangleRec({0, 0, width, height}, {10, 18, 24, 205});
         rlPushMatrix();
         rlTranslatef(o.x + 640, o.y + 360, 0);
         rlScalef(scale, scale, 1);
         rlTranslatef(-640, -360, 0);
+        if (front)
+            DrawMotes();
         if (screen == Screen::Play)
             DrawHUD();
-        else {
-            DrawRectangleRounded({330, 148, 620, 516}, 0.07f, 10, {29, 43, 44, 248});
-            DrawRectangleRoundedLines({330, 148, 620, 516}, 0.07f, 10, {112, 142, 112, 220});
-            if (screen == Screen::Menu) {
-                UI::LabelCentered(640, 183, "RAYGAME  /  ARCADE ADVENTURE", 18,
-                                  {186, 199, 167, 255});
-                UI::TitleCentered(640, 218, title, 66, Cream);
-                UI::LabelCentered(640, 302, tagline, 22, Cream);
-            } else if (screen == Screen::Levels) {
-                UI::TitleCentered(640, 194, "CHOOSE A LEVEL", 46, Cream);
-                UI::LabelCentered(640, 248, "Clear each stage to unlock the next.", 20, Cream);
-            } else if (screen == Screen::Settings) {
-                UI::TitleCentered(640, 185, "SETTINGS", 46, Cream);
-                UI::LabelCentered(640, 242, "Changes apply immediately and are saved.", 18, Cream);
-            } else if (screen == Screen::Help) {
-                UI::TitleCentered(640, 185, "HOW TO PLAY", 46, Cream);
-                DrawHelp();
-                UI::LabelCentered(640, 655, "R  restart     P / Back  pause     F11  fullscreen",
-                                  16, Cream);
-            } else {
-                UI::LabelCentered(640, 198, levelNames[level], 24, Cream);
-                UI::TitleCentered(640, 241,
-                                  screen == Screen::Pause ? "PAUSED"
-                                  : screen == Screen::Won
-                                      ? (level == 2 ? "ADVENTURE COMPLETE" : "LEVEL CLEARED")
-                                      : "TRY AGAIN",
-                                  48, screen == Screen::Lost ? Color{245, 153, 122, 255} : Cream);
-                UI::LabelCentered(640, 315,
-                                  Tr("SCORE") + "  " + std::to_string(Score()) + "     " +
-                                      Tr("BEST") + "  " + std::to_string(best[level]),
-                                  26, Cream);
-                UI::LabelCentered(640, 353,
-                                  screen == Screen::Lost ? hint
-                                  : screen == Screen::Won
-                                      ? "Progress saved. Your next challenge awaits."
-                                      : "Take a break. The world is waiting.",
-                                  18, Cream);
-            }
+        else if (screen == Screen::Menu)
+            DrawTitleScreen();
+        else if (screen == Screen::Levels)
+            DrawLevelSelect(o, scale);
+        else if (screen == Screen::Settings) {
+            DrawSheet("SETTINGS", ButtonIcon::Settings);
+            UI::LabelCentered(640, 238, "Changes apply immediately and are saved.", 18, Fade(Cream, 0.8f));
+        } else if (screen == Screen::Help) {
+            DrawSheet("HOW TO PLAY", ButtonIcon::None);
+            DrawHelp();
+            UI::LabelCentered(640, 655, "R  restart     P / Back  pause     F11  fullscreen", 16, Fade(Cream, 0.7f));
         }
-        BuildButtons();
-        for (const auto& b : buttons) {
-            bool hover = b.enabled && CheckCollisionPointRec(aim, b.rect);
-            bool pressed = capture == b.id && pointer.held;
-            ButtonPainter::Draw(
-                b.rect, {hover, pressed, screen != Screen::Play && menuFocus == b.id, !b.enabled},
-                {{40, 71, 55, 248}, {176, 215, 126, 255}, Cream});
-            std::string label = Tr(b.label);
-            int size = b.rect.width < 135 ? 16 : 20;
-            while (size > 13 && RayGame::UI::TextWidth(label, size) > b.rect.width - 20)
-                --size;
-            UI::LabelCentered(b.rect.x + b.rect.width / 2,
-                              b.rect.y + (b.rect.height - size) / 2 + (pressed ? 2 : 0), label,
-                              size, b.enabled ? Cream : Color{128, 138, 121, 255});
-        }
+        float rise = screen == Screen::Pause || screen == Screen::Won || screen == Screen::Lost
+                         ? 24 * (1 - EaseOut(screenTime / 0.3f))
+                         : 0;
+        rlPushMatrix();
+        rlTranslatef(0, rise, 0);
+        if (screen == Screen::Pause)
+            DrawPauseCard();
+        else if (screen == Screen::Won || screen == Screen::Lost)
+            DrawResultCard();
+        DrawButtons();
+        rlPopMatrix();
         if (!storageError.empty())
             UI::LabelCentered(640, 685, storageError, 16, Cream);
         rlPopMatrix();
+    }
+    void DrawButtons() {
+        BuildButtons();
+        bool menu = screen == Screen::Menu;
+        for (size_t i = 0; i < buttons.size(); ++i) {
+            const auto& b = buttons[i];
+            if (b.look == Look::Card)
+                continue;
+            bool hover = b.enabled && CheckCollisionPointRec(aim, b.rect);
+            bool pressed = capture == b.id && pointer.held;
+            bool focused = screen != Screen::Play && menuFocus == b.id;
+            Rectangle r = b.rect;
+            if (menu) // title buttons slide in one after another
+                r.x -= 40 * (1 - EaseOut((screenTime - 0.15f - i * 0.06f) / 0.35f));
+            bool primary = b.look == Look::Primary;
+            ButtonStyle style = primary ? ButtonStyle{accent, Cream, Ink} : ButtonStyle{{40, 71, 55, 248}, accent, Cream};
+            ButtonPainter::Draw(r, {hover, pressed, focused, !b.enabled}, style);
+            if (menu && (hover || focused)) // a pointer beside the chosen title entry
+                Triangle({r.x - 22, r.y + r.height / 2 - 9}, {r.x - 22, r.y + r.height / 2 + 9},
+                         {r.x - 10, r.y + r.height / 2}, accent);
+            Color ink = !b.enabled ? Color{128, 138, 121, 255} : primary ? Ink : Cream;
+            std::string label = Tr(b.label);
+            int size = primary && r.height >= 56 ? 24 : r.width < 135 ? 16 : 20;
+            float room = r.width - 20 - (b.icon != ButtonIcon::None ? 34 : 0);
+            while (size > 13 && RayGame::UI::TextWidth(label, size) > room)
+                --size;
+            float textWidth = RayGame::UI::TextWidth(label, size);
+            float cx = r.x + r.width / 2, y = r.y + (r.height - size) / 2 + (pressed ? 2 : 0);
+            if (b.icon != ButtonIcon::None) {
+                bool trailing = b.icon == ButtonIcon::Right; // forward arrows follow the label
+                cx += trailing ? -14 : 14;
+                float iconX = trailing ? cx + textWidth / 2 + 20 : cx - textWidth / 2 - 20;
+                ButtonPainter::Icon(b.icon, {iconX, r.y + r.height / 2 + (pressed ? 2 : 0)}, size * 0.9f, ink);
+            }
+            UI::LabelCentered(cx, y, label, size, ink);
+        }
+    }
+    void DrawMotes() {
+        for (int i = 0; i < 26; ++i) {
+            float speed = 14 + (i * 7 % 11) * 3, x = 160.0f + (i * 151 % 980);
+            float y = 760 - std::fmod(clock * speed + i * 97.0f, 820.0f);
+            DrawCircleV({x + std::sin(clock * 0.8f + i) * 12, y}, 1.5f + (i % 3),
+                        Fade(accent, 0.18f + 0.12f * std::sin(clock * 2 + i)));
+        }
+    }
+    void DrawTitleScreen() {
+        auto slide = [&](int order) { return -40 * (1 - EaseOut((screenTime - order * 0.07f) / 0.4f)); };
+        UI::Label(232 + slide(0), 108, "RAYGAME  /  ARCADE ADVENTURE", 16, accent);
+        DrawEmblem({292 + slide(1), 194 + std::sin(clock * 1.6f) * 5}, clock);
+        float x = 230 + slide(2);
+        UI::Title(x + 3, 259, title, 70, Fade(BLACK, 0.45f));
+        UI::Title(x, 256, title, 70, Cream);
+        UI::Label(234 + slide(3), 347, tagline, 21, Fade(Cream, 0.85f));
+        // Progress at a glance: one medallion per stage.
+        Rectangle panel{690, 470 - slide(4) * 0.5f, 360, 174};
+        DrawRectangleRounded(panel, 0.12f, 8, {12, 22, 26, 200});
+        DrawRectangleRoundedLines(panel, 0.12f, 8, Fade(accent, 0.35f));
+        UI::Label(panel.x + 20, panel.y + 16, "ADVENTURE PROGRESS", 16, accent);
+        for (int i = 0; i < 3; ++i) {
+            Vector2 c{panel.x + 60 + i * 120, panel.y + 90};
+            bool open = i < unlocked, cleared = best[i] > 0;
+            DrawCircleV(c, 33, cleared ? accent : Color{36, 52, 54, 255});
+            DrawRing(c, 31, 34, 0, 360, 48, open ? accent : Color{86, 98, 96, 255});
+            if (open)
+                UI::TitleCentered(c.x, c.y - 19, std::to_string(i + 1), 32, cleared ? Ink : Cream);
+            else
+                DrawPadlock(c, 1, {150, 160, 152, 255});
+            UI::LabelCentered(c.x, c.y + 42,
+                              cleared ? std::to_string(best[i]) : Tr(open ? "READY" : "LOCKED"), 15,
+                              Fade(Cream, cleared ? 0.95f : 0.6f));
+        }
+#if !defined(__ANDROID__)
+        UI::Label(232, 664, "UP / DOWN  SELECT     ENTER  CONFIRM", 14, Fade(Cream, 0.5f));
+#endif
+    }
+    void DrawLevelSelect(Vector2 origin, float scale) {
+        UI::Title(210, 98, "CHOOSE A LEVEL", 50, Cream);
+        UI::Label(212, 160, "Clear each stage to unlock the next.", 19, Fade(Cream, 0.8f));
+        for (int i = 0; i < 3; ++i) {
+            Rectangle r = LevelCard(i);
+            bool open = i < unlocked, cleared = best[i] > 0;
+            bool lit = open && (menuFocus == 20 + i || CheckCollisionPointRec(aim, r));
+            r.y += 30 * (1 - EaseOut((screenTime - i * 0.08f) / 0.4f)) - (lit ? 6 : 0);
+            DrawRectangleRounded({r.x + 4, r.y + 10, r.width, r.height}, 0.06f, 8, Fade(BLACK, 0.35f));
+            DrawRectangleRounded(r, 0.06f, 8, {24, 38, 40, 250});
+            Rectangle art{r.x + 10, r.y + 10, r.width - 20, 180};
+            {
+                // Clip in canvas units: the menu space is translated and scaled.
+                Rectangle canvas{origin.x + 640 + (art.x - 640) * scale, origin.y + 360 + (art.y - 360) * scale,
+                                 art.width * scale, art.height * scale};
+                Display::ClipScope clip(canvas);
+                DrawLevelArt(i, art, clock);
+                if (!open)
+                    DrawRectangleRec(art, {10, 16, 20, 170});
+            }
+            if (!open)
+                DrawPadlock({art.x + art.width / 2, art.y + art.height / 2}, 1.6f, Cream);
+            DrawCircleV({art.x + 30, art.y + 30}, 22, open ? accent : Color{70, 80, 78, 255});
+            UI::TitleCentered(art.x + 30, art.y + 13, std::to_string(i + 1), 28, Ink);
+            UI::Title(r.x + 20, r.y + 204, levelNames[i], 25, open ? Cream : Color{150, 158, 150, 255});
+            UI::Label(r.x + 20, r.y + 246,
+                      cleared ? Tr("BEST") + "  " + std::to_string(best[i]) : Tr(open ? "Not played yet" : "LOCKED"),
+                      17, Fade(Cream, 0.75f));
+            const char* state = cleared ? "CLEARED" : open ? "READY" : "LOCKED";
+            Color chip = cleared ? accent : open ? Color{226, 160, 82, 255} : Color{86, 96, 94, 255};
+            std::string text = Tr(state);
+            float w = RayGame::UI::TextWidth(text, 15) + 28;
+            DrawRectangleRounded({r.x + 20, r.y + 298, w, 30}, 1, 12, chip);
+            UI::Label(r.x + 34, r.y + 305, state, 15, Ink);
+            if (lit)
+                DrawRectangleRoundedLinesEx(r, 0.06f, 8, 3, accent);
+        }
+    }
+    void DrawSheet(const char* heading, ButtonIcon icon) {
+        Rectangle panel{330, 148, 620, 516};
+        DrawRectangleRounded({panel.x + 4, panel.y + 10, panel.width, panel.height}, 0.07f, 10, Fade(BLACK, 0.3f));
+        DrawRectangleRounded(panel, 0.07f, 10, {29, 43, 44, 250});
+        DrawRectangleRounded({panel.x, panel.y, panel.width, 74}, 0.35f, 10, Fade(accent, 0.22f));
+        DrawRectangle(static_cast<int>(panel.x), static_cast<int>(panel.y + 50), static_cast<int>(panel.width), 24,
+                      {29, 43, 44, 250});
+        DrawRectangle(static_cast<int>(panel.x + 24), static_cast<int>(panel.y + 72), static_cast<int>(panel.width - 48),
+                      2, Fade(accent, 0.5f));
+        if (icon != ButtonIcon::None)
+            ButtonPainter::Icon(icon, {panel.x + 44, panel.y + 38}, 28, accent);
+        UI::TitleCentered(640, panel.y + 14, heading, 42, Cream);
+    }
+    void DrawPauseCard() {
+        Rectangle card{430, 170, 420, 410};
+        DrawRectangleRounded({card.x + 4, card.y + 10, card.width, card.height}, 0.08f, 10, Fade(BLACK, 0.4f));
+        DrawRectangleRounded(card, 0.08f, 10, {33, 49, 50, 252});
+        DrawRectangleRounded({card.x + 150, card.y, 120, 5}, 1, 8, accent);
+        Vector2 icon{640, 224};
+        DrawCircleV(icon, 30, accent);
+        DrawRectangleRounded({icon.x - 11, icon.y - 13, 8, 26}, 0.4f, 4, Ink);
+        DrawRectangleRounded({icon.x + 3, icon.y - 13, 8, 26}, 0.4f, 4, Ink);
+        UI::TitleCentered(640, 262, "PAUSED", 40, Cream);
+        UI::LabelCentered(640, 318, levelNames[level], 18, Fade(Cream, 0.7f));
+        UI::LabelCentered(640, 346,
+                          Tr("SCORE") + "  " + std::to_string(Score()) + "     " + Tr("BEST") + "  " +
+                              std::to_string(best[level]),
+                          18, Cream);
+    }
+    void DrawResultCard() {
+        bool won = screen == Screen::Won;
+        Rectangle card{390, 130, 500, 480};
+        DrawRectangleRounded({card.x + 4, card.y + 12, card.width, card.height}, 0.07f, 10, Fade(BLACK, 0.4f));
+        DrawRectangleRounded(card, 0.07f, 10, {29, 43, 44, 252});
+        Color ribbon = won ? Color{236, 186, 74, 255} : Color{190, 96, 82, 255};
+        if (won) { // slowly turning rays behind the banner star
+            Vector2 c{640, 136};
+            for (int i = 0; i < 12; ++i) {
+                float a = clock * 0.4f + i * PI / 6;
+                Triangle(c, {c.x + std::cos(a - 0.09f) * 120, c.y + std::sin(a - 0.09f) * 120},
+                         {c.x + std::cos(a + 0.09f) * 120, c.y + std::sin(a + 0.09f) * 120}, Fade(ribbon, 0.18f));
+            }
+            DrawStar(c, 34 * EaseOut(screenTime / 0.4f), ribbon);
+        }
+        // Banner across the top with notched tails.
+        Rectangle band{360, 168, 560, 66};
+        for (float side : {-1.0f, 1.0f}) {
+            float x = side < 0 ? band.x : band.x + band.width;
+            Triangle({x, band.y + 10}, {x + side * 34, band.y + 10}, {x + side * 20, band.y + 43}, Fade(ribbon, 0.75f));
+            Triangle({x, band.y + 10}, {x + side * 20, band.y + 43}, {x, band.y + 76}, Fade(ribbon, 0.75f));
+            Triangle({x, band.y + 76}, {x + side * 20, band.y + 43}, {x + side * 34, band.y + 76}, Fade(ribbon, 0.75f));
+        }
+        DrawRectangleRounded(band, 0.2f, 8, ribbon);
+        UI::TitleCentered(640, band.y + 12,
+                          won ? (level == 2 ? "ADVENTURE COMPLETE" : "LEVEL CLEARED") : "TRY AGAIN", 38, Ink);
+        UI::LabelCentered(640, 250, levelNames[level], 20, Fade(Cream, 0.75f));
+        int shown = static_cast<int>(std::round(Score() * EaseOut((screenTime - 0.15f) / 0.9f)));
+        UI::LabelCentered(640, 284, "SCORE", 16, Fade(Cream, 0.6f));
+        UI::TitleCentered(640, 304, std::to_string(shown), 54, won ? Color{255, 226, 140, 255} : Cream);
+        UI::LabelCentered(640, 372, Tr("BEST") + "  " + std::to_string(best[level]), 17, Fade(Cream, 0.75f));
+        if (newRecord && won && screenTime > 0.9f) {
+            float pulse = 1 + 0.06f * std::sin(clock * 6);
+            std::string text = Tr("NEW RECORD!");
+            float w = (RayGame::UI::TextWidth(text, 16) + 30) * pulse, h = 28 * pulse;
+            DrawRectangleRounded({640 - w / 2, 410 - h / 2, w, h}, 1, 12, ribbon);
+            UI::LabelCentered(640, 402, "NEW RECORD!", 16, Ink);
+        } else
+            UI::LabelCentered(640, 402, won ? "Progress saved. Your next challenge awaits." : hint, 16,
+                              Fade(Cream, 0.8f));
+    }
+    static void DrawPadlock(Vector2 c, float s, Color color) {
+        DrawRing({c.x, c.y - 6 * s}, 7 * s, 10 * s, 180, 360, 24, color);
+        DrawRectangleRounded({c.x - 12 * s, c.y - 6 * s, 24 * s, 19 * s}, 0.25f, 6, color);
+        DrawCircleV({c.x, c.y + 2 * s}, 2.5f * s, Ink);
+    }
+    static void DrawStar(Vector2 c, float r, Color color) {
+        for (int i = 0; i < 5; ++i) {
+            float a = -PI / 2 + i * 2 * PI / 5, b = a + PI / 5, prev = a - PI / 5;
+            Vector2 tip{c.x + std::cos(a) * r, c.y + std::sin(a) * r};
+            Vector2 left{c.x + std::cos(prev) * r * 0.45f, c.y + std::sin(prev) * r * 0.45f};
+            Vector2 right{c.x + std::cos(b) * r * 0.45f, c.y + std::sin(b) * r * 0.45f};
+            Triangle(c, left, tip, color);
+            Triangle(c, tip, right, color);
+        }
     }
     void Step(InputFrame input = {}, float dt = 1.0f / 60) {
         Display::Refresh();
@@ -463,7 +679,19 @@ public:
         Step(f);
         Step();
     }
+    // Clicks the centre of the current screen's button `idValue`, enabled or not.
+    void ClickButton(int idValue, bool touch = false) {
+        BuildButtons();
+        for (const auto& b : buttons)
+            if (b.id == idValue) {
+                Click({b.rect.x + b.rect.width / 2, b.rect.y + b.rect.height / 2}, touch);
+                return;
+            }
+    }
     void Capture(const char* name) {
+        // Menus are paused, so letting their entrance animation finish changes no game state.
+        for (int i = 0; i < 90 && screen != Screen::Play && screenTime < 1.3f; ++i)
+            Step();
         auto image = LoadImageFromTexture(Display::GetCanvasTexture());
         ImageFlipVertical(&image);
         bool ok = ExportImage(image, (data / (std::string(name) + ".png")).u8string().c_str());
@@ -471,7 +699,12 @@ public:
         if (!ok)
             throw std::runtime_error("Screenshot export failed");
     }
-    bool MenuPanelVisible() const {
+    // The first button of the menu is drawn at full brightness: nothing such as an engine pause
+    // shade covers the menu, and it sits where its hit box is.
+    bool MenuPanelVisible() {
+        BuildButtons();
+        if (buttons.empty())
+            return false;
         auto texture = Display::GetCanvasTexture();
         auto img = LoadImageFromTexture(texture);
         if (!IsImageValid(img))
@@ -479,7 +712,9 @@ public:
         ImageFlipVertical(&img);
         auto o = Origin();
         float scale = MenuScale();
-        auto p = Vector2{o.x + 640 + (350 - 640) * scale, o.y + 360 + (400 - 360) * scale};
+        auto r = buttons.front().rect;
+        Vector2 local{r.x + 12, r.y + r.height * 0.75f}; // inside the face, clear of label and icon
+        auto p = Vector2{o.x + 640 + (local.x - 640) * scale, o.y + 360 + (local.y - 360) * scale};
         auto c = GetImageColor(img, static_cast<int>(p.x / Display::GetWidth() * img.width),
                                static_cast<int>(p.y / Display::GetHeight() * img.height));
         UnloadImage(img);
@@ -515,17 +750,17 @@ public:
     template <class Check> void CheckPauseSettings(Check check) {
         Click({1090, 49}, true);
         check(screen == Screen::Pause, "HUD opens the custom pause page");
-        Click({640, 548}, true);
+        ClickButton(12, true);
         check(screen == Screen::Settings && settingsReturn == Screen::Pause,
               "pause opens settings without stacking menus");
         check(MenuPanelVisible(), "pause settings have no upper engine overlay");
         Capture("pause-settings");
         Click({640, 624}, true);
         check(screen == Screen::Pause, "settings return to the custom pause page");
-        Click({640, 418}, true);
+        ClickButton(6, true);
     }
     template <class Check> void CheckSettings(Check check) {
-        Click({540, 570}, true);
+        ClickButton(12, true);
         check(screen == Screen::Settings, "touch opens settings");
         check(MenuPanelVisible(), "settings draw above the background shade");
         Capture("settings-zh");
@@ -579,7 +814,7 @@ public:
         Capture("play-fullscreen");
         Click({1090, 49}, true);
         check(screen == Screen::Pause, "fullscreen HUD touch position matches the button");
-        Click({640, 418}, true);
+        ClickButton(6, true);
         SetFullscreen(false);
         Step();
 #endif

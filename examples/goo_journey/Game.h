@@ -54,6 +54,46 @@ public:
                          {"Across the Quiet Brook", "Up to the Lantern", "The Windmill Pass"},
                          std::move(directory)) {
         hint = "Build triangles. Keep the bridge steady before sending the lights.";
+        accent = Mint;
+    }
+    void DrawEmblem(Vector2 c, float time) override {
+        DrawCircleV({c.x + 38, c.y - 34}, 22 + std::sin(time * 2) * 2, Fade(Gold, 0.3f));
+        DrawCircleV({c.x + 38, c.y - 34}, 10, Gold);
+        Vector2 nodes[] = {{c.x - 34, c.y + 26}, {c.x + 30, c.y + 26}, {c.x - 2, c.y - 26}};
+        for (int i = 0; i < 3; ++i) {
+            DrawLineEx(nodes[i], nodes[(i + 1) % 3], 12, Dark);
+            DrawLineEx(nodes[i], nodes[(i + 1) % 3], 7, {136, 205, 146, 255});
+        }
+        for (auto p : nodes)
+            Ball(p, 17, time, Mint);
+    }
+    void DrawLevelArt(int stage, Rectangle area, float time) override {
+        DrawRectangleGradientV(static_cast<int>(area.x), static_cast<int>(area.y), static_cast<int>(area.width),
+                               static_cast<int>(area.height), {127, 184, 183, 255}, {231, 230, 181, 255});
+        DrawCircleV({area.x + area.width - 50, area.y + 50}, 28, {255, 241, 193, 255});
+        float ground = area.y + area.height - 40;
+        DrawEllipse(static_cast<int>(area.x + 60), static_cast<int>(ground + 30), 120, 50, {92, 148, 139, 255});
+        DrawEllipse(static_cast<int>(area.x + area.width - 30), static_cast<int>(ground + 34), 140, 56,
+                    {74, 127, 124, 255});
+        // A small structure in the shape the stage asks for: bridge, tower, then a long span.
+        std::vector<Vector2> pts;
+        if (stage == 1)
+            pts = {{area.x + 100, ground}, {area.x + 150, ground}, {area.x + 125, ground - 45},
+                   {area.x + 160, ground - 85}, {area.x + 120, ground - 120}};
+        else
+            for (int i = 0; i < 5; ++i)
+                pts.push_back({area.x + 40 + i * (stage == 2 ? 46.0f : 40.0f), ground - 30 - (i % 2) * 34.0f});
+        for (size_t i = 0; i + 1 < pts.size(); ++i) {
+            DrawLineEx(pts[i], pts[i + 1], 7, Dark);
+            if (i + 2 < pts.size())
+                DrawLineEx(pts[i], pts[i + 2], 7, Dark);
+        }
+        for (auto p : pts)
+            Ball(p, 11, time, Mint);
+        Vector2 lantern = stage == 1 ? Vector2{area.x + 120, ground - 150}
+                                     : Vector2{area.x + area.width - 40, ground - 70};
+        DrawCircleV(lantern, 18, Fade(Gold, 0.3f));
+        DrawRectangleRounded({lantern.x - 9, lantern.y - 12, 18, 24}, 0.3f, 6, Gold);
     }
     Model& M() {
         return arena->model;
