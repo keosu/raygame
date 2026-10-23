@@ -2,6 +2,18 @@
 
 更新时间：2026-10-20。
 
+## 工作包：修复 Android（Clang）编译错误（2026-10-23）
+
+用户在另一台机器编译 Android 报 `Automation.h:17:12 default member initializer for 'hiddenWindow' needed within
+definition of enclosing class`。原因是嵌套结构体 `Automation::Options` 带默认成员初始化，又在同一个类里被用作
+默认参数和 `static inline` 成员；MSVC 接受，NDK Clang 拒绝。本机 NDK r28c 用原头文件可复现同样错误。
+- 修复：`Options` 移到类外为 `AutomationOptions`，类内 `using Options = AutomationOptions;`，调用方不变。
+- 用户本机 `xmake f -p android` 报找不到 SDK/NDK 及 box2d 无匹配平台：本机工具在
+  `%LOCALAPPDATA%\raygame\android-sdk`（NDK 28.2），应使用 `xmake android` 任务自动发现；box2d 报错是
+  NDK 未找到的连带结果，未改代码。
+- 验证：`xmake android` 10 个 APK 编译并通过校验（含 ultra_guard）；桌面全目标构建，tests 499、
+  campaign_tests 37、smoke 通过。未做：Linux 构建、真机运行。
+
 ## 工作包：Ultra Guard v2.0（2026-10-23，已提交并发布）
 
 用户要求先按 v1.5 发布，随后改为 v2.0；提交、推送并在 GitHub 发布。

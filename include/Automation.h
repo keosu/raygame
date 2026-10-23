@@ -7,6 +7,12 @@
 
 namespace RayGame {
 
+// Defined outside Automation: Clang rejects a nested struct with default member initializers
+// as a default argument inside its enclosing class.
+struct AutomationOptions {
+    bool hiddenWindow = false; // GameEngine::Init creates the window hidden (desktop only)
+};
+
 // Scripted runs for screenshot tours and smoke checks. A run is a timeline of actions keyed by
 // frame number. Actions can load scenes or call game code, inject input that reaches the game
 // through Input exactly like a player's, and save screenshots. GameEngine begins each frame of
@@ -14,9 +20,7 @@ namespace RayGame {
 // always reads as focused, so a run works in a background or hidden window.
 class RAYGAME_API Automation {
 public:
-    struct Options {
-        bool hiddenWindow = false; // GameEngine::Init creates the window hidden (desktop only)
-    };
+    using Options = AutomationOptions;
 
     // Starts a run writing into `directory` (created if needed). Returns false, leaving no run
     // active, if the directory cannot be created. Call before GameEngine::Init for hiddenWindow.
