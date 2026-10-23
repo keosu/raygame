@@ -5,6 +5,10 @@
 ## 工作包：Ultra Guard v2.0（2026-10-23，已提交并发布）
 
 用户要求先按 v1.5 发布，随后改为 v2.0；提交、推送并在 GitHub 发布。
+- 发布：提交 `7244517` 推送到 `origin/dev`，标签 `ultra-guard-v2.0`（仓库是整个引擎，不用裸 `v2.0`），
+  Release <https://github.com/keosu/raygame/releases/tag/ultra-guard-v2.0> 附 `UltraGuard-v2.0-windows-x64.zip`
+  （exe + `assets/ultra_guard` + README，15.6 MB，需要 VC++ 2015-2022 运行库）。解压到干净目录、从别的工作目录
+  启动跑完 `--capture` 38 张，退出码 0。
 - 英雄名单 24 位：用户列了 21 位（从人气榜第 4 名捷德起），加上榜单前三迪迦、梦比优斯、雷欧凑满 24；初代退出名单。
   新增泰迦、艾克斯、希卡利、高斯、维克特利、罗索、布鲁、奥美迦，各有新 `AttackKind`（Strium、Xanadium、Knight、
   Luna、Quake、Flame、Aqua、Omega，实现在 `FireSignature`），罗索/布鲁同场伤害 +15%。`HeroId` 改为与 key 同名
