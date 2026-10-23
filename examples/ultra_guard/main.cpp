@@ -35,7 +35,7 @@ protected:
             return; // GameEngine::Run ignores Quit() during OnInit; quit on the first update
         }
 #if !defined(__ANDROID__) // Android uses the launcher icon from the manifest
-        Image icon = LoadImageFromTexture(Art::Portrait(HeroId::Ultraman));
+        Image icon = LoadImage(AssetPath("icon.png").c_str()); // tools/make_icon.py, from a real avatar
         if (IsImageValid(icon)) {
             ImageFormat(&icon, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
             ImageResize(&icon, 64, 64);
@@ -237,40 +237,25 @@ private:
             break;
         case 2970: // database page: the preview plays inside the panel, a few seconds per hero
             Automation::SaveCanvas("30_prepare_pool");
-            PreviewHero((int)HeroId::Man);
+            PreviewHero((int)HeroId::Taiga);
             GoToMenu(MenuPage::Heroes);
-            break;
-        case 3130:
-            Automation::SaveCanvas("31_preview_man");
-            PreviewHero((int)HeroId::Nexus);
-            GoToMenu(MenuPage::Heroes);
-            break;
-        case 3290:
-            Automation::SaveCanvas("32_preview_nexus");
-            PreviewHero((int)HeroId::Ginga);
-            GoToMenu(MenuPage::Heroes);
-            break;
-        case 3450:
-            Automation::SaveCanvas("33_preview_ginga");
-            PreviewHero((int)HeroId::Gaia);
-            GoToMenu(MenuPage::Heroes);
-            break;
-        case 3610:
-            Automation::SaveCanvas("34_preview_gaia");
-            PreviewHero((int)HeroId::Leo);
-            GoToMenu(MenuPage::Heroes);
-            break;
-        case 3770:
-            Automation::SaveCanvas("35_preview_leo");
-            PreviewHero((int)HeroId::Mebius);
-            GoToMenu(MenuPage::Heroes);
-            break;
-        case 3930:
-            Automation::SaveCanvas("36_preview_mebius");
-            Quit();
             break;
         default:
             break;
+        }
+        // The v2.0 heroes on the database page, 160 frames each so the preview fires a few times.
+        static const HeroId kTour[] = {HeroId::Taiga, HeroId::X,     HeroId::Hikari, HeroId::Cosmos,
+                                       HeroId::Victory, HeroId::Rosso, HeroId::Blu, HeroId::Omega};
+        constexpr int kTourStart = 3130, kTourStep = 160, kTourCount = (int)std::size(kTour);
+        if (frame >= kTourStart && (frame - kTourStart) % kTourStep == 0 && frame <= kTourStart + (kTourCount - 1) * kTourStep) {
+            int i = (frame - kTourStart) / kTourStep;
+            Automation::SaveCanvas(TextFormat("%d_preview_%s", 31 + i, HeroInfo(kTour[i]).key));
+            if (i + 1 < kTourCount) {
+                PreviewHero((int)kTour[i + 1]);
+                GoToMenu(MenuPage::Heroes);
+            } else {
+                Quit();
+            }
         }
     }
 

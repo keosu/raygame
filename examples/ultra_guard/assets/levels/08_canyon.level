@@ -11,22 +11,22 @@ hp       2.05
 assault  1.0
 seed     3102
 base     18 5
-heroes   z blazar tiga geed arc decker
+heroes   z blazar tiga geed victory decker
 path     -1,2 5,2 5,6 10,6 10,9 15,9 15,5 18,5
 path     -1,10 7,10 7,6 10,6 10,9 15,9 15,5 18,5
 
 wave     gomora x6 every 1.1 path 1 | baltan x6 every 0.9 after 1 path 2
 wave     eleking x8 every 0.7
-wave     redking x2 every 2.4 path 2 | gomora x8 every 0.9 after 2 path 1
+wave     golza x2 every 2.4 path 2 | gomora x8 every 0.9 after 2 path 1
 wave     metron x2 every 2 path 1 | metron x2 every 2 after 1 path 2 | baltan x8 every 0.7 after 3
 wave     kingjoe x1 path 1 | eleking x8 every 0.65 after 2 path 2
 wave     zetton x1 path 2 | gomora x8 every 0.85 after 2 path 1
-wave     baltan x12 every 0.55 | redking x3 every 2 after 3
+wave     dada x10 every 0.6 | redking x3 every 2 after 3
 wave     kingjoe x2 every 2.5 path 2 | eleking x10 every 0.6 after 2 path 1
 wave     redking x4 every 1.6 | metron x3 every 2 after 3
 wave     tregear x1 path 1 | baltan x10 every 0.6 after 3 path 2
-wave     eleking x12 every 0.5 | gomora x10 every 0.7 after 3
+wave     gabora x8 every 0.9 | gomora x10 every 0.7 after 3
 wave     kingjoe x3 every 2.2 | redking x3 every 1.8 after 3
 wave     zetton x1 path 1 | zetton x1 after 10 path 2 | baltan x10 every 0.55 after 3
-wave     metron x4 every 1.6 | eleking x12 every 0.5 after 3 | redking x3 every 1.8 after 6
+wave     bemstar x2 every 2.5 | eleking x12 every 0.5 after 3 | redking x3 every 1.8 after 6
 wave     belial x1 path 2 | kingjoe x2 every 3 after 4 path 1 | gomora x10 every 0.7 after 6

@@ -1,16 +1,17 @@
 # 光之守护者关卡文件（UTF-8）。每行“键 值”，# 开头为注释，空行忽略。
 #
 # id        存档用的唯一标识（可省略，默认是文件名）
-# theme     地图主题：city / mountain / nebula / park / plaza / studio
+# theme     地图主题：city / mountain / nebula / park / plaza / studio / volcano / moon / citadel
 # gold      初始金币      lives  生命      hp  怪兽血量倍率      seed  装饰随机种子
 # base      基地所在格子：列 行（地图 20 列 × 12 行，从 0 开始）
 # arc       关卡页上分组的篇章名（可省略）
 # heroes    本关可放置的英雄（最多 6 位，按卡片顺序）；省略时为 z orb tiga geed arc zero。
-#           可用：z orb tiga geed arc zero trigger decker blazar
+#           可用：z orb tiga geed arc zero trigger decker blazar mebius leo ginga gaia nexus dyna teo
+#                 taiga x hikari cosmos victory rosso blu omega（出战准备页可以自由换人）
 # path      路径拐点“列,行”，按行进顺序书写；起点可在地图外（列 -1）。可写多条 path。
 # wave      一波怪兽，多组用 | 分隔。每组：怪兽 x数量 [every 间隔秒] [after 延迟秒] [path 第几条|all]
-#           怪兽：gomora baltan baltan_clone eleking redking zetton belial
-#           含 zetton/belial 的波次自动显示 BOSS 警告。修改中文文字后需重新生成字体子集。
+#           怪兽：gomora baltan baltan_clone eleking redking metron kingjoe bemstar gabora golza dada kingpandon
+#                 首领 zetton belial tregear gatanothor zagi；含首领的波次自动显示 BOSS 警告。修改中文文字后需重新生成字体子集。
 id       tokyo
 name     东京湾防线
 subtitle 守护地球篇 · 黄昏都市

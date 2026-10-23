@@ -10,6 +10,8 @@ namespace UG {
 
 using namespace RayGame;
 
+constexpr const char* kVersion = "v2.0"; // shown on the title page; keep in step with the Android versionName
+
 constexpr int kCanvasW = 1280;
 constexpr int kCanvasH = 720;
 constexpr int kCols = 20;

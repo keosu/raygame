@@ -22,6 +22,7 @@ public:
     float breakTime = 0, vulnTime = 0, stunTime = 0, shieldTime = 0;
     float phaseTime = 0; // Tregear inside a dimension gate: untargetable and immune
     float buffTime = 0;  // driven berserk by Tregear: faster and tougher
+    float absorbTime = 0; // Bemstar's open belly: half of the damage taken heals it
     float abilityA = 0, abilityB = 0;
     float strikeTimer = 0, strikePause = 0; // attacks on heroes; ordinary kaiju halt briefly to swing
     float flash = 0, face = 1, anim = 0, appear = 0;
@@ -43,7 +44,7 @@ class HeroActor : public Component {
 public:
     BattleScene* battle = nullptr;
     int id = 0;
-    HeroId hero = HeroId::Ultraman;
+    HeroId hero = HeroId::Z;
     int col = 0, row = 0, level = 0, mode = 0, invested = 0, shots = 0, kills = 0;
     float cooldown = 0.35f, recoil = 0, flash = 0, build = 0, dealt = 0;
     float nextCooldownScale = 1; // set by Fire for one shot, e.g. Trigger's rapid Sky Type
@@ -132,7 +133,7 @@ private:
 
     int levelIndex;
     bool demo = false;
-    HeroId demoHero = HeroId::Ultraman;
+    HeroId demoHero = HeroId::Z;
     int demoStar = 2;
     float demoSpawn = 0, demoClock = 0, demoDealt = 0;
     int demoCount = 0;

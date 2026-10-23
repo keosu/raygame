@@ -4,9 +4,16 @@
 
 namespace UG {
 
-// The first six ids are the original roster (keys z orb tiga geed arc zero); levels pick up to six.
-enum class HeroId { Ultraman, Seven, Tiga, Cosmos, Taro, Zero, Trigger, Decker, Blazar, Mebius, Leo, Ginga, Gaia, Nexus, Dyna, Man, Teo, Count };
-enum class AttackKind { PierceBeam, Boomerang, Snipe, Pulse, Splash, Twin, Multi, Vortex, Spear, Slash, Infinity, Kick, Chain, Edge, Field, Dual, Focus };
+// Ids match the hero keys. The first six are the original roster (z orb tiga geed arc zero), the
+// default when a level names no heroes; levels field up to six.
+enum class HeroId {
+    Z, Orb, Tiga, Geed, Arc, Zero, Trigger, Decker, Blazar, Mebius, Leo, Ginga,
+    Gaia, Nexus, Dyna, Teo, Taiga, X, Hikari, Cosmos, Victory, Rosso, Omega, Blu, Count
+};
+enum class AttackKind {
+    PierceBeam, Boomerang, Snipe, Pulse, Splash, Twin, Multi, Vortex, Spear, Infinity, Kick, Chain, Edge, Field, Dual,
+    Focus, Strium, Xanadium, Knight, Luna, Quake, Flame, Aqua, Omega
+};
 constexpr int kHeroCount = (int)HeroId::Count;
 constexpr int kRosterMax = 6; // hero cards that fit the battle panel
 
@@ -32,7 +39,10 @@ struct HeroDef {
 const HeroDef& HeroInfo(HeroId id);
 bool HeroByKey(const std::string& key, HeroId& out);
 
-enum class EnemyId { Baltan, BaltanClone, Gomora, Eleking, RedKing, Zetton, Belial, KingJoe, Metron, Tregear, Gatanothor, Count };
+enum class EnemyId {
+    Baltan, BaltanClone, Gomora, Eleking, RedKing, Zetton, Belial, KingJoe, Metron, Tregear, Gatanothor,
+    Bemstar, Gabora, Golza, Dada, KingPandon, Zagi, Count
+};
 constexpr int kEnemyCount = (int)EnemyId::Count;
 
 // How a kaiju hits heroes in levels with `assault` above zero.

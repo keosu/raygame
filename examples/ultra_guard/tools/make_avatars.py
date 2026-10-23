@@ -35,8 +35,17 @@ SOURCES = {
     "gaia": "gaia.png",
     "nexus": "nexus.png",
     "dyna": "dyna.png",
-    "man": "man.png",
     "teo": "teo.png",
+    "taiga": "taiga.png",
+    "omega": "omega.png",
+    # v2.0: Ultra series wiki renders (ultra.fandom.com): Ultraman X Render I, Ultraman Hikari Render,
+    # CosmosRender (Luna Mode), Ultraman Victory full, Ultraman Rosso, Ultraman Blu(V2).
+    "x": "x.png",
+    "hikari": "hikari.png",
+    "cosmos": "cosmos.png",
+    "victory": "victory.png",
+    "rosso": "rosso.png",
+    "blu": "blu.png",
 }
 
 # Hand-measured (centre x, top y, head height) in source pixels for poses that fool

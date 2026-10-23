@@ -11,20 +11,20 @@ hp       2.3
 assault  0.8
 seed     3101
 base     18 8
-heroes   z orb trigger geed arc zero
+heroes   z orb taiga geed rosso blu
 path     -1,5 3,5 3,1 8,1 8,10 12,10 12,3 16,3 16,8 18,8
 
 wave     gomora x8 every 1.2
 wave     baltan x10 every 0.8
 wave     eleking x8 every 0.7 | gomora x4 every 1 after 3
-wave     redking x2 every 2.4 | baltan x8 every 0.75 after 2
+wave     golza x2 every 2.4 | baltan x8 every 0.75 after 2
 wave     metron x3 every 2 | gomora x8 every 0.9 after 2
 wave     zetton x1 | eleking x6 every 0.7 after 3
 wave     baltan x12 every 0.6 | redking x2 every 2.2 after 3
 wave     kingjoe x2 every 3 | gomora x8 every 0.8 after 2
-wave     eleking x12 every 0.55 | metron x2 every 2 after 4
+wave     dada x8 every 0.7 | metron x2 every 2 after 4
 wave     redking x4 every 1.7 | baltan x10 every 0.6 after 2
 wave     kingjoe x2 every 2.5 | eleking x10 every 0.55 after 3
 wave     tregear x1 | gomora x10 every 0.75 after 3
-wave     redking x4 every 1.6 | metron x3 every 2 after 2 | baltan x10 every 0.55 after 4
+wave     kingpandon x1 | metron x3 every 2 after 2 | baltan x10 every 0.55 after 4
 wave     zetton x1 | redking x3 every 1.8 after 4 | eleking x10 every 0.55 after 6

@@ -478,7 +478,7 @@ bool LoadCustom(int i) {
     int side = std::min(image.width, image.height);
     ImageCrop(&image, {(image.width - side) / 2.0f, (image.height - side) / 2.0f, (float)side, (float)side});
     ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-    ImageResize(&image, 256, 256);
+    ImageResize(&image, 384, 384); // the title spotlight draws avatars at about 400 px
     Finish(i, image);
     UnloadImage(image);
     return true;
@@ -494,11 +494,11 @@ void BeginBakeBlend() {
 
 void DrawBust(HeroId id) {
     switch (id) {
-    case HeroId::Ultraman: DrawUltraman(); break;
-    case HeroId::Seven: DrawSeven(); break;
+    case HeroId::Z: DrawUltraman(); break;
+    case HeroId::Orb: DrawSeven(); break;
     case HeroId::Tiga: DrawTiga(); break;
-    case HeroId::Cosmos: DrawCosmos(); break;
-    case HeroId::Taro: DrawTaro(); break;
+    case HeroId::Geed: DrawCosmos(); break;
+    case HeroId::Arc: DrawTaro(); break;
     case HeroId::Zero: DrawZero(); break;
     case HeroId::Trigger: DrawTrigger(); break;
     case HeroId::Decker: DrawDecker(); break;
@@ -555,7 +555,7 @@ void DrawPortrait(HeroId id, Rectangle dest, Color tint) {
 }
 
 Vector2 EyePoint(HeroId id, int side) {
-    float y = (id == HeroId::Seven || id == HeroId::Taro || id == HeroId::Zero) ? H.y + 6 : H.y + 3;
+    float y = (id == HeroId::Orb || id == HeroId::Arc || id == HeroId::Zero) ? H.y + 6 : H.y + 3;
     return {H.x + (side < 0 ? -22.0f : 22.0f), y};
 }
 

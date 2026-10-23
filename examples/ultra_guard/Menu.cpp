@@ -5,6 +5,7 @@
 #include "Draw.h"
 #include "Gui.h"
 #include "Skins.h"
+#include <random>
 #include <rlgl.h>
 
 namespace UG {
@@ -24,6 +25,17 @@ constexpr float W = (float)kCanvasW, Hh = (float)kCanvasH;
 float EaseOut(float t) {
     t = Clamp(t, 0.0f, 1.0f);
     return 1 - (1 - t) * (1 - t) * (1 - t);
+}
+
+// The gallery leaves out Baltan's clones: they belong to Baltan, and sixteen fill a 4 × 4 grid.
+const std::vector<EnemyId>& GalleryKaiju() {
+    static const std::vector<EnemyId> ids = [] {
+        std::vector<EnemyId> out;
+        for (int i = 0; i < kEnemyCount; ++i)
+            if ((EnemyId)i != EnemyId::BaltanClone) out.push_back((EnemyId)i);
+        return out;
+    }();
+    return ids;
 }
 
 void Skyline(Rng& rng, float baseY, float minH, float maxH, Color body, Color window, float windowChance) {
@@ -105,7 +117,7 @@ void MenuScene::OnLoad() {
         }
         Draw::BlendNormal();
         // Distant Earth
-        Vector2 earth{150, 120};
+        Vector2 earth{600, 96}; // between the title logo and the hero spotlight
         Draw::BlendAdd();
         Draw::Glow(earth, 120, WithAlpha({80, 160, 255, 255}, 0.35f));
         Draw::BlendNormal();
@@ -133,6 +145,14 @@ void MenuScene::OnLoad() {
     if (!survivalPreview.id && SurvivalLevel()) {
         survivalMap.Build(*SurvivalLevel());
         survivalPreview = RenderMap(survivalMap, 0.5f);
+    }
+    if (spotlight.empty()) {
+        std::mt19937 rng((std::uint32_t)GetRandomValue(0, 0x7fffffff));
+        for (int i = 0; i < kHeroCount; ++i) spotlight.push_back((HeroId)i);
+        std::shuffle(spotlight.begin(), spotlight.end(), rng);
+        for (int i = 0; i < kEnemyCount; ++i)
+            if ((EnemyId)i != EnemyId::BaltanClone) rivals.push_back((EnemyId)i);
+        std::shuffle(rivals.begin(), rivals.end(), rng);
     }
     pageTime = 0;
     Sfx::PlayMusic("menu");
@@ -216,8 +236,14 @@ void MenuScene::Update() {
         if (Input::GetKeyDown(KEY_LEFT) || Input::GetKeyDown(KEY_A)) levelPage = std::max(levelPage - 1, 0);
     }
     if (page == MenuPage::Kaiju) {
-        if (Input::GetKeyDown(KEY_RIGHT) || Input::GetKeyDown(KEY_D)) kaijuIndex = (kaijuIndex + 1) % kEnemyCount;
-        if (Input::GetKeyDown(KEY_LEFT) || Input::GetKeyDown(KEY_A)) kaijuIndex = (kaijuIndex + kEnemyCount - 1) % kEnemyCount;
+        const auto& gallery = GalleryKaiju();
+        int n = (int)gallery.size();
+        int at = (int)(std::find(gallery.begin(), gallery.end(), (EnemyId)kaijuIndex) - gallery.begin()) % n;
+        if (Input::GetKeyDown(KEY_RIGHT) || Input::GetKeyDown(KEY_D)) at = (at + 1) % n;
+        if (Input::GetKeyDown(KEY_LEFT) || Input::GetKeyDown(KEY_A)) at = (at + n - 1) % n;
+        if (Input::GetKeyDown(KEY_DOWN) || Input::GetKeyDown(KEY_S)) at = std::min(at + 4, n - 1);
+        if (Input::GetKeyDown(KEY_UP) || Input::GetKeyDown(KEY_W)) at = std::max(at - 4, 0);
+        kaijuIndex = (int)gallery[at];
     }
 }
 
@@ -281,62 +307,113 @@ void MenuScene::DrawBack() {
     if (Gui::Button({30, 28, 120, 44}, "返回", Gui::Style::Dark, true, 18)) SetPage(MenuPage::Title);
 }
 
+// The title page: logo and actions on the left; on the right a spotlight that cycles through the
+// roster, one hero at a time, facing a kaiju in the dark behind.
 void MenuScene::DrawTitle() {
     float t = RealTime();
     float a = EaseOut(pageTime / 0.6f);
-    // Light burst behind the title
+    auto slide = [&](int order) { return -50 * (1 - EaseOut((pageTime - order * 0.07f) / 0.45f)); };
+
+    constexpr float kHold = 3.6f, kFade = 0.55f;
+    float cycle = std::max(0.0f, pageTime - 0.3f);
+    int turn = (int)(cycle / kHold);
+    float local = std::fmod(cycle, kHold), fadeIn = EaseOut(local / kFade);
+    int heroCount = (int)spotlight.size(), rivalCount = (int)rivals.size();
+    HeroId hero = spotlight[turn % heroCount], previous = spotlight[(turn + heroCount - 1) % heroCount];
+    const HeroDef& def = HeroInfo(hero);
+
+    // Rival kaiju looming at the right edge, changing every other hero.
+    Vector2 stage{895, 330};
+    {
+        int rivalTurn = turn / 2;
+        float rivalLocal = std::fmod(cycle, kHold * 2), rivalIn = EaseOut(rivalLocal / (kFade * 1.6f));
+        auto rival = [&](EnemyId id, float alpha) {
+            Draw::BlendAdd();
+            Draw::Glow({1150, 360}, 260, WithAlpha({255, 50, 70, 255}, 0.16f * alpha));
+            Draw::BlendNormal();
+            Art::KaijuPose pose;
+            pose.feet = {1150, 640};
+            pose.scale = Art::KaijuFitScale(id, 300, 400);
+            pose.time = t;
+            pose.face = -1;
+            pose.alpha = 0.55f * alpha * a;
+            Art::DrawKaiju(id, pose);
+        };
+        if (rivalIn < 1 && turn >= 2) rival(rivals[(rivalTurn + rivalCount - 1) % rivalCount], 1 - rivalIn);
+        rival(rivals[rivalTurn % rivalCount], rivalIn);
+    }
+    // Light burst and halo behind the hero.
     Draw::BlendAdd();
     for (int i = 0; i < 14; ++i) {
-        float ang = t * 0.08f + i * PI / 7;
-        Vector2 c{W / 2, 130};
-        Draw::Tri(c, Add(c, Mul(Dir(ang - 0.05f), 700)), Add(c, Mul(Dir(ang + 0.05f), 700)), WithAlpha({255, 220, 160, 255}, 0.035f * a));
+        float ang = t * 0.09f + i * PI / 7;
+        Draw::Tri(stage, Add(stage, Mul(Dir(ang - 0.05f), 640)), Add(stage, Mul(Dir(ang + 0.05f), 640)),
+                  WithAlpha(Mix({255, 220, 160, 255}, def.beam, 0.5f), 0.04f * a));
     }
-    Draw::Glow({W / 2, 130}, 320, WithAlpha({255, 200, 120, 255}, 0.18f * a));
+    Draw::Glow(stage, 300, WithAlpha(def.primary, 0.32f * a * fadeIn));
+    Draw::Glow(stage, 170, WithAlpha(def.beam, 0.22f * a * fadeIn));
     Draw::BlendNormal();
+    DrawRing(stage, 196, 199, 0, 360, 96, WithAlpha(def.beam, 0.45f * a * fadeIn));
+    DrawRing(stage, 214, 215, 0, 360, 96, WithAlpha(Palette::gold, 0.25f * a));
+    float size = 420, bob = std::sin(t * 1.5f) * 5;
+    if (fadeIn < 1 && turn > 0)
+        Art::DrawPortrait(previous, {stage.x - size / 2 - 40 * fadeIn, stage.y - size / 2 - 14 + bob, size, size},
+                          WithAlpha(WHITE, (1 - fadeIn) * a));
+    Art::DrawPortrait(hero, {stage.x - size / 2 + 40 * (1 - fadeIn), stage.y - size / 2 - 14 + bob, size, size},
+                      WithAlpha(WHITE, fadeIn * a));
+    // Name plate under the spotlight, with a thin timer bar for the rotation.
+    Rectangle plate{stage.x - 230, 556, 460, 92};
+    Draw::RoundedPanel(plate, 14, {10, 12, 30, 215}, WithAlpha(def.beam, 0.6f * fadeIn), 1.5f);
+    Gui::TextShadow(def.name, plate.x + 24, plate.y + 10 + (1 - fadeIn) * 8, 32, WithAlpha(Palette::text, fadeIn));
+    Gui::Text(def.role, plate.x + plate.width - 22, plate.y + 20, 15, WithAlpha(def.beam, fadeIn), Gui::Align::Right, true);
+    Gui::Text(TextFormat("必杀技 · %s", def.move), plate.x + 24, plate.y + 56, 17, WithAlpha(Palette::gold, fadeIn), Gui::Align::Left, true);
+    Gui::Text(TextFormat("%d / %d", turn % heroCount + 1, heroCount), plate.x + plate.width - 22, plate.y + 58, 13,
+              WithAlpha(Palette::muted, fadeIn), Gui::Align::Right, true);
+    DrawRectangleRec({plate.x + 14, plate.y + plate.height - 6, (plate.width - 28) * Clamp(local / kHold, 0.0f, 1.0f), 2},
+                     WithAlpha(def.beam, 0.8f));
 
-    Gui::Text("ULTRAMAN  TOWER  DEFENSE", W / 2, 40, 16, WithAlpha(Palette::cyan, a), Gui::Align::Center, true);
-    float bounce = (1 - EaseOut(pageTime / 0.7f)) * -40;
-    Gui::TextOutline("光之守护者", W / 2 + 3, 64 + bounce + 5, 92, WithAlpha({120, 20, 20, 255}, a), WithAlpha({120, 20, 20, 255}, a), 3);
-    Gui::TextOutline("光之守护者", W / 2, 64 + bounce, 92, WithAlpha({255, 236, 180, 255}, a), WithAlpha({170, 40, 30, 255}, a), 3.5f);
-    Gui::Text("奥特曼塔防  ·  集结光之巨人，守护地球", W / 2, 174, 21, WithAlpha(Palette::text, a), Gui::Align::Center);
+    // Logo block.
+    float lx = 72;
+    Gui::Text("ULTRAMAN  TOWER  DEFENSE", lx + slide(0), 74, 15, WithAlpha(Palette::cyan, a), Gui::Align::Left, true);
+    float tagX = lx + Gui::Measure("ULTRAMAN  TOWER  DEFENSE", 15, true) + 14 + slide(0);
+    Draw::RoundedPanel({tagX, 71, 52, 22}, 11, WithAlpha(Palette::gold, 0.9f * a), BLANK, 0);
+    Gui::Text(kVersion, tagX + 26, 73, 14, WithAlpha({40, 20, 0, 255}, a), Gui::Align::Center, true);
+    Draw::BlendAdd();
+    Draw::Glow({lx + 190 + slide(1), 150}, 220, WithAlpha({255, 160, 90, 255}, 0.14f * a));
+    Draw::BlendNormal();
+    Gui::TextOutline("光之守护者", lx + 4 + slide(1), 106, 88, WithAlpha({110, 16, 20, 255}, a), WithAlpha({110, 16, 20, 255}, a), 3,
+                     Gui::Align::Left);
+    Gui::TextOutline("光之守护者", lx + slide(1), 100, 88, WithAlpha({255, 236, 180, 255}, a), WithAlpha({170, 40, 30, 255}, a), 3.5f,
+                     Gui::Align::Left);
+    Gui::Text("奥特曼塔防  ·  集结光之巨人，守护地球", lx + 2 + slide(2), 206, 20, WithAlpha(Palette::text, a));
+    Gui::Text(TextFormat("%d 位光之巨人  ·  %d 种怪兽  ·  %d 个关卡 + 守城生存", kHeroCount, kEnemyCount - 1, (int)Levels().size()),
+              lx + 2 + slide(2), 238, 14, WithAlpha(Palette::muted, a));
 
-    // Hero lineup: the 2026 popularity top ten, in ranking order.
-    static const HeroId kTopTen[] = {HeroId::Tiga,  HeroId::Mebius, HeroId::Leo,  HeroId::Cosmos, HeroId::Seven,
-                                     HeroId::Ginga, HeroId::Gaia,   HeroId::Zero, HeroId::Nexus,  HeroId::Ultraman};
-    constexpr int kShown = (int)std::size(kTopTen);
-    float gap = 12;
-    float size = std::min(150.0f, (W - 70 - (kShown - 1) * gap) / kShown);
-    float total = kShown * size + (kShown - 1) * gap;
-    for (int i = 0; i < kShown; ++i) {
-        HeroId id = kTopTen[i];
-        const HeroDef& def = HeroInfo(id);
-        float appear = EaseOut((pageTime - 0.15f - i * 0.06f) / 0.5f);
-        if (appear <= 0) continue;
-        float arc = std::fabs(i - (kShown - 1) * 0.5f) * 5.0f / (kShown - 1);
-        float x = W / 2 - total / 2 + i * (size + gap);
-        float y = 226 + arc * arc * 5 + std::sin(t * 1.6f + i) * 5 + (1 - appear) * 60;
-        Vector2 c{x + size / 2, y + size * 0.62f};
-        Draw::BlendAdd();
-        Draw::Glow(c, size * 0.7f, WithAlpha(def.primary, 0.45f * appear));
-        Draw::Glow(c, size * 0.38f, WithAlpha(def.beam, 0.25f * appear));
-        Draw::BlendNormal();
-        Draw::GlowStretched({c.x, y + size + 4}, size * 0.5f, 12, 0, WithAlpha(BLACK, 0.5f * appear));
-        Art::DrawPortrait(id, {x, y, size, size}, WithAlpha(WHITE, appear));
-        std::string name = def.name;
-        const std::string suffix = "奥特曼";
-        if (name.size() > suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0)
-            name.resize(name.size() - suffix.size());
-        Gui::TextShadow(name, c.x, y + size + 6, 15, WithAlpha(Palette::text, appear), Gui::Align::Center);
-        Gui::Text(TextFormat("%d", i + 1), x + 8, y + 4, 14, WithAlpha(i < 3 ? Palette::gold : Palette::muted, appear), Gui::Align::Left, true);
+    // Actions, stacked like a game menu: the main one largest.
+    float bx = lx;
+    if (Gui::Button({bx + slide(3), 290, 400, 66}, "开始作战", Gui::Style::Gold, true, 28)) SetPage(MenuPage::Levels);
+    if (Gui::Button({bx + slide(4), 370, 400, 56}, "守城生存", Gui::Style::Red, SurvivalLevel() != nullptr, 24)) OpenPrepare(kSurvivalIndex);
+    if (Gui::Button({bx + slide(5), 440, 196, 50}, "奥特数据库", Gui::Style::Blue, true, 19)) SetPage(MenuPage::Heroes);
+    if (Gui::Button({bx + 204 + slide(5), 440, 196, 50}, "怪兽图鉴", Gui::Style::Red, true, 19)) SetPage(MenuPage::Kaiju);
+    if (Gui::Button({bx + slide(6), 502, 400, 44}, "操作说明", Gui::Style::Dark, true, 18)) SetPage(MenuPage::Help);
+
+    // Progress at a glance.
+    int stars = 0;
+    for (int i = 0; i < (int)Levels().size(); ++i) stars += Progress::Stars(i);
+    float best = Progress::SurvivalBestTime();
+    Rectangle stats{bx + slide(7), 566, 400, 70};
+    Draw::RoundedPanel(stats, 12, {10, 12, 30, 200}, Palette::line, 1.2f);
+    struct Stat {
+        std::string value;
+        const char* label;
+        Color tone;
+    } items[] = {{TextFormat("%d/%d", stars, (int)Levels().size() * 3), "关卡星星", Palette::gold},
+                 {TextFormat("%d", Progress::TotalKills()), "击败怪兽", Palette::red},
+                 {TextFormat("%02d:%02d", (int)best / 60, (int)best % 60), "守城最佳", Palette::cyan}};
+    for (int i = 0; i < 3; ++i) {
+        float cx = stats.x + stats.width * (i + 0.5f) / 3;
+        Gui::Text(items[i].value, cx, stats.y + 10, 22, items[i].tone, Gui::Align::Center, true);
+        Gui::Text(items[i].label, cx, stats.y + 42, 13, Palette::muted, Gui::Align::Center);
     }
-    Gui::Text("2026 奥特曼人气榜 TOP 10", W / 2, 208, 13, WithAlpha(Palette::muted, a), Gui::Align::Center);
-
-    float by = 470 + (1 - a) * 30;
-    if (Gui::Button({W / 2 - 300, by, 290, 60}, "开始作战", Gui::Style::Gold, true, 26)) SetPage(MenuPage::Levels);
-    if (Gui::Button({W / 2 + 10, by, 290, 60}, "生存模式", Gui::Style::Red, SurvivalLevel() != nullptr, 26)) OpenPrepare(kSurvivalIndex);
-    if (Gui::Button({W / 2 - 300, by + 76, 190, 46}, "奥特数据库", Gui::Style::Blue, true, 19)) SetPage(MenuPage::Heroes);
-    if (Gui::Button({W / 2 - 95, by + 76, 190, 46}, "怪兽图鉴", Gui::Style::Red, true, 19)) SetPage(MenuPage::Kaiju);
-    if (Gui::Button({W / 2 + 110, by + 76, 190, 46}, "操作说明", Gui::Style::Dark, true, 19)) SetPage(MenuPage::Help);
 
     auto& opt = Progress::Options();
     Rectangle sfxBtn{W - 160, Hh - 64, 56, 44}, musicBtn{W - 96, Hh - 64, 56, 44};
@@ -352,21 +429,9 @@ void MenuScene::DrawTitle() {
         Progress::Save();
     }
     Gui::NoteIcon({musicBtn.x + 28, musicBtn.y + 21}, 11, opt.music ? WHITE : Palette::muted, opt.music);
-    if (Gui::Button({40, Hh - 64, 130, 44}, "退出游戏", Gui::Style::Dark, true, 17)) QuitGame();
-    const auto& skins = Skins::All();
-    if (skins.size() > 1 && Gui::Button({186, Hh - 64, 210, 44}, "皮肤：" + skins[Skins::Current()].name, Gui::Style::Dark, true, 17)) {
-        Skins::Select((Skins::Current() + 1) % (int)skins.size());
-        GoToMenu(MenuPage::Title); // rebuilds the baked map previews
-    }
-    if (!Skins::Errors().empty()) Gui::Text("皮肤文件有误：" + Skins::Errors()[0], 40, Hh - 86, 12, Palette::red);
-
-    int stars = 0;
-    for (int i = 0; i < (int)Levels().size(); ++i) stars += Progress::Stars(i);
-    float best = Progress::SurvivalBestTime();
-    Gui::Text(TextFormat("已获得星星 %d / %d     累计击败怪兽 %d     生存最佳 %02d:%02d", stars, (int)Levels().size() * 3, Progress::TotalKills(),
-                         (int)best / 60, (int)best % 60),
-              W / 2, Hh - 50, 15, Palette::muted, Gui::Align::Center);
-    Gui::Text("Enter 开始   F11 全屏   Esc 退出", W / 2, Hh - 28, 12, WithAlpha(Palette::muted, 0.7f), Gui::Align::Center);
+    if (Gui::Button({W - 296, Hh - 64, 124, 44}, "退出游戏", Gui::Style::Dark, true, 17)) QuitGame();
+    if (!Skins::Errors().empty()) Gui::Text("皮肤文件有误：" + Skins::Errors()[0], lx, Hh - 30, 12, Palette::red);
+    Gui::Text("Enter 开始   F11 全屏   Esc 退出", lx, Hh - 54, 12, WithAlpha(Palette::muted, 0.7f));
 }
 
 void MenuScene::DrawLevels() {
@@ -488,9 +553,9 @@ void MenuScene::DrawPrepare() {
         Gui::Paragraph("怪兽会用光线、岩石和火球攻击附近的英雄。能量耗尽的英雄倒下 8 秒，脱离攻击后能量会慢慢恢复，升级可以立刻补满。",
                        info.x + 18, std::min(y + 4, info.y + info.height - 64), info.width - 36, 12.5f, {255, 190, 180, 255}, 1.5f);
 
-    // Hero pool: five compact cards per row (room for twenty), picked heroes show their card number.
+    // Hero pool: six compact cards per row (four rows for the 24 heroes), picked heroes show their card number.
     float t = RealTime();
-    constexpr int kPoolCols = 5;
+    constexpr int kPoolCols = 6;
     constexpr float kPoolW = 755, kPoolH = 418, kGap = 7;
     const int poolRows = (kHeroCount + kPoolCols - 1) / kPoolCols;
     const float kCardW = (kPoolW - (kPoolCols - 1) * kGap) / kPoolCols;
@@ -569,48 +634,53 @@ void MenuScene::DrawPrepare() {
 
 void MenuScene::DrawHeroes() {
     DrawBack();
-    DrawPageTitle("奥特曼数据库", "可上阵的光之巨人，每关阵容不同");
-    // Two columns so the roster can grow to twenty.
-    const int perColumn = (kHeroCount + 1) / 2;
-    float rowH = std::min(92.0f, 566.0f / perColumn);
+    DrawPageTitle("奥特曼数据库", TextFormat("%d 位可上阵的光之巨人，每关阵容自由挑选", kHeroCount));
+    // Three columns of compact rows: the whole roster fits beside the detail panel.
+    constexpr int kColumns = 3;
+    const int perColumn = (kHeroCount + kColumns - 1) / kColumns;
+    constexpr float kListX = 26, kRowW = 150, kColGap = 4;
+    float rowH = std::min(80.0f, 566.0f / perColumn);
     for (int i = 0; i < kHeroCount; ++i) {
         const HeroDef& def = HeroInfo((HeroId)i);
-        Rectangle r{30 + (i / perColumn) * 180.0f, 128 + (i % perColumn) * rowH, 174, rowH - 5};
+        Rectangle r{kListX + (i / perColumn) * (kRowW + kColGap), 128 + (i % perColumn) * rowH, kRowW, rowH - 4};
         bool active = heroIndex == i;
         if (Gui::Clicked(r)) heroIndex = i;
         bool hover = Gui::Hover(r);
-        Draw::RoundedPanel(r, 10, active ? Mix(def.primary, {10, 14, 30, 255}, 0.55f) : Color{14, 20, 44, 230},
+        Draw::RoundedPanel(r, 9, active ? Mix(def.primary, {10, 14, 30, 255}, 0.55f) : Color{14, 20, 44, 230},
                            active  ? Palette::gold
                            : hover ? Lighten(def.primary, 0.3f)
                                    : Palette::line,
-                           active ? 2.5f : 1.3f);
+                           active ? 2.4f : 1.2f);
         float s = r.height + 2;
-        Art::DrawPortrait((HeroId)i, {r.x + 2, r.y - 2, s, s});
-        Gui::Text(def.name, r.x + s + 6, r.y + r.height * 0.5f - 17, 14, Palette::text, Gui::Align::Left, true);
-        Gui::Text(def.role, r.x + s + 6, r.y + r.height * 0.5f + 2, 11.5f, def.beam);
+        Art::DrawPortrait((HeroId)i, {r.x + 1, r.y - 2, s, s});
+        std::string name = def.name;
+        const std::string suffix = "奥特曼";
+        if (name.size() > suffix.size() && name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0)
+            name.resize(name.size() - suffix.size());
+        Gui::Text(name, r.x + s + 4, r.y + r.height * 0.5f - 16, 14, Palette::text, Gui::Align::Left, true);
+        Gui::Text(def.role, r.x + s + 4, r.y + r.height * 0.5f + 2, 11, def.beam);
     }
     const HeroDef& def = HeroInfo((HeroId)heroIndex);
-    Rectangle panel{396, 128, 856, 562};
+    Rectangle panel{492, 128, 762, 562};
     Gui::Panel(panel, {12, 18, 40, 240}, 18);
     float t = RealTime();
-    Vector2 c{panel.x + 210, panel.y + 250};
+    Vector2 c{panel.x + 180, panel.y + 250};
     Draw::BlendAdd();
-    Draw::Glow(c, 230, WithAlpha(def.primary, 0.45f));
-    Draw::Glow(c, 130, WithAlpha(def.beam, 0.3f));
+    Draw::Glow(c, 210, WithAlpha(def.primary, 0.45f));
+    Draw::Glow(c, 120, WithAlpha(def.beam, 0.3f));
     for (int i = 0; i < 10; ++i) {
         float a = t * 0.3f + i * PI / 5;
-        Draw::Tri(c, Add(c, Mul(Dir(a - 0.04f), 260)), Add(c, Mul(Dir(a + 0.04f), 260)), WithAlpha(def.beam, 0.05f));
+        Draw::Tri(c, Add(c, Mul(Dir(a - 0.04f), 230)), Add(c, Mul(Dir(a + 0.04f), 230)), WithAlpha(def.beam, 0.05f));
     }
     Draw::BlendNormal();
-    DrawRing(c, 150, 154, 0, 360, 64, WithAlpha(def.beam, 0.5f));
-    float s = 340;
+    DrawRing(c, 140, 144, 0, 360, 64, WithAlpha(def.beam, 0.5f));
+    float s = 320;
     Art::DrawPortrait((HeroId)heroIndex, {c.x - s / 2, c.y - s / 2 - 10 + std::sin(t * 1.5f) * 4, s, s});
     // The hero's real attack effects play over the portrait, fired at invisible passing kaiju.
     if (preview && previewHero == heroIndex)
-        preview->DrawEmbedded({panel.x + 6, panel.y + 6, 428, panel.height - 12}, {c.x - 20, c.y - 10});
-    if (Art::HasCustomAvatar((HeroId)heroIndex)) Gui::Text("自定义头像", panel.x + 20, panel.y + 16, 13, Palette::muted);
+        preview->DrawEmbedded({panel.x + 6, panel.y + 6, 368, panel.height - 12}, {c.x - 20, c.y - 10});
 
-    float x = panel.x + 440, y = panel.y + 36, w = panel.width - 470;
+    float x = panel.x + 380, y = panel.y + 36, w = panel.width - 404;
     Gui::Text(def.role, x, y, 16, def.beam, Gui::Align::Left, true);
     Gui::TextShadow(def.name, x, y + 24, 46, Palette::text);
     Gui::Text(TextFormat("必杀技 · %s", def.move), x, y + 86, 20, Palette::gold, Gui::Align::Left, true);
@@ -645,52 +715,60 @@ void MenuScene::DrawHeroes() {
 
 void MenuScene::DrawKaiju() {
     DrawBack();
-    DrawPageTitle("怪兽图鉴", "了解敌人的特性，才能制定最佳防守策略");
+    const auto& gallery = GalleryKaiju();
+    const int count = (int)gallery.size();
+    DrawPageTitle("怪兽图鉴", TextFormat("%d 种怪兽与宇宙人，了解特性才能制定最佳防守策略", count));
     float t = RealTime();
-    float gap = 10;
-    float cw = std::min(150.0f, (W - 60 - (kEnemyCount - 1) * gap) / kEnemyCount);
-    float start = W / 2 - (kEnemyCount * cw + (kEnemyCount - 1) * gap) / 2;
-    for (int i = 0; i < kEnemyCount; ++i) {
-        const EnemyDef& def = EnemyInfo((EnemyId)i);
-        Rectangle r{start + i * (cw + gap), 128, cw, 160};
-        bool active = kaijuIndex == i;
-        if (Gui::Clicked(r)) kaijuIndex = i;
-        Draw::RoundedPanel(r, 12, active ? Color{50, 24, 40, 240} : Color{14, 20, 44, 230},
+    // A 4 × 4 grid of photo cards on the left, the selected kaiju in detail on the right.
+    constexpr int kColumns = 4;
+    constexpr float kGridX = 26, kGridW = 462, kGap = 6;
+    const int gridRows = (count + kColumns - 1) / kColumns;
+    const float cw = (kGridW - (kColumns - 1) * kGap) / kColumns;
+    const float ch = std::min(136.0f, (562 - (gridRows - 1) * kGap) / gridRows);
+    for (int i = 0; i < count; ++i) {
+        EnemyId id = gallery[i];
+        const EnemyDef& def = EnemyInfo(id);
+        Rectangle r{kGridX + (i % kColumns) * (cw + kGap), 128 + (i / kColumns) * (ch + kGap), cw, ch};
+        bool active = kaijuIndex == (int)id;
+        if (Gui::Clicked(r)) kaijuIndex = (int)id;
+        Draw::RoundedPanel(r, 10, active ? Color{50, 24, 40, 240} : Color{14, 20, 44, 230},
                            active          ? Palette::red
                            : Gui::Hover(r) ? Palette::muted
                                            : Palette::line,
-                           active ? 2.5f : 1.5f);
-        Draw::GlowStretched({r.x + cw / 2, r.y + 112}, 46, 10, 0, WithAlpha(BLACK, 0.5f));
+                           active ? 2.4f : 1.2f);
+        float ground = r.y + ch - 26;
+        Draw::GlowStretched({r.x + cw / 2, ground}, 36, 7, 0, WithAlpha(BLACK, 0.5f));
         Art::KaijuPose pose;
-        pose.feet = {r.x + cw / 2, r.y + 112};
-        pose.scale = 1.7f / std::max(1.0f, def.size * 0.85f) * std::min(1.0f, cw / 120);
+        pose.feet = {r.x + cw / 2, ground};
+        pose.scale = Art::KaijuFitScale(id, cw - 16, ch - 40); // every photo fills its card, however it is shaped
         pose.time = t + i;
-        Art::DrawKaiju((EnemyId)i, pose);
-        Gui::Text(def.name, r.x + cw / 2, r.y + 124, cw < 120 ? 13.0f : 16.0f, Palette::text, Gui::Align::Center, true);
-        if (def.boss) Gui::Text("BOSS", r.x + cw - 8, r.y + 8, 11, Palette::red, Gui::Align::Right, true);
+        Art::DrawKaiju(id, pose);
+        Gui::Text(def.name, r.x + cw / 2, r.y + ch - 21, 13, Palette::text, Gui::Align::Center, true);
+        if (def.boss) Gui::Text("BOSS", r.x + cw - 6, r.y + 5, 11, Palette::red, Gui::Align::Right, true);
     }
     const EnemyDef& def = EnemyInfo((EnemyId)kaijuIndex);
-    Rectangle panel{50, 306, W - 100, 384};
+    Rectangle panel{500, 128, 754, 562};
     Gui::Panel(panel, {12, 18, 40, 240}, 18);
-    Vector2 feet{panel.x + 240, panel.y + 330};
+    Vector2 feet{panel.x + 180, panel.y + 470};
     Draw::BlendAdd();
-    Draw::Glow({feet.x, feet.y - 120}, 220, WithAlpha(def.boss ? Color{255, 60, 80, 255} : Color{255, 160, 80, 255}, 0.25f));
+    Draw::Glow({feet.x, feet.y - 170}, 230, WithAlpha(def.boss ? Color{255, 60, 80, 255} : Color{255, 160, 80, 255}, 0.25f));
     Draw::BlendNormal();
     Draw::GlowStretched(feet, 110, 22, 0, WithAlpha(BLACK, 0.55f));
     Art::KaijuPose pose;
     pose.feet = feet;
-    pose.scale = 4.6f / std::max(1.0f, def.size * 0.75f);
+    pose.scale = Art::KaijuFitScale((EnemyId)kaijuIndex, 320, 400);
     pose.time = t;
-    pose.shielded = kaijuIndex == (int)EnemyId::Zetton && std::fmod(t, 6.0f) > 4;
+    pose.shielded = (kaijuIndex == (int)EnemyId::Zetton || kaijuIndex == (int)EnemyId::Zagi) && std::fmod(t, 6.0f) > 4;
     pose.enraged = kaijuIndex == (int)EnemyId::Belial && std::fmod(t, 6.0f) > 4;
     Art::DrawKaiju((EnemyId)kaijuIndex, pose);
+    if (def.boss) Gui::Text("BOSS", panel.x + 24, panel.y + 18, 16, Palette::red, Gui::Align::Left, true);
 
-    float x = panel.x + 500, y = panel.y + 30, w = panel.width - 540;
+    float x = panel.x + 360, y = panel.y + 30, w = panel.width - 384;
     Gui::Text(def.title, x, y, 17, Palette::red, Gui::Align::Left, true);
-    Gui::TextShadow(def.name, x, y + 24, 46, Palette::text);
-    float py = y + 96;
-    py += Gui::Paragraph(def.desc, x, py, w, 17, Palette::muted, 1.6f);
-    py += 18;
+    Gui::TextShadow(def.name, x, y + 24, 42, Palette::text);
+    float py = y + 92;
+    py += Gui::Paragraph(def.desc, x, py, w, 16, Palette::muted, 1.6f);
+    py += 16;
     const char* speed = def.speed >= 1.7f ? "极快" : def.speed >= 1.3f ? "快" : def.speed >= 0.9f ? "中等" : "缓慢";
     struct Row {
         const char* label;
@@ -706,6 +784,13 @@ void MenuScene::DrawKaiju() {
         Draw::RoundedPanel({rx, ry, w / 3 - 12, 52}, 10, {22, 30, 60, 230}, Palette::line, 1);
         Gui::Text(rows[i].label, rx + 12, ry + 6, 13, Palette::muted);
         Gui::Text(rows[i].value, rx + 12, ry + 24, 19, Palette::text, Gui::Align::Left, true);
+    }
+    if (def.strikeDamage > 0) {
+        float sy = py + 2 * 62 + 6;
+        Draw::RoundedPanel({x, sy, w - 12, 44}, 10, {40, 16, 24, 220}, WithAlpha(Palette::red, 0.6f), 1.2f);
+        Gui::Text(TextFormat("后期反击 · %s", def.strikeName), x + 12, sy + 6, 15, {255, 170, 160, 255}, Gui::Align::Left, true);
+        Gui::Text(TextFormat("伤害 %.0f   射程 %.1f 格   间隔 %.1f 秒", def.strikeDamage, def.strikeRange, def.strikeCooldown), x + 12,
+                  sy + 25, 12, Palette::muted);
     }
 }
 

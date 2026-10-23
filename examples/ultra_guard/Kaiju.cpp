@@ -311,7 +311,17 @@ void Gatanothor(const Frame& k, float t, bool cracked) {
 }
 } // namespace
 
+Vector2 KaijuExtent(EnemyId id) {
+    if (const Skins::KaijuSprite* sprite = Skins::Kaiju(id)) {
+        float fw = sprite->texture.width / (float)std::max(1, sprite->frames), fh = (float)std::max(1, sprite->texture.height);
+        return {sprite->size * fw / fh, sprite->size};
+    }
+    float h = KaijuHeight(id);
+    return {h * 0.8f, h};
+}
+
 float KaijuHeight(EnemyId id) {
+    if (const Skins::KaijuSprite* sprite = Skins::Kaiju(id)) return sprite->size; // the photo decides the height
     switch (id) {
     case EnemyId::Zetton: return 62;
     case EnemyId::Belial: return 66;

@@ -63,7 +63,7 @@ void MonsterActor::FixedUpdate() {
     appear = std::min(1.0f, appear + dt * 2.5f);
     flash = std::max(0.0f, flash - dt * 6);
     bool phased = phaseTime > 0;
-    for (float* timer : {&slowTime, &burnTime, &breakTime, &vulnTime, &stunTime, &shieldTime, &phaseTime, &buffTime})
+    for (float* timer : {&slowTime, &burnTime, &breakTime, &vulnTime, &stunTime, &shieldTime, &phaseTime, &buffTime, &absorbTime})
         *timer = std::max(0.0f, *timer - dt);
     if (burnTime > 0) {
         b.DamageEnemy(*this, burnDps * dt, -1, true);
@@ -170,6 +170,63 @@ void MonsterActor::FixedUpdate() {
                 b.Text(Add(h->Pos(), {0, -46}), "石化！", {210, 210, 200, 255}, 14);
             }
         }
+    } else if (type == EnemyId::Bemstar) {
+        abilityA -= dt;
+        if (abilityA <= 0) {
+            abilityA = 7.0f;
+            absorbTime = 1.8f;
+            b.AddRing(Center(), 30, 8, 0.4f, 4, {255, 230, 120, 255});
+            b.Text(Add(Center(), {0, -48}), "吸收口张开", {255, 230, 140, 255}, 14);
+            Sfx::Play("shield", 0.4f);
+        }
+    } else if (type == EnemyId::Gabora) {
+        const Color dirt{170, 130, 90, 255};
+        abilityA -= dt;
+        if (abilityA <= 0 && !phased) {
+            abilityA = 9.0f;
+            phaseTime = 1.2f;
+            speedMul = 1.35f;
+            b.Smoke(Feet(), 6, 12);
+            b.Burst(Feet(), dirt, 14, 120, 5, 0.4f);
+            b.Text(Add(Center(), {0, -40}), "钻入地下", dirt, 14);
+        }
+        if (phased && phaseTime <= 0) {
+            speedMul = 1.0f;
+            b.Smoke(Feet(), 6, 12);
+            b.Burst(Feet(), dirt, 16, 150, 5, 0.45f);
+        }
+    } else if (type == EnemyId::Dada) {
+        abilityA -= dt;
+        if (abilityA <= 0) {
+            abilityA = 6.0f;
+            if (dist < line.length - 160) {
+                b.Burst(Center(), WHITE, 12, 120, 4, 0.35f);
+                dist += 36;
+                gameObject->transform->position = line.Sample(dist, &dir);
+                b.Burst(Center(), WHITE, 12, 120, 4, 0.35f);
+                b.Text(Add(Center(), {0, -36}), "闪烁", {230, 230, 255, 255}, 13);
+            }
+        }
+    } else if (type == EnemyId::Zagi) {
+        if (!enraged && hp < maxHp * 0.5f) {
+            enraged = true;
+            speedMul = 1.3f;
+            b.shake = std::max(b.shake, 0.8f);
+            b.Banner("黑暗扎基狂暴了！", "黑暗屏障会更频繁地张开，抓住空隙集火！", Palette::red, true);
+            Sfx::Play("boss", 0.8f, 0);
+        }
+        abilityA -= dt;
+        if (abilityA <= 0) {
+            abilityA = enraged ? 7.0f : 10.0f;
+            const Color dark{170, 60, 200, 255};
+            for (MonsterActor* e : b.KaijuInCircle(Center(), kTile * 2.6f)) {
+                e->shieldTime = std::max(e->shieldTime, 1.5f);
+                if (e != this) b.AddBeam(Center(), e->Center(), 2.5f, 0.3f, dark, WHITE);
+            }
+            b.AddRing(Center(), 10, kTile * 2.6f, 0.5f, 4, dark);
+            b.Text(Add(Center(), {0, -70}), "黑暗屏障", {220, 160, 255, 255}, 16);
+            Sfx::Play("shield", 0.6f);
+        }
     }
 
     strikePause = std::max(0.0f, strikePause - dt);
@@ -239,6 +296,19 @@ void MonsterActor::Render() {
     pose.burn = burnTime > 0 ? 1.0f : 0.0f;
     pose.shielded = shieldTime > 0;
     pose.enraged = enraged || buffTime > 0;
+    if (type == EnemyId::Gabora && phaseTime > 0) { // burrowed: only a travelling mound of earth shows
+        Vector2 f = Feet();
+        Draw::GlowStretched(Add(f, {0, 2}), 26 * Scale(), 8, 0, WithAlpha(BLACK, 0.4f));
+        Draw::Ellipse(Add(f, {0, -4}), 22 * Scale(), 9, {120, 92, 62, 255}, 0);
+        Draw::Ellipse(Add(f, {-4, -8}), 12 * Scale(), 5, {150, 118, 82, 255}, 0);
+        if (GetRandomValue(0, 3) == 0) battle->Emit(BattleScene::Fx::Smoke, f, {150, 120, 90, 255}, 1, 20, 6, 0.5f);
+        return;
+    }
+    if (absorbTime > 0) {
+        Draw::BlendAdd();
+        Draw::Glow(Center(), 30 * Scale(), WithAlpha({255, 220, 110, 255}, 0.45f));
+        Draw::BlendNormal();
+    }
     if (phaseTime > 0 || buffTime > 0) {
         Draw::BlendAdd();
         Draw::Glow(Center(), 26 * Scale(), WithAlpha({140, 90, 255, 255}, phaseTime > 0 ? 0.5f : 0.3f));
@@ -252,6 +322,10 @@ void MonsterActor::Render() {
         Draw::BlendAdd();
         Draw::Glow(Center(), 16 * Scale(), WithAlpha({120, 200, 255, 255}, 0.25f));
         Draw::BlendNormal();
+    }
+    if (vulnTime > 0) { // analysed (X, Geed, Nexus): a scanning bracket around the feet
+        float pulse = 0.6f + 0.4f * std::sin(battle->simTime * 8);
+        DrawRing(Feet(), 14 * Scale(), 16 * Scale(), 0, 360, 32, WithAlpha({120, 230, 255, 255}, 0.6f * pulse));
     }
 }
 
@@ -925,6 +999,14 @@ void BattleScene::Fire(HeroActor& t, MonsterActor& target) {
     t.flash = 1;
     t.shots++;
     float dmg = HeroDamage(t.hero, t.level);
+    if (t.hero == HeroId::Rosso || t.hero == HeroId::Blu) { // the Ultraman R/B brothers fight better side by side
+        HeroId partner = t.hero == HeroId::Rosso ? HeroId::Blu : HeroId::Rosso;
+        for (const auto& h : heroes)
+            if (h->hero == partner) {
+                dmg *= 1.15f;
+                break;
+            }
+    }
     float range = HeroRange(t.hero, t.level);
     Vector2 origin = Add(t.Pos(), {0, -24});
     Vector2 aim = target.Center();
@@ -1201,48 +1283,226 @@ void BattleScene::FireSignature(HeroActor& t, MonsterActor& target, float dmg, f
     const HeroDef& def = HeroInfo(t.hero);
     int tower = t.id;
     switch (def.kind) {
-    case AttackKind::Slash: {
-        if (t.level >= 2 && t.shots % 4 == 0) {
-            // Specium Ray: arms crossed, a wide white-blue stream.
-            PierceBeam(t, origin, aim, dmg * 3, range * 1.2f, {150, 220, 255, 255}, false);
-            AddBeam(origin, Add(origin, Mul(Normalize(Sub(aim, origin)), range * 1.2f)), 18, 0.45f, WithAlpha({150, 220, 255, 255}, 0.6f), WHITE);
-            Text(Add(origin, {0, -34}), "斯派修姆光线", {170, 230, 255, 255}, 14);
+    case AttackKind::Strium: {
+        // Strium Blaster: a red-and-blue stream that sets the kaiju burning.
+        Color red{255, 100, 76, 255}, blue{96, 160, 255, 255};
+        if (t.level >= 2 && t.shots % 3 == 0) {
+            PierceBeam(t, origin, aim, dmg * 1.6f, range * 1.2f, red, true);
+            AddBeam(origin, Add(origin, Mul(Normalize(Sub(aim, origin)), range * 1.2f)), 5, 0.36f, blue, WHITE);
+            Text(Add(origin, {0, -34}), "三重斯特利姆爆裂", {255, 170, 130, 255}, 14);
             Sfx::Play("beam", 0.5f);
             break;
         }
-        // Ultra Slash: a spinning saw disc that flies straight through every kaiju in line.
-        Vector2 d = Normalize(Sub(aim, origin));
-        constexpr float kSpeed = 600;
-        auto p = Launch(ProjectileMotion::Straight, Add(origin, {0, -16}));
-        p->velocity = Mul(d, kSpeed);
-        p->hitRadius = 14;
-        p->pierce = true;
-        p->maxLife = range * 1.3f / kSpeed;
-        p->onHit = [this, dmg, tower, d](Projectile& self, Collider* c) {
-            MonsterActor* e = KaijuOf(c);
-            if (!e || !Running()) return;
-            Vector2 at = e->Center(), n{-d.y, d.x};
-            DamageEnemy(*e, dmg, tower);
-            AddBeam(Sub(at, Mul(n, 18)), Add(at, Mul(n, 18)), 3, 0.22f, {150, 220, 255, 255}, WHITE);
-            Sparks(self.Position(), WHITE, 6, 200);
-            Sparks(self.Position(), {150, 220, 255, 255}, 4, 160);
-            Sfx::Play("hit", 0.25f);
+        AddBeam(origin, aim, 10, 0.32f, red, {255, 232, 200, 255});
+        AddBeam(origin, aim, 3.5f, 0.32f, blue, WHITE);
+        DamageEnemy(target, dmg, tower);
+        if (!target.dead) {
+            target.burnTime = std::max(target.burnTime, 2.5f);
+            target.burnDps = std::max(target.burnDps, dmg * 0.25f);
+        }
+        Burst(aim, red, 12, 170, 5, 0.4f);
+        AddRing(aim, 4, 30, 0.3f, 3, red);
+        Sfx::Play("beam", 0.35f);
+        break;
+    }
+    case AttackKind::Xanadium: {
+        // Xanadium Ray: the struck kaiju is analysed and takes more damage from everyone.
+        Color gold{255, 226, 120, 255}, cyan{120, 230, 255, 255};
+        auto analyse = [](MonsterActor& e) {
+            if (!e.dead) e.vulnTime = std::max(e.vulnTime, 3.0f);
         };
-        p->onStep = [this](Projectile& self) { Emit(Fx::Glow, self.Position(), {150, 220, 255, 255}, 1, 0, 12, 0.18f); };
+        if (t.level >= 2 && t.shots % 4 == 0) {
+            float r = def.splash * kTile * 1.2f;
+            for (MonsterActor* e : KaijuInCircle(aim, r)) {
+                DamageEnemy(*e, dmg * 1.4f, tower);
+                analyse(*e);
+            }
+            for (float a : {PI / 4, -PI / 4}) {
+                Vector2 d = Dir(a);
+                AddBeam(Sub(aim, Mul(d, r)), Add(aim, Mul(d, r)), 7, 0.35f, gold, WHITE);
+            }
+            AddRing(aim, 6, r, 0.4f, 4, cyan);
+            Text(Add(origin, {0, -34}), "艾克斯斩击", gold, 14);
+            Sfx::Play("snipe", 0.45f);
+            break;
+        }
+        AddBeam(origin, aim, 9, 0.3f, gold, WHITE);
+        AddBeam(origin, aim, 3, 0.3f, cyan, WHITE);
+        DamageEnemy(target, dmg, tower);
+        analyse(target);
+        for (int i = 0; i < 6; ++i) Emit(Fx::Glow, Add(aim, {Rand(-14, 14), Rand(-14, 14)}), cyan, 1, 30, 4, 0.4f);
+        AddRing(aim, 4, 26, 0.3f, 2, cyan);
+        Sfx::Play("beam", 0.32f);
+        break;
+    }
+    case AttackKind::Knight: {
+        // Knight Beam Blade: quick slashes that ignore armour and catch a neighbour.
+        Color blue{120, 196, 255, 255};
+        auto slash = [&](MonsterActor& e, float scale) {
+            Vector2 at = e.Center(), n = Normalize({Rand(-1, 1), Rand(-1, -0.3f)});
+            AddBeam(Sub(at, Mul(n, 22)), Add(at, Mul(n, 22)), 4, 0.2f, blue, WHITE);
+            DamageEnemy(e, dmg * scale, tower, true);
+            Sparks(at, blue, 5, 180);
+        };
+        t.lunge = 0.6f;
+        t.lungeTo = target.Feet();
+        slash(target, 1);
+        if (MonsterActor* other = NearestKaiju(aim, def.splash * kTile, {&target})) slash(*other, 0.6f);
+        if (t.level >= 2 && t.shots % 5 == 0) {
+            PierceBeam(t, origin, aim, dmg * 3, range * 1.3f, blue, false);
+            Text(Add(origin, {0, -34}), "骑士射击", blue, 13);
+        }
+        Sfx::Play("hit", 0.3f);
+        break;
+    }
+    case AttackKind::Luna: {
+        Color moon{160, 214, 255, 255}, corona{255, 120, 60, 255};
+        if (t.level >= 2 && t.shots % 4 == 0) {
+            // Corona Mode: the Naybuster Ray, a heavy single blow.
+            AddBeam(origin, aim, 14, 0.4f, corona, {255, 230, 170, 255});
+            DamageEnemy(target, dmg * 6, tower);
+            Burst(aim, corona, 20, 200, 6, 0.45f);
+            AddRing(aim, 6, 40, 0.4f, 4, corona);
+            Text(Add(origin, {0, -34}), "科罗娜形态", corona, 13);
+            Sfx::Play("snipe", 0.45f);
+            break;
+        }
+        // Full Moon Rect: soft moonlight calms ordinary kaiju for a moment and slows bosses.
+        float r = def.splash * kTile * (1 + 0.1f * t.level);
+        AddBeam(origin, aim, 6, 0.4f, WithAlpha(moon, 0.8f), WHITE);
+        for (MonsterActor* e : KaijuInCircle(aim, r)) {
+            DamageEnemy(*e, dmg, tower);
+            if (e->dead) continue;
+            if (e->Def().boss) {
+                e->slowAmount = e->slowTime > 0 ? std::max(e->slowAmount, def.slow) : def.slow;
+                e->slowTime = std::max(e->slowTime, 1.5f);
+            } else {
+                e->stunTime = std::max(e->stunTime, 0.7f);
+            }
+        }
+        for (int i = 0; i < 8; ++i) Emit(Fx::Glow, Add(aim, Mul(Dir(i * PI / 4), r * 0.6f)), moon, 1, 20, 5, 0.6f);
+        AddRing(aim, r, 6, 0.6f, 4, moon);
+        AddRing(aim, r * 0.6f, 4, 0.5f, 2, WHITE);
+        Sfx::Play("shield", 0.3f);
+        break;
+    }
+    case AttackKind::Quake: {
+        Color gold{255, 196, 70, 255}, red{255, 80, 50, 255};
+        if (t.level >= 2 && t.shots % 3 == 0) {
+            PierceBeam(t, origin, aim, dmg * 1.5f, range * 1.3f, gold, false);
+            Text(Add(origin, {0, -34}), "维克特利姆光线", gold, 13);
+            Sfx::Play("beam", 0.45f);
+            break;
+        }
+        // EX Red King Knuckle: a blow to the ground whose shockwave staggers the crowd.
+        Vector2 at = target.Feet();
+        float r = def.splash * kTile;
+        t.lunge = 0.5f;
+        t.lungeTo = at;
+        for (MonsterActor* e : KaijuInCircle(at, r)) {
+            DamageEnemy(*e, e == &target ? dmg : dmg * 0.7f, tower);
+            if (!e->dead) e->stunTime = std::max(e->stunTime, 0.35f);
+        }
+        for (int i = 0; i < 6; ++i) {
+            Vector2 d = Dir(i * PI / 3 + Rand(-0.2f, 0.2f));
+            AddBeam(at, Add(at, {d.x * r, d.y * r * 0.55f}), 3, 0.35f, red, gold);
+        }
+        AddRing(at, 6, r, 0.4f, 5, gold);
+        Smoke(at, 5, 12);
+        Burst(at, gold, 14, 180, 5, 0.4f);
+        shake = std::max(shake, 0.12f);
+        Sfx::Play("explode", 0.3f);
+        break;
+    }
+    case AttackKind::Flame: {
+        // Rosso's flame ball: a lobbed fireball that leaves the area burning.
+        Color red{255, 110, 40, 255};
+        auto p = Launch(ProjectileMotion::Lob, origin);
+        p->target = target.Feet();
+        p->flightTime = 0.45f;
+        float splash = def.splash * kTile * (t.level >= 2 ? 1.3f : 1.0f);
+        float burnDps = dmg * (t.level >= 2 ? 0.45f : 0.3f);
+        p->onArrive = [this, dmg, splash, tower, burnDps, red](Projectile&, Vector2 at) {
+            if (!Running()) return;
+            Explode(at, splash, dmg, tower, false, false, red);
+            for (MonsterActor* e : KaijuInCircle(at, splash)) {
+                e->burnTime = std::max(e->burnTime, 2.5f);
+                e->burnDps = std::max(e->burnDps, burnDps);
+            }
+        };
+        p->onStep = [this, red](Projectile& self) { Emit(Fx::Ember, self.Position(), red, 1, 40, 7, 0.35f); };
         p->onDraw = [](const Projectile& self) {
             Vector2 at = self.RenderPosition();
-            float spin = self.Age() * 26;
-            auto flat = [at](Vector2 v) { return Vector2{at.x + v.x, at.y + v.y * 0.62f}; };
+            Draw::Shadow(self.target, 8, 4, 0.35f);
             Draw::BlendAdd();
-            Draw::Glow(at, 24, WithAlpha({140, 210, 255, 255}, 0.55f));
+            Draw::Glow(at, 24, WithAlpha({255, 90, 30, 255}, 0.85f));
+            Draw::Glow(at, 9, WithAlpha({255, 236, 180, 255}, 0.95f));
             Draw::BlendNormal();
-            for (int i = 0; i < 12; ++i) {
-                float a = spin + i * PI / 6;
-                Draw::Tri(flat(Mul(Dir(a), 9)), flat(Mul(Dir(a + 0.42f), 9)), flat(Mul(Dir(a + 0.12f), 16)), {210, 240, 255, 255});
-            }
-            Draw::Ellipse(at, 10, 6.2f, {190, 232, 255, 240}, 0);
-            Draw::Ellipse(at, 5, 3.1f, WHITE, 0);
         };
+        Sfx::Play("fire", 0.35f);
+        break;
+    }
+    case AttackKind::Aqua: {
+        // Blu's water stream: pierces the line, slows and pushes the kaiju back.
+        Color water{90, 200, 255, 255}, foam{220, 245, 255, 255};
+        Vector2 d = Normalize(Sub(aim, origin)), n{-d.y, d.x};
+        Vector2 end = Add(origin, Mul(d, range * 1.1f));
+        float slow = t.level >= 2 ? 0.5f : def.slow;
+        for (const SegmentHit& hit : GetPhysicsWorld().SegmentCast(origin, end, t.level >= 2 ? 14.0f : 9.0f, kKaijuMask)) {
+            MonsterActor* e = KaijuOf(hit.collider);
+            if (!e) continue;
+            DamageEnemy(*e, dmg, tower);
+            if (e->dead) continue;
+            e->slowAmount = e->slowTime > 0 ? std::max(e->slowAmount, slow) : slow;
+            e->slowTime = std::max(e->slowTime, 1.6f);
+            Knock(*e, t.level >= 2 ? 0.25f : 0.12f);
+            Sparks(hit.point, water, 4, 140);
+        }
+        Vector2 prev = origin;
+        for (int k = 1; k <= 10; ++k) {
+            float u = k / 10.0f;
+            Vector2 q = Add(Lerp(origin, end, u), Mul(n, std::sin(u * 4 * PI + simTime * 12) * 5));
+            AddBeam(prev, q, 9, 0.3f, WithAlpha(water, 0.8f), foam);
+            prev = q;
+        }
+        Burst(end, foam, 8, 120, 4, 0.3f);
+        Sfx::Play("pulse", 0.3f);
+        break;
+    }
+    case AttackKind::Omega: {
+        Color red{255, 80, 70, 255}, blue{80, 170, 255, 255};
+        int period = t.level >= 2 ? 3 : 4;
+        if (t.shots % period == 0) {
+            // Rays Omega: arms trace a pentagon of light, then cross to fire a bright blue stream.
+            Vector2 ring = Add(origin, {0, -18});
+            for (int i = 0; i < 5; ++i)
+                AddBeam(Add(ring, Mul(Dir(-PI / 2 + i * 2 * PI / 5), 15)), Add(ring, Mul(Dir(-PI / 2 + (i + 1) * 2 * PI / 5), 15)), 2,
+                        0.35f, blue, WHITE);
+            AddBeam(origin, aim, 13, 0.4f, blue, WHITE);
+            AddBeam(origin, aim, 4, 0.4f, {200, 240, 255, 255}, WHITE);
+            DamageEnemy(target, dmg * 3.2f, tower);
+            Burst(aim, blue, 18, 200, 6, 0.45f);
+            AddRing(aim, 6, 42, 0.4f, 4, blue);
+            Text(Add(origin, {0, -36}), "雷特克鲁特光线", blue, 13);
+            Sfx::Play("snipe", 0.45f);
+            break;
+        }
+        // Omega Slugger: the head blade ricochets from kaiju to kaiju.
+        int hops = t.level >= 2 ? 3 : 2;
+        std::vector<const MonsterActor*> struck;
+        MonsterActor* current = &target;
+        Vector2 from = origin;
+        float amount = dmg;
+        for (int i = 0; i < hops && current; ++i) {
+            Vector2 at = current->Center();
+            AddBeam(from, at, 4, 0.22f, red, {255, 230, 220, 255});
+            Sparks(at, red, 5, 170);
+            struck.push_back(current);
+            DamageEnemy(*current, amount, tower);
+            from = at;
+            amount *= 0.8f;
+            current = NearestKaiju(at, kTile * 2.0f, struck);
+        }
         Sfx::Play("slugger", 0.35f);
         break;
     }
@@ -1516,6 +1776,11 @@ void BattleScene::DamageEnemy(MonsterActor& e, float amount, int towerId, bool i
     float dmg = ignoreArmor ? amount : std::max(amount * 0.25f, amount - armor);
     if (e.vulnTime > 0) dmg *= 1.2f;
     if (e.shieldTime > 0) dmg *= kShieldTaken;
+    if (e.absorbTime > 0) { // Bemstar swallows the blow and turns half of it into health
+        e.hp = std::min(e.maxHp, e.hp + dmg * 0.5f);
+        if (GetRandomValue(0, 3) == 0) Sparks(e.Center(), {255, 220, 110, 255}, 3, 90);
+        return;
+    }
     e.hp -= dmg;
     if (amount > 2) e.flash = 0.7f;
     if (HeroActor* t = FindTower(towerId)) t->dealt += dmg;
@@ -2785,7 +3050,7 @@ void BattleScene::DrawInfo(Rectangle area) {
         "在道路旁的空地上放置英雄，拐角处可覆盖更长的路径。",
         "点击已放置的英雄可以升级、出售或切换攻击目标。",
         "捷德的力场能让怪兽变慢，再让亚刻的光弹在怪群里爆开。",
-        "红王护甲很厚，高伤害光线和欧布圣剑的破甲是克星。",
+        "雷德王护甲很厚，高伤害光线和欧布圣剑的破甲是克星。",
         "提前召唤下一波可以获得额外金币奖励。",
         "芝顿会展开护盾，护盾期间受到的伤害降低，可等护盾消失再集火。",
         "巴尔坦星人被击倒后会分裂，记得在后方保留火力。",
@@ -2842,6 +3107,7 @@ void BattleScene::DrawBossBar() {
     if (boss->shieldTime > 0) status = TextFormat("护盾展开！伤害 -%d%%", (int)std::lround((1 - kShieldTaken) * 100));
     else if (boss->phaseTime > 0) status = "穿越异次元，无法攻击";
     else if (boss->type == EnemyId::Gatanothor) status = boss->enraged ? "外壳碎裂" : "外壳坚硬，护甲极高";
+    else if (boss->type == EnemyId::Zagi) status = boss->enraged ? "狂暴 · 屏障更频繁" : "黑暗屏障守护周围怪兽";
     else if (boss->enraged) status = "暴怒";
     if (!status.empty())
         Gui::Text(status, r.x + r.width - 12, r.y + 4, 13, boss->shieldTime > 0 ? Palette::gold : Palette::red, Gui::Align::Right, true);

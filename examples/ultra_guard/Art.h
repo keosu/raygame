@@ -40,5 +40,11 @@ void DrawKaiju(EnemyId id, const KaijuPose& pose);
 void DrawBuiltinKaiju(EnemyId id, const KaijuPose& pose);
 // Approximate visual height in pixels at scale 1.
 float KaijuHeight(EnemyId id);
+// Drawn width and height at scale 1 (the photo's aspect when there is one), for fitting into a box.
+Vector2 KaijuExtent(EnemyId id);
+inline float KaijuFitScale(EnemyId id, float boxW, float boxH) {
+    Vector2 e = KaijuExtent(id);
+    return std::min(boxW / std::max(1.0f, e.x), boxH / std::max(1.0f, e.y));
+}
 
 } // namespace UG::Art

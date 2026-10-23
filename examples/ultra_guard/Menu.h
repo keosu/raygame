@@ -42,6 +42,9 @@ private:
         float life;
     };
     std::vector<Meteor> meteors;
+    // Title spotlight: the whole roster and a set of rival kaiju, shuffled each time the menu opens.
+    std::vector<HeroId> spotlight;
+    std::vector<EnemyId> rivals;
 
     void SetPage(MenuPage next);
     void DrawBackground();

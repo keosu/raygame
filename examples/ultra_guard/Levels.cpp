@@ -132,7 +132,7 @@ const std::vector<std::string>& LevelErrors() { return State().errors; }
 const LevelDef* SurvivalLevel() { return State().survival.get(); }
 
 WaveDef SurvivalWave(int wave) {
-    static const EnemyId kBosses[] = {EnemyId::Zetton, EnemyId::Tregear, EnemyId::Belial, EnemyId::Gatanothor};
+    static const EnemyId kBosses[] = {EnemyId::Zetton, EnemyId::Tregear, EnemyId::Belial, EnemyId::Zagi, EnemyId::Gatanothor};
     struct Pick {
         EnemyId enemy;
         int from;      // first wave it can appear in
@@ -143,6 +143,8 @@ WaveDef SurvivalWave(int wave) {
     static const Pick kPool[] = {
         {EnemyId::Gomora, 0, 6, 0.55f, 1.0f},   {EnemyId::Baltan, 0, 6, 0.5f, 0.85f}, {EnemyId::Eleking, 1, 5, 0.5f, 0.7f},
         {EnemyId::RedKing, 2, 2, 0.22f, 2.1f},  {EnemyId::Metron, 4, 2, 0.18f, 2.0f}, {EnemyId::KingJoe, 6, 1, 0.16f, 2.6f},
+        {EnemyId::Dada, 2, 4, 0.4f, 1.0f},      {EnemyId::Gabora, 3, 3, 0.3f, 1.3f},  {EnemyId::Bemstar, 5, 1, 0.16f, 2.4f},
+        {EnemyId::Golza, 7, 1, 0.14f, 2.6f},    {EnemyId::KingPandon, 10, 1, 0.1f, 3.4f},
     };
     Rng rng(7919u * (std::uint32_t)(wave + 1));
     std::vector<const Pick*> pool;
@@ -158,7 +160,8 @@ WaveDef SurvivalWave(int wave) {
     }
     if (wave % 5 == 4) {
         int boss = wave / 5;
-        out.groups.push_back({kBosses[boss % 4], 1 + boss / 4, 6, 2, -1});
+        constexpr int kBossCount = (int)std::size(kBosses);
+        out.groups.push_back({kBosses[boss % kBossCount], 1 + boss / kBossCount, 6, 2, -1});
         out.boss = true;
     }
     return out;

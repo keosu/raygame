@@ -109,9 +109,9 @@ Texture2D LoadNamed(const std::string& name, const std::string& path) {
     return *handle;
 }
 
-// Reads skin.txt into the palette and per-kaiju sprite options.
-void ParseSkinFile(int index, std::array<KaijuSprite, kEnemyCount>& options) {
-    std::string file = Dir(index) + "skin.txt", text;
+// Reads skin.txt (or the built-in kaiju/kaiju.txt) into the palette and per-kaiju sprite options.
+void ParseSkinFile(const std::string& file, std::array<KaijuSprite, kEnemyCount>& options) {
+    std::string text;
     if (!FileSystem::ReadAssetText(AssetPath(file), text)) return;
     for (const auto& entry : Lines(text)) {
         int number = entry.first;
@@ -171,9 +171,11 @@ void Apply(int index) {
     state.errors = state.indexErrors;
     state.current = index;
     std::array<KaijuSprite, kEnemyCount> options{};
-    if (index > 0) ParseSkinFile(index, options);
+    ParseSkinFile("kaiju/kaiju.txt", options); // the built-in photo sprites
+    if (index > 0) ParseSkinFile(Dir(index) + "skin.txt", options);
     for (int i = 0; i < kEnemyCount; ++i) {
         std::string key = EnemyInfo((EnemyId)i).key, path = Find("kaiju/" + key + ".png");
+        if (path.empty() && FileSystem::AssetExists(AssetPath("kaiju/" + key + ".png"))) path = AssetPath("kaiju/" + key + ".png");
         if (path.empty()) continue;
         options[i].texture = LoadNamed("skin-kaiju-" + key, path);
         if (!options[i].texture.id) continue;
@@ -206,10 +208,9 @@ void Load(const std::string& folder) {
             state.skins.push_back(skin);
         }
     }
-    // With no saved choice, fall back to the photo skin so the real pictures are
-    // what players see first; "经典" (index 0) stays selectable and keeps the drawn art.
-    std::string wanted = folder.empty() ? Progress::Options().skin : folder;
-    if (wanted.empty()) wanted = "real";
+    // The photo kaiju are built in; skins are an opt-in for modders (--skin), not a menu choice,
+    // so an old saved choice (such as the retired drawn looks) no longer applies.
+    const std::string& wanted = folder;
     int chosen = 0;
     for (int i = 1; i < (int)state.skins.size(); ++i)
         if (state.skins[i].folder == wanted) chosen = i;
