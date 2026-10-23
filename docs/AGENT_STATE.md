@@ -2,6 +2,14 @@
 
 更新时间：2026-10-20。
 
+## 工作包：艾克斯高清头像（2026-10-23）
+
+用户反馈艾克斯头像模糊。原图 `Ultraman X Render I` 只有 506×940，且 wiki CDN 默认返回有损 WebP。
+改用同一渲染图的 1872×3534 放大版（X 字交叉姿势），用 `?format=original` 下载原始 PNG
+（`build/ug-dl.ps1` 已加此参数），`make_avatars.py` 生成。`--capture` 核对了数据库与技能预览。
+注意：此前 v2.0 其他百科素材（希卡利、高斯等头像和新怪兽）也是 WebP 转存，若再有模糊反馈可同法重下。
+v2.0 发布包里仍是旧头像。
+
 ## 工作包：修复 Android（Clang）编译错误（2026-10-23）
 
 用户在另一台机器编译 Android 报 `Automation.h:17:12 default member initializer for 'hiddenWindow' needed within

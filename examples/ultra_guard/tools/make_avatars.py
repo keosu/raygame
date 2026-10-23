@@ -38,8 +38,9 @@ SOURCES = {
     "teo": "teo.png",
     "taiga": "taiga.png",
     "omega": "omega.png",
-    # v2.0: Ultra series wiki renders (ultra.fandom.com): Ultraman X Render I, Ultraman Hikari Render,
-    # CosmosRender (Luna Mode), Ultraman Victory full, Ultraman Rosso, Ultraman Blu(V2).
+    # v2.0: Ultra series wiki renders (ultra.fandom.com): Ultraman X (the 1872x3534 waifu2x upscale of
+    # Render I), Ultraman Hikari Render, CosmosRender (Luna Mode), Ultraman Victory full, Ultraman Rosso,
+    # Ultraman Blu(V2). Download with ?format=original; the CDN otherwise serves lossy WebP.
     "x": "x.png",
     "hikari": "hikari.png",
     "cosmos": "cosmos.png",
