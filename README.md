@@ -335,6 +335,11 @@ use a scope; it suspends the canvas and restores its logical projection afterwar
 { Display::OffscreenScope bake(target); ClearBackground(BLANK); DrawStuff(); }
 ```
 
+To clip drawing to part of the canvas, use `Display::ClipScope clip(rect)` with `rect` in
+canvas units. raylib's `BeginScissorMode` takes render-target pixels, and the canvas texture is
+supersampled and padded to 64-pixel steps, so passing canvas units to it clips the wrong area
+(badly so in fullscreen). Nested scopes intersect.
+
 With the default `Fit` scaling, windows of another aspect ratio show bars around the
 canvas. `Display::SetMarginStyle(Display::MarginStyle::BlurredCanvas, brightness)` fills
 them with a blurred, dimmed copy of the current frame (three small downsampling passes);
@@ -407,10 +412,38 @@ auto line = world.SegmentCast(origin, end, 8.0f); // piercing beam, nearest firs
 - `AudioManager::LoadSound(name, path, voices)` lets rapid repeats overlap,
   `SetSoundCooldown` throttles spam, and `SetChannelVolume(AudioChannel::Sfx/Music, v)`
   scales each group for settings menus. `PlaySound` returns whether it played.
+  `AudioManager::Duck duck(AudioChannel::Sfx, 0.35f)` lowers a channel while it lives
+  (a preview under a menu, music under dialogue) without touching the player's setting.
+- `SceneClock` drives a scene the engine does not own, in the engine's frame order:
+  `clock.Advance(scene, dt)` for a preview or picture-in-picture view, `clock.Step(scene)`
+  for a windowless simulation. Both run `Scene::RunFixedStep`, the same fixed step the
+  engine uses, on the clock's own time and accumulator.
+
+  ```cpp
+  SceneClock previewClock;                    // a member next to the preview scene
+  previewClock.Advance(*preview, GameTime::UnscaledDeltaTime()); // from Update
+  ```
 - `ResourceManager::CodepointsFromText(text)` gathers the glyphs a UTF-8 string needs
   for `LoadFontResource(..., codepoints)`; `SetFontOptions(name, {true, TEXTURE_FILTER_TRILINEAR})`
   adds mipmaps for large CJK atlases drawn small. `scripts/subset-font.py` shrinks a
   font to the characters used by your sources and assets.
+
+### Scripted runs and screenshots
+
+`Automation` runs a timeline of actions keyed by frame for screenshot tours and smoke
+checks. Start it before `Init`; `GameEngine` begins each frame of the run before capturing
+input. Injected clicks, key presses and taps reach the game through `Input` like a player's,
+and the window always reads as focused, so a run can work in a hidden or background window.
+
+```cpp
+Automation::Start("build/tour", {/*hiddenWindow=*/true});
+Automation::At(30, [] { Automation::Click({640, 400}); });   // canvas coordinates
+Automation::At(90, [] { Automation::SaveCanvas("01_menu"); }); // build/tour/01_menu.png
+Automation::Every([](int frame) { if (frame == 600) QuitMyGame(); });
+```
+
+`SaveCanvas` writes the last rendered canvas at its logical size; `SaveWindow` writes the
+frame as presented, margins included.
 
 ### Save
 ```cpp

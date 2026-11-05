@@ -53,7 +53,7 @@ public:
         }
         entry.next = (voice + 1) % entry.voices.size();
         Sound& sound = entry.voices[voice];
-        SetSoundVolume(sound, std::max(0.0f, std::isfinite(volume) ? volume : 0.0f) * sfxVolume);
+        SetSoundVolume(sound, std::max(0.0f, std::isfinite(volume) ? volume : 0.0f) * sfxVolume * GetDuckFactor(AudioChannel::Sfx));
         SetSoundPitch(sound, std::isfinite(pitch) && pitch > 0 ? pitch : 1.0f);
         ::PlaySound(sound);
         return true;
@@ -145,7 +145,45 @@ public:
         return channel == AudioChannel::Sfx ? sfxVolume : musicVolume;
     }
 
+    // Temporary attenuation on top of a channel's volume, such as effects from a preview playing
+    // under a menu or music under dialogue. It leaves the player's channel setting alone. Active
+    // ducks multiply and each one lifts its share when destroyed, in any order. Effects started
+    // while a duck is active use it; music streams follow it immediately.
+    class Duck {
+    public:
+        Duck(AudioChannel channel, float factor) : id(++nextDuck) {
+            ducks.push_back({id, channel, std::isfinite(factor) ? Clamp(factor, 0.0f, 1.0f) : 1.0f});
+            if (channel == AudioChannel::Music) ApplyAllMusicVolumes();
+        }
+        ~Duck() {
+            auto it = std::find_if(ducks.begin(), ducks.end(), [this](const DuckEntry& d) { return d.id == id; });
+            if (it == ducks.end()) return;
+            bool music = it->channel == AudioChannel::Music;
+            ducks.erase(it);
+            if (music) ApplyAllMusicVolumes();
+        }
+        Duck(const Duck&) = delete;
+        Duck& operator=(const Duck&) = delete;
+
+    private:
+        int id;
+    };
+    static float GetDuckFactor(AudioChannel channel) {
+        float factor = 1;
+        for (const auto& d : ducks)
+            if (d.channel == channel) factor *= d.factor;
+        return factor;
+    }
+
 private:
+    struct DuckEntry {
+        int id;
+        AudioChannel channel;
+        float factor;
+    };
+    static void ApplyAllMusicVolumes() {
+        for (auto& pair : music) ApplyMusicVolume(pair.second);
+    }
     static constexpr int kMaxVoices = 16;
     struct SoundEntry {
         std::vector<Sound> voices; // voices[0] owns the samples; the rest are aliases
@@ -167,13 +205,17 @@ private:
         if (!entry.voices.empty()) UnloadSound(entry.voices[0]);
         entry.voices.clear();
     }
-    static void ApplyMusicVolume(MusicEntry& entry) { ::SetMusicVolume(entry.stream, entry.volume * musicVolume); }
+    static void ApplyMusicVolume(MusicEntry& entry) {
+        ::SetMusicVolume(entry.stream, entry.volume * musicVolume * GetDuckFactor(AudioChannel::Music));
+    }
 
     static inline std::unordered_map<std::string, SoundEntry> sounds;
     static inline std::unordered_map<std::string, MusicEntry> music;
     static inline float masterVolume = 1.0f;
     static inline float sfxVolume = 1.0f;
     static inline float musicVolume = 1.0f;
+    static inline std::vector<DuckEntry> ducks;
+    static inline int nextDuck = 0;
 };
 
 }

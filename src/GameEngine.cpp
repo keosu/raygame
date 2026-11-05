@@ -49,15 +49,7 @@ void GameEngine::Tick(float dt) {
             GameTime::FixedStepScope fixedTime(fixedDelta, timing.fixedTime);
             auto scene = currentScene; // Keep the scene alive throughout callbacks.
             if (scene) {
-                ScopeActivation sceneScope(scene->GetCallbackScope());
-                auto generation = scene->GetGeneration();
-                auto canContinue = [&] { return !paused && scene->GetGeneration() == generation; };
-                scene->BeginFixedStep();
-                if (canContinue()) scene->FixedUpdate();
-                if (canContinue()) scene->IntegratePhysics(fixedDelta);
-                if (canContinue()) scene->GetPhysicsWorld().Step();
-                if (canContinue()) scene->PostFixedUpdate();
-                if (!canContinue()) {
+                if (!scene->RunFixedStep(fixedDelta, [this] { return !paused; })) {
                     fixedAccumulator = 0;
                     timing.interpolationAlpha = 1;
                     scene->ResetInterpolation();

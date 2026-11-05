@@ -1,6 +1,450 @@
 # Agent 工作状态
 
-更新时间：2026-10-14。
+更新时间：2026-10-20。
+
+## 工作包：艾克斯高清头像（2026-10-23）
+
+用户反馈艾克斯头像模糊。原图 `Ultraman X Render I` 只有 506×940，且 wiki CDN 默认返回有损 WebP。
+改用同一渲染图的 1872×3534 放大版（X 字交叉姿势），用 `?format=original` 下载原始 PNG
+（`build/ug-dl.ps1` 已加此参数），`make_avatars.py` 生成。`--capture` 核对了数据库与技能预览。
+注意：此前 v2.0 其他百科素材（希卡利、高斯等头像和新怪兽）也是 WebP 转存，若再有模糊反馈可同法重下。
+v2.0 发布包里仍是旧头像。
+
+## 工作包：修复 Android（Clang）编译错误（2026-10-23）
+
+用户在另一台机器编译 Android 报 `Automation.h:17:12 default member initializer for 'hiddenWindow' needed within
+definition of enclosing class`。原因是嵌套结构体 `Automation::Options` 带默认成员初始化，又在同一个类里被用作
+默认参数和 `static inline` 成员；MSVC 接受，NDK Clang 拒绝。本机 NDK r28c 用原头文件可复现同样错误。
+- 修复：`Options` 移到类外为 `AutomationOptions`，类内 `using Options = AutomationOptions;`，调用方不变。
+- 用户本机 `xmake f -p android` 报找不到 SDK/NDK 及 box2d 无匹配平台：本机工具在
+  `%LOCALAPPDATA%\raygame\android-sdk`（NDK 28.2），应使用 `xmake android` 任务自动发现；box2d 报错是
+  NDK 未找到的连带结果，未改代码。
+- 验证：`xmake android` 10 个 APK 编译并通过校验（含 ultra_guard）；桌面全目标构建，tests 499、
+  campaign_tests 37、smoke 通过。未做：Linux 构建、真机运行。
+
+## 工作包：Ultra Guard v2.0（2026-10-23，已提交并发布）
+
+用户要求先按 v1.5 发布，随后改为 v2.0；提交、推送并在 GitHub 发布。
+- 发布：提交 `7244517` 推送到 `origin/dev`，标签 `ultra-guard-v2.0`（仓库是整个引擎，不用裸 `v2.0`），
+  Release <https://github.com/keosu/raygame/releases/tag/ultra-guard-v2.0> 附 `UltraGuard-v2.0-windows-x64.zip`
+  （exe + `assets/ultra_guard` + README，15.6 MB，需要 VC++ 2015-2022 运行库）。解压到干净目录、从别的工作目录
+  启动跑完 `--capture` 38 张，退出码 0。
+- 英雄名单 24 位：用户列了 21 位（从人气榜第 4 名捷德起），加上榜单前三迪迦、梦比优斯、雷欧凑满 24；初代退出名单。
+  新增泰迦、艾克斯、希卡利、高斯、维克特利、罗索、布鲁、奥美迦，各有新 `AttackKind`（Strium、Xanadium、Knight、
+  Luna、Quake、Flame、Aqua、Omega，实现在 `FireSignature`），罗索/布鲁同场伤害 +15%。`HeroId` 改为与 key 同名
+  （Z、Orb、Geed、Arc……），存档按 key 记录不受影响。头像由 `make_avatars.py` 从百科立绘生成，泰迦/奥美迦从历史恢复。
+- 怪兽 16 种（另有巴尔坦分身，不单列）：新增贝蒙斯坦（吸收口回复）、加波拉（钻地潜行）、哥尔赞、达达星人（闪烁）、
+  金潘顿、首领黑暗扎基（黑暗屏障）。“红王”改名“雷德王”。贴图在 `assets/kaiju/` + `kaiju.txt`，皮肤不再出现在菜单，
+  只能用 `--skin` 启用；旧的“写实”皮肤目录已并入内置素材。贝利亚换成百科的完整立绘（旧抠图丢了黑色部分）。
+  `Art::KaijuHeight` 优先用贴图尺寸，新增 `KaijuExtent/KaijuFitScale`，图鉴与首页按图片宽高比适配。
+- 界面：首页左侧菜单 + 右侧英雄轮播（每次进入随机洗牌，背后衬一只随机怪兽）、版本号；数据库三列；图鉴 4×4 网格
+  加详情；出战准备 6 列。头像纹理提高到 384。
+- 图标：`make_icon.py` 用迪迦真人头像合成，输出 `assets/icon.png`（窗口图标）、ICO、Android 启动图标；
+  rc 加版本信息 2.0.0，Android versionName 2.0.0 / versionCode 20。
+- 关卡：前六关不变；后六关换入新怪兽和新英雄推荐阵容，并调整血量倍率。生存池加入新怪兽，扎基为第 20 波首领。
+- 平衡（`build/ug-bal-v20d.txt`）：后六关普通 bot 胜场 12/7/8/4/6/4（改动前 11/9/5/6/5/4），高手全胜；
+  前六关与改动前逐行一致；守城高手 21~23 波、普通 11~12 波。注意：中途有一轮测试因为试玩进程锁住 exe 而用了旧程序，
+  最终数字是重新编译后的结果。
+- 验证：全目标构建；tests 499、campaign_tests 37、smoke.exe 通过；`--capture` 38 张截图，核对了首页、数据库、图鉴、
+  出战准备、8 位新英雄的技能预览和首领战。未做：Android APK 重打、Linux 构建、真人试玩。
+
+## 工作包：战役示例菜单分层与阳光置顶（2026-10-21）
+
+用户反馈：garden_guard 阳光应在最上层；三个战役游戏的菜单是纯文字，主菜单和暂停用同一个对话框，没有区分感。
+- 层级：garden 阳光改在 `OnRender` 里画在 HUD 和种子包之上（落点阴影仍在地面层），拖拽中的植物和飞行中的阳光在它之上。
+  新增 `Campaign::Game::PlayGrab` 钩子，`Hit` 先问它：飘过种子栏的阳光点击时优先收集。marble 得分飘字移到
+  `OnRender`，不再被炮台和 HUD 挡住。goo 的效果在场景层，没有被挡的问题。
+- 菜单（`CampaignGame.h`，三个战役共用），每类界面一种样式：
+  - 主菜单：全屏标题页，左暗右亮渐变 + 漂浮光点，游戏标志（`DrawEmblem`：向日葵、三颗彩球、粘球三角）、大标题、
+    左侧竖排按钮（主按钮用游戏主题色 `accent`，带图标，依次滑入，选中项左侧有指示三角），右侧“冒险进度”三枚勋章。
+  - 选关：全屏三张卡片（`DrawLevelArt` 缩略图：花园天空/植物/僵尸、神庙背景裁切、粘球桥/塔），编号、最高分、
+    已通关/可挑战/未解锁状态；缩略图用 `Display::ClipScope` 裁剪。
+  - 暂停：更暗的遮罩 + 小卡片，顶部暂停图标。设置/玩法说明：带标题栏的二级页。
+  - 结算：彩带横幅（胜利金色 + 转动星芒，失败暗红），得分滚动，破纪录显示“新纪录！”（`newRecord`）。
+  - 布局都在设计框中央 860 宽内，保证竖屏 720×1000 也放得下。按钮新增 `Look`（Plain/Primary/Card）和图标。
+- 测试：新增 `ClickButton(id)`，三个冒烟里菜单点击改按按钮编号；`MenuPanelVisible` 改为采样第一个按钮；
+  `Capture` 在菜单界面先等入场动画结束。garden 冒烟新增 sun-over-hud（检查点击优先级），marble 冒烟新增 levels 截图。
+- 新文案 6 条进 `common/locales/zh-CN.tsv`，`prepare-campaign-fonts.py` 重新生成三个游戏的字体子集。
+
+验证（全部通过）：全目标构建；campaign_tests 37、tests 499、smoke.exe；garden/marble/goo `--smoke` 0 failures；
+核对了三个主菜单、选关、暂停、胜利/失败/通关、玩法说明、设置、竖屏和宽屏菜单、阳光压在种子包上的截图。
+
+## 工作包：示例动画打磨（2026-10-21）
+
+用户反馈 garden_guard 收集阳光没有动画、marble_temple 加球有突变，并要求检查其他示例。
+- garden_guard：
+  - `Sun` 新增 `origin/travel/hop` 和 `At()`。天降阳光从顶部飘落（左右轻摆，落点有阴影），向日葵阳光抛出一道弧线并弹出。
+    点击检测改用 `At()`（看到哪里点哪里）。快过期的阳光最后 1.5 秒渐隐，寿命改为入场时间 + 10 秒。
+  - 收集后阳光沿曲线飞向左上角计数器（0.6 秒，`Game::flights`），落下时数字才增加，图标放大发光；模型里的 `sun` 仍立即增加。
+  - 新种植物从土里弹出并扬起尘土（`Plant::age`、`DrawPlant` 的 `size`）。
+  - 被打倒的僵尸向后倒下、下沉，扬起一团尘土（`Model::fallen`，0.8 秒）。
+- marble_temple：
+  - `Ball` 新增 `lag/settle/from`，`Model::Visible` 计算绘制位置。射入的球从击中点滑进空位（0.12 秒），
+    前面的球按 lag 指数缓动让位，不再瞬间跳一个球位；碰撞和逻辑仍用真实 `distance`。
+  - 轨道起点画出洞口，新球从洞口长大出来。炮口装填、交换颜色、下一颗变化时有弹出缩放。
+  - 消除时在消除位置飘出 “+分数” 和 “COMBO xN”（`Model::popups`）。
+- goo_journey：`Burst` 效果（断裂火花、救援金光、落水水花、回收光环）；新放的粘球弹出（`Node::age`）。
+- 街机示例：`ExampleUI::Result` 新增 `appear` 参数和 `ResultAppear(秒, 延迟)`，结算面板在最后的爆炸之后延迟渐入、
+  上滑，完全出现前按钮不响应。space_shooter（延迟 0.8 秒）、bullet_hell、neon_breakout（0.6 秒）接入；
+  neon_breakout 丢球后新球在挡板上弹出（缩放缓动，`Ball::Render` 按缩放绘制）。
+- 测试：`tests/campaigns.cpp` 的 garden bot 改为点 `At()`。garden 冒烟新增 plant-pop、sun-flight、sun-landed、sky-sun
+  截图和检查；marble 冒烟新增 insert-glide、clear-popup 截图和检查。
+
+验证（全部通过）：全目标构建；`campaign_tests` 37 passed（bot 三关都照常打通）；`tests.exe` 499 passed；`smoke.exe`；
+engine_lab、garden_guard、marble_temple、goo_journey `--smoke` 0 failures。核对了新增截图。
+未核对画面：goo_journey 的救援、断裂、水花效果（冒烟流程里没有发生）；三个街机示例的结算渐入（没有截图流程）。
+
+## 工作包：引擎新增场景时钟、脚本化运行、音量压低和画布裁剪（2026-10-20~21，已提交）
+
+2026-10-21 会话重新连接后补跑窗口检查，全部通过：`smoke.exe` 退出 0；engine_lab、garden_guard、marble_temple、
+goo_journey 的 `--smoke` 均 0 failures；Ultra Guard `--capture build/ug-engine` 隐藏窗口 70 秒跑完，36 张截图 + 17 张头像。
+核对了 15_margins、28_survival（怪兽正常进攻）、31~33 预览（特效被裁在头像区域内）和引擎实验室 physics 视口。
+下面“未运行”和“下一步”中的窗口检查一项已完成；Linux 构建仍未跑。
+
+从 Ultra Guard 里抽出四项通用能力放进引擎，Ultra Guard 和引擎实验室改用引擎版本。
+- `Scene::RunFixedStep(dt, proceed)`：引擎固定步长的阶段顺序（位姿记录、FixedUpdate、积分、物理、PostFixedUpdate），
+  `GameEngine::Tick` 改为调用它，行为不变。新头文件 `SceneClock.h`：`Advance(scene, dt)` 按引擎帧顺序驱动
+  引擎之外的场景（自己的累加器、时间和时间倍率，每帧最多 8×倍率步），`Step(scene)` 给无窗口模拟用。
+  - Ultra Guard：菜单用 `SceneClock` 驱动技能预览，删除 `TickEmbedded`；`BattleScene::Update` 在 embedded 时只跑
+    `Scene::Update`。`RunBot` 和 `BenchmarkDemo` 改用 `clock.Step`，从“只调 FixedUpdate”变成完整固定步。
+- `AudioManager::Duck`：作用域内把某个频道再乘一个系数，可叠乘、任意顺序释放，不改玩家设置；音乐立即生效，音效对之后
+  播放的生效。Ultra Guard 删掉自己的 `Sfx::SetEffectScale`，预览期间持有 `Duck(Sfx, 0.35)`。
+- `Display::ClipScope`（画布单位裁剪，可嵌套求交）和纯函数 `CanvasToTargetPixels`。原来 Ultra Guard 预览直接用
+  `BeginScissorMode` 传画布坐标是错的：画布纹理按 64 像素取整并超采样，窗口模式下纵向偏约 7%，全屏会裁到错误区域。
+  引擎实验室的手写换算也改用 `ClipScope`。`Display::End` 拆成 `PreparePresentation` + `DrawPresentation`。
+- 新模块 `Automation.h/.cpp`：`Start(目录, {hiddenWindow})`、`At(帧, 动作)`、`Every(动作)`、`Click/PressKey/Tap`
+  （画布坐标，经 `Input` 的新捕获过滤器 `Input::SetCaptureFilter` 叠加在设备输入上，运行期间窗口始终视为有焦点）、
+  `SaveCanvas`（逻辑尺寸）、`SaveWindow`（含边距，复用 Display 的呈现步骤）。`GameEngine::Update` 在采集输入前
+  `BeginFrame`；`hiddenWindow` 时 Init 前设 `FLAG_WINDOW_HIDDEN`（与 `tests/smoke.cpp` 相同做法）。
+  - Ultra Guard `--capture` 改用 Automation：隐藏窗口，`Shot/ShotWindow` 换成 `SaveCanvas/SaveWindow`，
+    `Capture(frame)` 由 `Every` 驱动；删除 `captureDir`、`ScriptedCapture()`。
+- README 增加 ClipScope、Duck、SceneClock、脚本化运行的说明；`tests/scene_clock_and_automation.h` 新增 45 项检查。
+
+验证：
+- 通过：MSVC Release 全目标构建；`tests.exe` 499 passed、0 failed；`--balance`（`build/ug-bal-engine.txt`）与改动前
+  `build/ug-bal-castle5.txt` 212 行逐字相同（完整固定步没有改变任何结果）。
+- 未运行：所有需要窗口的检查。用户的 Windows 会话处于断开状态（`query user` 显示 Disc，只有 WinDisc 虚拟显示器），
+  GLFW 建窗时报 “Failed to determine Monitor to center Window” 后崩溃，未改动的 `smoke.exe` 和各示例 `--smoke` 也一样
+  （上午会话连接时 `smoke.exe` 和 `--capture` 都通过）。没有核对：Ultra Guard 隐藏窗口截图巡览、技能预览裁剪位置、
+  `SaveWindow` 边距截图、引擎实验室 ClipScope。Linux 构建未跑。
+
+下一步：
+- 会话重新连接后：跑 `smoke.exe`、`engine_lab --smoke --data build/smoke-engine_lab`、三个战役示例 `--smoke`、
+  Ultra Guard `--capture build/ug-engine`（应生成 36 张截图和 portraits），核对 15_margins 和 31~36 预览。
+  注意：巡览动作现在在 Tick 之前执行，场景切换比原来早一帧生效，个别截图时机可能要微调。
+- 都通过后提交这一工作包。
+- 其他示例（engine_lab、CampaignGame、forge_runner）仍各自实现截图和输入注入，可以逐步改用 `Automation::SaveCanvas`；
+  它们的 smoke 是自己驱动 Tick/Render，不走 `Run`，所以 `At/Every` 对它们不适用，只能用截图函数。
+
+## 工作包：Ultra Guard 新关卡、守城生存、17 位英雄与技能演示（2026-10-19~20，已提交）
+
+三部分在 2026-10-20 按用户要求合成一个提交。第三部分覆盖了第二部分里的“技能演示”和守城地图。
+
+第三部分（2026-10-20）：
+- 奥特数据库只收录 17 位可上阵英雄：`codex.txt` 精简，`CodexPortrait`、光之档案页、`GoToDemo`、独立演示页的
+  HandleInput/Render 分支都删了；`avatars/{taiga,omega,seven,taro}.png` 删除，`make_avatars.py` 同步。
+  标题页按钮“奥特数据库”直接进英雄页，排版保持原样（两列列表 + 大头像 + 文字栏）。
+- 技能粒子预览：英雄页持有一个 `embedded` 的 `BattleScene(HeroId)`（`Menu::SyncPreview`/`DropPreview`），
+  菜单 Update 里用 `TickEmbedded` 按引擎同样的固定步长推进；`DrawEmbedded` 只画 `DrawZones` + 组件特效，
+  怪兽和英雄本体不画，平移到头像中心并用 scissor 裁到头像区域。
+  - 嵌入模式不改全局：不 `SetGameSpeed`、不播 battle 音乐、不订阅 `ug.kill`；音效经 `Sfx::SetEffectScale(0.35)` 压低。
+  - 展示节奏：冷却 ×0.5、目标在英雄左侧两格出现（`StepDemo` start 8.5 格）、刷怪间隔 ×0.6、目标血量 1e7、
+    走过右侧 3.2 格即移除。`--balance` 的 `BenchmarkDemo` 不是 embedded，数值不变。
+- 守城生存改成城堡：
+  - 关卡新键 `castle 左列 上行 右列 下行`（`LevelDef::castleMin/Max`），城墙沿矩形边缘格，路径穿墙处即城门。
+    城墙格可以放英雄；四角塔格为 Blocked；城内（含城墙）不生成装饰。
+  - `survival.level`：`base 9 5`，`castle 5 2 14 8`，四条路呈风车形，各在外侧拐一个钩后从北/东/南/西门进庭院，
+    `hp 1.4→1.3`，金币和耐久不变（760 / 300）。
+  - 画面（`Map.cpp`）：庭院大理石地砖 + 金色环纹，城外一圈光之护城河（路面盖过即桥）；`CastleWalls` 画城墙、
+    垛口、四角蓝顶塔、城门两侧红顶塔；`SparkTower` 换成 `Lighthouse`（白塔红环、彩色计时器小灯、灯室和两道旋转光束），
+    灯室位置 `kLanternOffset`（Map.h）同时是 `StepSiege` 光束起点。
+  - 文案：“城塔”统一改“灯塔”，结算“灯塔被摧毁”，操作说明的守城和技能演示条目重写；字体子集 1049 码位。
+- `DebugAutoplay` 先 `EnsureWaves`：截图流程直接跳到第 6 波时，生存模式之前只生成了 2 波，波次根本没开始（老问题）。
+
+第三部分验证：
+- 通过：MSVC Release 全目标构建；`tests.exe` 454 passed、0 failed；`smoke.exe` 退出 0；`--capture` 36 张截图
+  （`build/ug-final`），核对了英雄页预览（初代光线、奈克瑟斯领域、银河雷电、盖亚连拍）、城堡地图、怪兽从四门进攻、
+  结算和操作说明。
+- `--balance`（`build/ug-bal-castle5.txt`）：守城 expert 都止于第 20 波（约 8.6 分钟，第 20 波是首领波），
+  casual 8~12 波；同一代码下旧路线是 expert 21~23、casual 11~12（`build/ug-bal-oldlayout.txt`）。普通关卡不受影响。
+- 未运行：Linux 构建、Android APK、真人试玩。
+
+第三部分已知限制与下一步：
+- 城堡版 expert 卡在第 20 波首领，红王漏到灯塔的次数明显多（30~46 次 vs 旧路线 0~2），可以再调首领或红王攻城伤害。
+- 截图读图工具按路径缓存，核对新截图时要换文件名。
+
+第一部分（上一会话）：
+- 新增 6 关（3-1~3-3 火山，4-1~4-3 月面/星云，`07_island`…`12_landoflight`）。
+- 出战准备页：可以选择出战阵容，阵容按关卡存档（`Progress::Roster`/`SetRoster`）。
+- 后期关卡怪兽会攻击英雄：`KaijuStrike` 与 `assault`，英雄有能量，耗尽后倒下 8 秒。
+- 标题页新增生存模式：`levels/survival.level`，`SurvivalWave` 生成无尽波次，记录最佳存活时间和最高波次。
+
+第二部分（本会话）：
+- 守城生存：`LevelDef.siege`（关卡文件 `siege <耐久>`），`citadel` 主题（光之国水晶地面、金色光路、
+  等离子火花塔 `SparkTower`）。塔在正中 `base 9 6`，四条路从左、右、上、下进入：`MapData::Build` 现在支持
+  路径首点在任意一侧格外，`col>=kCols` 或 `row<0` / `row>=kRows` 都可以。
+  - 怪兽在离塔 1.65~2.15 格处停下（`sieging`），每 1.2 秒撞塔一次（首领 1.5 秒），伤害为 `leak×(1+0.04×波次)`。
+  - 塔每秒向最近的怪兽放一道火花光线（80×(1+0.12×波次)，无视护甲），每波开始修复 5%。
+  - HUD 上用城塔百分比代替生命；结算显示“城塔被摧毁”。
+  - 这两次随机数调用只在 Siege 模式里执行，普通关卡的 `--balance` 结果与改动前逐行一致。
+- 新增 8 位英雄（`HeroId` 共 17 个，`AttackKind` 多 8 种），数值在 `Data.cpp`，招式在 `Battle.cpp` 的 `FireSignature`：
+  - 初代：八分光轮锯齿圆盘直线贯穿；三级起每第 4 发是斯派修姆光线（3 倍伤害）。
+  - 梦比优斯：∞ 粒子加金色光线；每第 4 发（三级第 3 发）是梦比姆爆裂火球，三级附带灼烧。
+  - 雷欧：头像扑出（`lunge`）飞踢，击退并眩晕；三级补踢第二只。
+  - 银河：银河雷电连锁 4 跳（三级 6 跳并麻痹），每跳伤害 ×0.75。
+  - 盖亚：光子刃波浪光鞭，扫过 ±35° 扇形；三级击退。
+  - 奈克瑟斯：梅塔领域 `Zone` 持续 3.5 秒，伤害无视护甲并减速；三级附加易伤。
+  - 戴拿：闪亮型索尔捷特光线，每第 3 发（三级第 2 发）是强壮型加尔奈特轰炸，落点范围眩晕。
+  - 提欧：连续命中同一目标每次 +30%，切换目标保留一半蓄力；三级蓄满后光线贯穿。
+  - 头像 `avatars/{mebius,leo,ginga,gaia,nexus,dyna}.png` 由 `make_avatars.py` 生成，源在 `build/ug-src/new6`。
+- 技能演示：`BattleScene(HeroId)` 使用 `DemoLevel`（一条直路），英雄放在 (9,5)，怪兽循环出场，不扣生命。
+  - 顶栏可切换一到三星，右栏显示说明和实测每秒输出。
+  - 入口：英雄详情页和光之档案中可上阵条目的「技能演示」按钮（`GoToDemo`），返回时回到原来的条目。
+- 菜单改动：
+  - 标题页改为 2026 人气榜前十（迪迦、梦比优斯、雷欧、捷德、欧布、银河、盖亚、赛罗、奈克瑟斯、泽塔）。
+  - 出战准备的英雄池改为 5 列小卡（最多放得下 20 位）；英雄列表改为两列。
+  - 操作说明重写，档案新增 6 条并调整顺序（共 21 条）。
+  - 字体子集已重新生成（1060 个码位）。
+- `--balance` 末尾新增每位英雄 90 秒演示场景的实测输出（一星 / 三星）。新英雄调整后每单位费用的输出在老英雄区间内
+  （0.23~0.35）；提欧在演示中偏低（0.19），因为演示里目标一直在换，它对首领更强。
+
+验证：
+- 通过：
+  - MSVC Release 全目标构建。
+  - `tests.exe` 454 passed、0 failed。
+  - `--balance`（`build/ug-bal-siege6.txt`）：守城生存 expert 21~23 波（约 9.5 分钟），casual 11~14 波（旧路线
+    expert 33 波、casual 7~20 波）；普通关卡与改动前逐行一致。
+- 未运行：
+  - `smoke.exe` 和 `--capture`：本机目前没有可用显示器，GLFW 建窗时崩溃（未改动的旧示例也一样）。新画面
+    （光之国地图、领域、演示页、5 列英雄池、两列列表）都还没有截图核对。`Capture()` 已追加 30~37 号截图。
+  - Linux 构建、Android APK、真人试玩。
+
+已知限制与下一步：
+- 人气榜第 12~20 名没找到可靠的文字来源，结果帖只有图片。已确认：1 迪迦、2 梦比优斯、3 雷欧、4 捷德、5 欧布、
+  6 银河、7 盖亚、8 赛罗、9 奈克瑟斯、10 泽塔、11 戴拿、15 提欧。国内这次投票不含部分昭和奥特曼；初代因为
+  用户点名要“光轮切割”而加入。还剩 3 个名额，需要用户给出完整名单。
+- 有显示器后：跑 `--capture build/ug-cap`，核对 27~37 号截图的排版（尤其英雄池卡片上的名字长度和演示右栏）。
+
+## 工作包：Ultra Guard 提高难度（2026-10-19）
+
+用户反馈六关都太简单。旧基线：expert 六关全满血，casual 平均剩余生命 19.7 / 19.2 / 18.5 / 17.3 / 15.0 / 13.2。
+- 只调 `hp`（击杀奖励固定，不影响经济）：东京 1.0→1.3、富士 1.82→2.18、星云 1.48→1.92、长隆 1.75→2.3、
+  乐园 2.05→2.7、环球 1.12→1.68。波次、金币未动。
+- `--balance` 的 casual 局数 6→12（每关共 15 局），样本太少时胜率噪声很大。
+- 扫描脚本 `build/ug-sweep.ps1`（不入库）把六关 hp 同乘系数跑报告并还原文件；`build/ug-bal.ps1` 加了 `-Name` 输出名。
+  casual 在约 1.4 倍处断崖，expert 多数关到 2.3 倍仍满血（环球靠究极合体，2.3 倍也满血）。
+- 结果 casual 胜场 12 / 12 / 11 / 7 / 4 / 3（共 12 局），平均剩余生命 18.4 / 13.9 / 10.5 / 8.9 / 1.7 / 3.0；
+  expert 全胜，乐园 19.3，其余满血。
+- 验证：MSVC Release 编译、`--balance`（报告 `build/ug-bal-r3.txt`）。未真人试玩，未重打 Android APK。
+- 下一步：若真人仍觉得偏易，后两关可以收紧金币或在终局前加波次；expert 与 casual 差距主要来自技能，
+  环球影城对会用合体技的玩家仍偏轻松。
+
+## 工作包：合并 origin/dev 与 Ultra Guard Android 入口（2026-10-17）
+
+- 合并 `origin/dev`（`112f217`，已推送）：远端 3 个提交是本分支最早三个 Ultra Guard 提交 rebase 后的副本，
+  内容是本地子集；冲突全部取本地，`scripts/build-android.ps1` 保持删除（Android 已迁到 xmake 任务）。
+- Android 入口按现状改：`scripts/android/build.lua` 游戏列表加 `ultra_guard`，`xmake android --help` 写“ten games”，
+  README 改为 `xmake android --game=ultra_guard`。
+- 验证：`xmake android --game=ultra_guard` 通过并校验（`build/android/native/arm64-v8a/release/ultra_guard.apk`，
+  约 10 MB）；之后 Windows `xmake build ultra_guard` 仍正常。未真机安装。
+
+## 工作包：Ultra Guard 两篇章、档案头像与地标调整（2026-10-16）
+
+已完成：
+- 关卡分两篇：`arc` 新字段（关卡页每行上方画篇章名），副标题改为「守护地球篇 · …」「乐园奇遇篇 · …」。
+  波次改为 12/14/16、12/14/16（`build/ug-waves2.py`：前三关在终局前各补两波，后三关删去重复的中段波次）。
+- 数据库：新增奥美迦奥特曼（官方中文名，必杀雷特克鲁特光线）与提欧奥特曼（2026 年 60 周年作，光石息吹、
+  提欧修姆光线），共 15 条。`Art::CodexPortrait` 按 id 取英雄头像或 `avatars/<id>.png`，列表和详情都显示头像。
+  新头像 man（1966 剧照，按天空色从边缘泛洪抠图）、seven（平成 1999 套装渲染）、taro、taiga（角比肩宽，
+  `WINDOWS` 手量）、omega、teo，源在 `build/ug-src/heroes`。
+- 光之乐园去掉奥特曼雕像与怪兽雕像（和角色冲突）：改为巨型贝塔魔棒（闪光头放射光芒）和喷气甲虫号展台，
+  小装饰的奥特曼像换成彩色计时器灯柱；删除 `assets/landmarks/` 与 `KaijuPose::statue`。
+- 环球影城终点改为 Universal 地球：蓝色地球自转（大陆随经度压扁）、倾斜银环上滚动 UNIVERSAL 字母、喷泉底座。
+- 平衡：长隆 hp 1.75、乐园 2.05、环球 1.12。casual 19.7 / 19.2 / 18.5 | 17.3 / 15.0 / 13.2（长隆、环球各 1 败），
+  expert 全满血。
+- 验证：MSVC Release 编译、`--balance`、`--capture`（关卡页分篇、数据库奥美迦页、光之乐园、环球地球放大图）。
+
+## 工作包：Ultra Guard 新怪兽、真人头像与体验打磨（2026-10-16）
+
+用户要求（个人使用，可用真实图片）：后三关主题辨识度、合体动画加长、波次逐关增加、集结按钮美化、
+技能冷却时更明显的灰显、真人头像，以及新增怪兽与首领（如托雷基亚）。
+
+第 1 步已完成（素材、怪兽、波次）：
+- 素材来自奥特曼维基（ultra.fandom.com）。页面会 403，但 `api.php` 可用；图片 CDN 需要带
+  `Referer: https://ultra.fandom.com/` 才能下载。下载脚本 `build/ug-dl.ps1`、联系表 `build/ug-sheet.py`
+  （都不入库），原图在 `build/ug-dl*`、整理后的源在 `build/ug-src/{heroes,kaiju}`。
+- 头像：TriggerMultiRender2、DeckerRender、BlazarRender1 经 `make_avatars.py` 裁成 `avatars/{trigger,decker,blazar}.png`；
+  特利迦举手的姿势会骗过自动识别，`WINDOWS` 里写了手量的头部窗口。
+- 怪兽：金古桥（护甲 14）、梅特隆星人（每 6 秒让 2.4 格内最近的英雄陷入幻觉 2.2 秒）、
+  托雷基亚（首领：每 10 秒进异次元之门 1.4 秒无敌且不可选中，出来前移 30；每 12 秒让 2.6 格内非首领怪兽狂暴
+  4.5 秒，+40% 速度、+4 护甲）、加坦杰厄（首领：护甲 12，半血外壳碎裂护甲 ×0.25；每 13 秒黑雾 4 秒，
+  英雄冷却走一半；每 9 秒石化 4.2 格内最近的英雄 3 秒）。图片在 `skins/real/kaiju/`，`make_kaiju.py` 支持
+  `--source` 并跳过缺失源；`Kaiju.cpp` 补了四个内置绘制。图鉴卡片按怪兽数缩放。
+- 波次：东京 10、富士 12、星云 14、长隆 15、乐园 16、环球 18。金古桥从星云第 8 波出现，梅特隆与托雷基亚
+  从长隆开始，环球终局是加坦杰厄。波次表由 `build/ug-waves.py` 生成。
+- 平衡（casual 平均剩余生命）：19.7 / 19.2 / 18.5 / 18.3 / 16.3 / 11.7（终章 1 败），expert 全满血。
+  hp：长隆 2.05、环球 1.45；托雷基亚 hp 2800、漏怪扣 6。
+
+第 2 步已完成（技能灰显、集结按钮、合体演出）：
+- 技能冷却时：灰底、图标去色变暗（`Desaturate`）、图标上扇形遮罩随冷却缩小、底部补充进度条，按键角标也变灰。
+- 集结按钮 190×58：上排本关阵容小头像（已放置亮、未放置为暗剪影），下排「集结 n/6 / 蓄能中 n 秒 / 究极合体 E」，
+  蓄能进度条按本次蓄能总长（`fusionSpan`）计算；就绪时金色渐变、扫光、呼吸描边。信息面板相应下移到 y=524。
+- 合体技改为 4.6 秒演出（真实时间，`fusionAnim`）：0–0.4 秒时停压暗加黑边；0.3 秒起阵容逐个横向切入（头像、
+  名字、招式）；场上英雄升起光柱并在 1.6–2.7 秒汇向空中能量球；2.9 秒（`kFusionImpactAt`）光柱砸下并结算伤害，
+  恢复时间；余波与「新世代闪光」标题到 4.6 秒结束。时停期间输入和面板点击被屏蔽；headless 机器人直接结算。
+- `fusion.wav` 重新合成为约 5 秒：切入音、上升噪声、2.9 秒爆炸；BGM 未改（重生成后已还原）。
+- 截图流程在演出中截三张：`21_fusion_cutin`、`22_fusion_orb`、`23_fusion_impact`。
+
+第 3 步已完成（后三关主题辨识度）：
+- `MapData::PlaceLandmarks` 按主题预留地标格（按到道路的 BFS 距离挑最远的空地，不压路，优先离路 ≥2 格），
+  标为 Blocked。长隆：摩天轮 3×3（转动、灯带）、动物园 3×2（长颈鹿、熊猫、金合欢）、鲸鲨池 2×2（鲸鲨巡游）；
+  奥特曼乐园：巨型雕像 2×3（`assets/landmarks/ultra_statue.png`，取自特利迦复合型渲染图，带聚光灯）、怪兽雕像台 3×2
+  （`KaijuPose::statue` 青铜着色，真实怪兽图）；环球影城：城堡 3×3（旗帜飘动）、恐龙园 3×2（霸王龙张嘴）、
+  27 号摄影棚 3×2（两束扫动的探照灯）。
+- 地标会动，所以战斗时在 `DrawMapLive` 里实时画（`RenderMap(..., withLandmarks=false)`），关卡缩略图则烘焙进去。
+- 路面：长隆木栈道横板、奥特曼乐园金边红毯加奥特徽记、环球影城星光大道粉色星星。装饰：帐篷换成气球车，
+  炮塔换成电影摄影机。
+- 地标改变了可放塔格与装饰分布，重调：乐园 hp 2.25、环球 hp 1.28 / 金币 880（仍低于六人总价 890）。
+  casual 19.7 / 19.2 / 18.5 / 16.8 / 17.0 / 10.0（终章 6 局 1 败，败局为前几波三路未覆盖），expert 全满血。
+- 验证：MSVC Release 编译、`--balance`、`--capture`（关卡页缩略图、三张乐园图、合体三阶段截图逐张看过）。
+
+未做 / 下一步：
+- 未重打 Android APK；新怪兽能力和合体演出未经真人试玩（尤其梅特隆/加坦杰厄让英雄停手的频率）。
+- 摄影棚编号用 raylib 默认字体，放大后有像素感。
+- 托雷基亚进门时也免疫究极合体（时停期间计时不走，通常无影响）。
+
+## 工作包：Ultra Guard 评审后修正（2026-10-15）
+
+用户批准：修错与文字、难度曲线与合体技节奏（伤害不变，凑齐后先蓄能、冷却拉长）、截图验证与体验。
+新英雄方向：前三关阵容不动，后面关卡用 2016 年以后的新生代（特利迦、德凯、布莱泽）。
+
+第 1 步已完成（修错与文字）：
+- 首领血条护盾减伤改为按常量计算（现为 -58%），底部提示补 E，作战提示换成现阵容并统一“芝顿”。
+- 帮助页的自定义头像文件名改为从 `HeroInfo` 生成。
+- 招式按中文常用译名校正：泽斯帝姆光线、毁灭爆裂（十字光线，蓄能时有红黑闪电力场）、亚刻泰拉光弹、
+  赛罗头镖与艾梅利姆切割。捷德攻击改为红黑闪电力场加一道蓝白光线，音效换回 pulse，不再每次震屏。
+- 数据库改为 13 条：六位现役、特利迦/德凯/布莱泽/泰迦（新生代）与初代/赛文/泰罗；删去来源不可靠的
+  戴拿、盖亚、梦比优斯、银河、艾克斯。初代时限改为 3 分钟。
+- 验证：字体子集 874 码位；MSVC Release 编译通过；`--balance` 六关各 3 次全胜。
+
+第 2 步已完成（难度曲线与合体技）：
+- `--balance` 现在每关跑 3 局 expert 和 6 局 casual。casual 不放技能、2.5 秒决策一次、一次只买一样，
+  开波前先花掉开局金币，放塔时从排名前 40% 的空格里随机挑（只跳格子会在三路汇合的终章崩盘，
+  只放慢决策则六关全满血，都测不出递进）。汇总脚本 `build/ug-bal.ps1`（不入库）。
+- 东京降为入门关：第 10 波去掉芝顿，艾雷王 18→12、14→10，第 3、5 波减量。
+  hp：富士 1.82、星云 1.48（金币 560）、长隆 2.20（560）、乐园 2.55、终章 1.55（金币 840，
+  低于六人总价 890）。终章第 3-5 波减量。
+- 结果（casual 平均剩余生命）：19.7 / 18.7 / 18.7 / 17.0 / 14.7（1 败）/ 12.5；expert 六关全满血。
+- 究极合体：伤害不变；凑齐六人后先蓄能 25 秒，冷却 52→75 秒，按钮显示「蓄能中」与秒数。
+
+第 3 步已完成（画面验证与体验）：
+- 光之乐园两条路原本在第 5、11 列反向共用路段，改为只在 (7,4) 和 (10,8) 两点十字交叉；
+  hp 重新校准到 2.03。星云、长隆、乐园、环球都画行进方向箭头（`PathArrows`）。
+- 亚刻每发爆炸不再震屏（只有空中支援震），火花/柔光粒子上限 900→1800。
+- 数据库每页 7 条，翻页按钮 175×46。
+- `--capture` 期间不再因窗口没焦点而自动暂停（以前后台启动时战斗截图全被暂停菜单挡住）；
+  合体技截图提前到释放后第 6 帧。
+- 验证：`--capture` 21 张截图逐张看过（关卡页、数据库、长隆、光之乐园、环球、合体特效正常）。
+  casual 平均剩余生命 19.7 / 19.2 / 18.5 / 17.3 / 16.8 / 11.8，六关全胜；expert 全满血。
+
+第 4 步已完成（新生代英雄）：
+- `HeroId` 增加 Trigger、Decker、Blazar（key trigger/decker/blazar）。前六个 id 仍是原阵容，枚举名沿用旧名
+  （Ultraman=泽塔 … Taro=亚刻），未改名。
+- 关卡新增可选 `heroes`（最多 6 位、按卡片顺序，省略为原六位）。战斗卡片、数字键、合体集结条件、
+  机器人购买顺序（按卡片槽位）都改为按本关阵容。阵容：第四章 z orb trigger geed arc zero；
+  第五章 z orb trigger geed arc decker；终章 z blazar trigger geed arc decker。前三关不变。
+- 新攻击：`Multi`（特利迦，复合型贯穿光线 / 强力型 2.2 倍重击并破甲 / 空中型 0.75 倍快射、冷却 ×0.45，
+  各 3 发轮换，三级空中型 5 发）；`Vortex`（德凯，蓝色光球落点黑洞，把半径内怪兽沿路往回拉 0.55 格，
+  首领只拉 30%，三级半径 ×1.3、拉 0.82 格）；`Spear`（布莱泽，红蓝双螺旋光矛直线贯穿，三级首个命中处爆炸）。
+- `Portraits.cpp` 画了三位的半身像（代码绘制，与其余六位的真人头像风格不同）；`make_avatars.py` 已预留三个 key。
+- 标题页阵容与「出战英雄」列表按英雄数自适应。数据库三位改为已编入。
+- 平衡：乐园 hp 1.88、终章 1.57。casual 19.7 / 19.2 / 18.5 / 17.5 / 16.8 / 13.5（终章 6 局 1 败），expert 全满血。
+- 验证：MSVC Release 编译、`--balance`、`--capture`（30 张含 9 张头像）通过；日志 Loaded 6 levels / 13 ultras，无关卡错误。
+
+未做 / 下一步：
+- 三位新英雄需要真人头像时，把全身抠图放进 `make_avatars.py` 的源目录再生成。
+- 未重打 Android APK；未在真人手上试玩新英雄手感（尤其德凯拉回是否过强）。
+- README 开头“示例不含任何官方图片”的声明与 e83b241 加入的真人头像、怪兽图不符，需用户决定怎么写。
+- 英雄枚举改名（Ultraman→Z 等）与 Data.cpp 怪兽表恢复紧凑格式属于未批准的第 4 项代码整理，未动。
+
+## 工作包：Ultra Guard 启动闪退（2026-10-15）
+
+已完成：
+- 启动在烘焙第四张关卡缩略图时访问冲突（0xC0000005）。日志停在长隆预览的 FBO 创建之后。
+- 原因：写实皮肤默认启用，`Skins::MapGround` 用主题枚举当下标去取地面文件名，数组只有 city / mountain / nebula。park、plaza、studio 读到野指针。
+- 主题名补齐为六项，并在下标越界时跳过。皮肤导出说明里的地面文件名同步改了。
+
+验证：
+- MSVC Release `xmake build ultra_guard` 通过。
+- 直接启动 `ultra_guard.exe`，六张 360×216 缩略图和边距 FBO 都创建成功，进程保持运行。随后已结束该验证进程。
+- 未点进关卡看合体特效。
+
+未做 / 下一步：
+- 本机再开一次，看长隆、乐园、环球画面，以及究极合体的特效和音效。
+- 若终章对人手感仍偏易或偏难，只调 `06_universal.level` 的 hp 和波次。
+
+
+## 工作包：Ultra Guard 难度、数据库与乐园关（2026-10-15）
+
+已完成：
+- 难度改成六关递进。第二章不再在第 5 波放出芝顿，终局只留一只；芝顿基础生命 2600→1500、护盾期间受伤从 15% 提到 42%、瞬移距离缩短；贝利亚 9000→4200、护甲 10→4，召唤更慢。波次血量曲线也放缓。
+- 招式文案按映像常用叫法改写：杰斯提姆光线、欧布圣剑、哉佩利敖光线、破坏爆裂、亚刻终结、赛罗双头镖。爆炸和光线按英雄换色（捷德赤红冲击、亚刻四色光立方、迪迦白金闪光、赛罗绿刃带红边）。
+- `assets/ultras/codex.txt`：奥特曼数据库。六位可上阵，另有初代、赛文、泰罗、戴拿、盖亚、梦比优斯、银河、艾克斯、特利迦、德凯的档案，标题页「奥特数据库」可翻阅。档案还不能直接放置，接入新英雄仍要改 `HeroId`。
+- 关卡页只留缩略图、名字、星级；未解锁为灰色并显示锁，点卡片出击。
+- 新关卡：长隆奇遇（热带栈道）、光之乐园（两条交叉巡游路）、环球影城（三条片场路汇到地球仪）。主题分别是 park / plaza / studio。
+- 究极合体：六位奥特曼都在场上后，右侧按钮或 E 发动。伤害为 max(2600, 68% 最大生命) 且无视护甲，并眩晕 1.5 秒。冷却 52 秒。音效 `fusion.wav`。
+
+验证：
+- MSVC Release `xmake build ultra_guard` 通过。
+- `--balance` 无窗口机器人六关各 3 次全部获胜，剩余生命都是 20，没有漏怪。报告在 `build/ug-balance.txt`（不入库）。
+- 未在本环境打开窗口：GLFW 报无法确定显示器后访问冲突，关卡缩略图、新地图和合体特效没有截图。字体已按新汉字重做子集（870 个码位）。
+
+未做 / 下一步：
+- 本机打开游戏看长隆、乐园、环球的画面，以及究极合体的特效和音效。
+- 若终章对人手感仍偏易或偏难，只调 `06_universal.level` 的 hp 和波次，不要再把芝顿护盾打回 15%。
+- 未构建 Android APK。数据库里未上阵的十位还没有战斗数据。
+
+
+## 工作包：Ultra Guard 真实头像与怪獣贴图（2026-10-14）
+
+用户授权把 `examples/ultra_guard` 的资源替换为真实图片，仅限个人游玩。
+
+已完成：
+- `assets/avatars/*.png`：6 位英雄真人头像，由 `tools/make_avatars.py` 从全身抠图
+  裁剪生成（自动识别头/肩线，头部居中偏上，512→384 平方形透明 PNG）。游戏原生的
+  `avatars/<key>.png` 覆盖机制直接生效，无需改代码。阵容按用户要求改为
+  泽塔(z)、欧布(orb)、迪迦(tiga)、捷德(geed)、亚刻(arc)、赛罗(zero)：
+  只改 `Data.cpp` 的 key 与显示名，技能数值/文案未动；头像源改为对应的新抠图。
+- `assets/skins/real/`：新皮肤"写实怪獣"，`kaiju/` 含 baltan、baltan_clone（baltan
+  蓝紫染色镜像）、gomora、eleking、redking、zetton（芝顿，用户补充要求）、belial
+  （本地抠图）；由 `tools/make_kaiju.py` 从立绘裁剪成紧贴内容边界的静止帧
+  （长边上限 768，eleking/redking 做了通道调色）。缺图自动回退内置绘制。
+- `Skins.cpp::Load`：未存档皮肤名时默认选 `real`，首启即看到真实图片；"经典"仍可选。
+- 换字后必须重跑 `tools/make_font.py`：字体是字符子集（`charset.txt` 驱动），新中文
+  （泽/欧/德/獣）不在表里会变方块。本次已重生成 Medium/Bold（各 718 字形）。
+  `make_font.py` 现支持回退：无 `NotoSansSC-VF.ttf` 时用本机微软雅黑
+  （`msyh.ttc`/`msyhbd.ttc`，先拆出单 face 再子集，跳过 `--weight`），临时文件用完即删。
+- 本地素材站点（pngegg/duitang 等）单只怪獣透明立绘供给很差，多数为拼图或带水印；
+  Alien_Baltan/OriginalBaltan 取自 Ultra 系列维基，redking 取自圆谷官网。
+
+验证：
+- MSVC Release `xmake build ultra_guard` 通过；实机启动约 10 秒无异常关闭，日志
+  （`%LOCALAPPDATA%\raygame.ultra_guard\logs\game.log`）显示 6 个头像与 6 张怪獣
+  贴图全部加载成功，无 Skin/Portrait 报错。
+- Android arm64-v8a Release APK 构建通过：`bin/android/arm64-v8a/release/ultra_guard.apk`
+  （7.2MB，含全部 assets，arm64-v8a 单 so）。
+- 桌面运行需手动同步资源：镜像 `examples/ultra_guard/assets` 到 `bin/assets/ultra_guard`
+  （xmake 的 phony 资源目标不会因源图更新而自动重跑，robocopy /MIR 在本机也偶发不删旧文件，
+  可用 Python 遍历删旧拷新；Android 打包的 before_build 每次都会重新 stage，不受影响）。
+- 切换构建平台后 `xmake build <target>` 只编当前平台：从 Android 配置切回 Windows 必须重跑
+  `xmake f -p windows ...` 再 build，否则 exe 是旧代码（本次踩过：头像 key 改了但 exe 未重编，
+  表现为新头像不加载、回退内置绘制，日志里看不到对应文件）。
+
+未做 / 下一步：
+- 未构建 armeabi-v7a（老设备需要时再构建）；未真机安装验证。
+- `maps/` 真实地面图可后续补充（缺图自动回退，无风险）。
+- 素材为第三方版权形象，仅限个人使用；如需公开分发需替换为原创素材。
+
 
 ## 目标与约束
 
@@ -240,6 +684,45 @@ build 约 **1,086.9 MiB**，包含当前两模式对象/链接符号、Android s
 历史合计约 15.17 MiB，无需为目录体积问题删减引擎能力。
 
 ## 远端工作包：弹道命中记录的地址复用问题（已修复并本地验证）
+## 分支工作包：Ultra Guard 示例（仅在 `example/ultra-guard` 分支，不合入 main）
+
+用户要求把外部塔防游戏作为示例放到独立分支，不推送 main。最初基线 main `d942764`；
+用户要求后已 rebase 到 main `095bbea`（只有本文件冲突，保留双方条目），并同步为外部
+仓库 `9cef57b` 的游戏版本。游戏为奥特曼同人（第三方版权/商标），README 顶部有非官方
+声明；公开仓库的分支同样公开可见，已向用户说明。是否合入 main 由用户另行决定。
+
+- `examples/ultra_guard/`：11 个 .cpp + 头文件（与外部仓库 `9cef57b` 的 src 一致，仅改
+  资源目录为 `bin/assets/ultra_guard/`、数据目录 `raygame.ultra_guard`、日志控制台跟随
+  `RAYGAME_QUIET_EXAMPLE`、Android 包名 `org.raygame.ultraguard`）；assets（字体子集与
+  OFL、WAV 音效与 OGG 音乐、`levels/` 关卡文件、`skins/neon` 示例皮肤）、android/、
+  resources/windows/、tools/（字体/音频/图标/示例皮肤脚本，路径改为相对示例目录、本仓库
+  `scripts/subset-font.py`、`bin/` 与 `build/`）、README（关卡与皮肤说明）。
+- 同步版本新增：文本关卡（`Levels.cpp`，`文件:行号` 报错、关卡页分页、星级按 id 存档）、
+  皮肤（`Skins.*`，调色板/头像/怪兽帧条/地图地面，标题页切换，`--export-skin` 模板、
+  `--skin`）、BGM 改 Ogg Vorbis、留边模糊填充（rebase 后 main 已有 `MarginStyle`，不再删除）。
+  外部仓库独有的 xmake Android 打包（`set_config("ndk_sdkver")`、APK 检查规则）未带入，
+  示例沿用本仓库 `examples/xmake.lua` 与 `scripts/build-android.ps1`。
+- `examples/xmake.lua`：示例名单加入 `ultra_guard`；源码改为 `<name>/*.cpp`（其余七个
+  示例目录都只有 main.cpp，行为不变）；README 随资源复制。`scripts/build-android.ps1`
+  的 -Game 选项与 all 列表加入 `ultra_guard`。`examples/README.md` 加一行。
+
+### 通过的检查
+
+同步版本（rebase 后，独立 worktree）：
+
+- Windows/MSVC x64 Release 全目标构建；454 引擎逻辑、图形 smoke 0 failures；
+  clang-format 47 文件与 `git diff --check` 通过。
+- 示例 `--balance` 报告与外部仓库逐字节一致（9 局胜 8）；`--capture` 经典与 `--skin neon`
+  各 15 张截图正常（含开头的皮肤切换往返）；`--export-skin` 输出 17 个文件；日志确认
+  从 `bin/assets/ultra_guard/` 读取 3 个关卡、neon 皮肤与 OGG 音乐。
+- 示例 `tools/make_font.py` 重新生成的字体与 charset 与外部仓库逐字节一致。
+- `build-android.ps1 -Game ultra_guard` 通过全部 APK 检查（4,100,925 B）。
+
+### 未运行
+
+Debug、Linux/macOS（CI 只在 main 推送/PR 或手动触发时运行）、Android 设备、人工试玩。
+
+## 最近工作包：弹道命中记录的地址复用问题（已修复并本地验证）
 
 基线 `d945ebc`。外部塔防游戏的平衡机器人在同一种子下偶发结果不同。原因：`Projectile`
 用裸 `Collider*` 记录本程已命中的对象；怪兽死亡后新怪兽的碰撞体可能分配在同一地址

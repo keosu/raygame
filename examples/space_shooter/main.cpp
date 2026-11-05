@@ -272,6 +272,7 @@ public:
     float enemySpawnTimer = 0;
     float enemySpawnRate = 2.0f;
     int score = 0;
+    float lostTime = 0; // real seconds since the ship was lost, for the result panel's entrance
     bool restartRequested = false;
     
     SpaceShooterScene() : Scene("Space Shooter") {}
@@ -348,6 +349,7 @@ public:
         Scene::Update();
         
         if (!player || player->IsDestroyed()) {
+            lostTime += GameTime::UnscaledDeltaTime();
             if (restartRequested || Input::GetKeyDown(KEY_R)) Restart();
             return;
         }
@@ -421,7 +423,9 @@ public:
         ExampleUI::Stat(ExampleUI::Width() - 32, "SCORE", TextFormat("%06d", score));
         ExampleUI::Footer(ExampleUI::Width(), ExampleUI::Height(), "WASD / ARROWS  MOVE     SPACE  FIRE", "DRAG TO MOVE / AUTO FIRE");
         if (!player || !player->active) {
-            if (ExampleUI::Result(ExampleUI::Width(), ExampleUI::Height(), "SECTOR LOST", score)) restartRequested = true;
+            if (ExampleUI::Result(ExampleUI::Width(), ExampleUI::Height(), "SECTOR LOST", score, false,
+                                  ExampleUI::ResultAppear(lostTime, 0.8f)))
+                restartRequested = true;
         }
     }
 
@@ -429,6 +433,7 @@ public:
         OnUnload();
         Clear();
         score = 0;
+        lostTime = 0;
         enemySpawnTimer = 0;
         enemySpawnRate = 2.0f;
         restartRequested = false;

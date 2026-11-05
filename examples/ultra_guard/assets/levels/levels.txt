@@ -1,0 +1,14 @@
+# 关卡顺序（一行一个文件名，位于本目录）。新增关卡：复制一个 .level 文件，修改后加到这里。
+# Android 无法列出 APK 内目录，所以用这个索引文件而不是自动扫描。
+01_tokyo.level
+02_fuji.level
+03_nebula.level
+04_chimelong.level
+05_ultrapark.level
+06_universal.level
+07_island.level
+08_canyon.level
+09_crater.level
+10_moonbase.level
+11_tranquility.level
+12_landoflight.level

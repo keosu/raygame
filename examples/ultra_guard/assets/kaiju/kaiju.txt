@@ -1,0 +1,20 @@
+# 内置怪兽贴图（UTF-8）。kaiju/<怪兽>.png 由 tools/make_kaiju.py 从写实立绘生成：紧贴内容边界的静止帧。
+# frames 帧数（静止帧为 1，上下浮动）；fps 播放速度；size 为 1 倍缩放时的绘制高度（画布像素）；
+# feet 是脚底在图片高度中的位置（1 = 贴图片底边）。皮肤里的同名设置会覆盖这里。
+kaiju baltan       frames 1 fps 1 size 48 feet 1
+kaiju baltan_clone frames 1 fps 1 size 48 feet 1
+kaiju gomora       frames 1 fps 1 size 48 feet 1
+kaiju eleking      frames 1 fps 1 size 48 feet 1
+kaiju redking      frames 1 fps 1 size 54 feet 1
+kaiju zetton       frames 1 fps 1 size 62 feet 1
+kaiju belial       frames 1 fps 1 size 66 feet 1
+kaiju kingjoe      frames 1 fps 1 size 54 feet 1
+kaiju metron       frames 1 fps 1 size 50 feet 1
+kaiju tregear      frames 1 fps 1 size 70 feet 1
+kaiju gatanothor   frames 1 fps 1 size 66 feet 1
+kaiju bemstar      frames 1 fps 1 size 54 feet 1
+kaiju gabora       frames 1 fps 1 size 46 feet 1
+kaiju golza        frames 1 fps 1 size 56 feet 1
+kaiju dada         frames 1 fps 1 size 52 feet 1
+kaiju kingpandon   frames 1 fps 1 size 58 feet 1
+kaiju zagi         frames 1 fps 1 size 68 feet 1

@@ -30,16 +30,17 @@ inline int Game::Smoke() {
     SetTargetFPS(0);
     check(BallTextures[0] && BallTextures[4] && BallShadow, "filtered marble assets loaded");
     check(screen == Campaign::Screen::Menu, "starts in menu");
-    Click({640, 508}, true);
+    ClickButton(3, true);
     check(screen == Campaign::Screen::Help, "touch opens instructions");
     Capture("help");
     Click({640, 624});
-    Click({640, 442});
+    ClickButton(2);
     check(screen == Campaign::Screen::Levels, "level selection");
-    Click({640, 401});
+    Capture("levels");
+    ClickButton(21);
     check(screen == Campaign::Screen::Levels, "locked level cannot start");
-    Click({640, 584});
-    Click({640, 376}, true);
+    ClickButton(5);
+    ClickButton(1, true);
     check(screen == Campaign::Screen::Play && model.stage == 0, "start adventure");
     check(HudVisible(), "top HUD is fully visible after starting");
     CheckPauseSettings(check);
@@ -71,6 +72,30 @@ inline int Game::Smoke() {
     for (int i = 0; i < 60; ++i)
         Step();
     Capture("courtyard");
+    {
+        // An inserted marble glides in from the impact; the balls ahead slide instead of jumping.
+        size_t hit = model.balls.size() / 2;
+        int color = 0;
+        while (color == model.balls[hit - 1].color || color == model.balls[hit].color ||
+               color == model.balls[hit + 1].color)
+            ++color;
+        auto impact = model.path.At(model.balls[hit].distance);
+        model.Insert(hit, color, {impact.x + 40, impact.y - 40});
+        auto gliding = [&] {
+            return std::any_of(model.balls.begin(), model.balls.end(), [](const Ball& b) { return b.settle < 1; });
+        };
+        Step();
+        check(model.balls[0].lag > 1 && gliding(), "insertion animates the chain");
+        Capture("insert-glide");
+        for (int i = 0; i < 40; ++i)
+            Step();
+        check(model.balls[0].lag == 0 && !gliding(), "insertion settles");
+        model.Erase(0, 3, true);
+        for (int i = 0; i < 10; ++i)
+            Step();
+        check(!model.popups.empty(), "cleared group shows its points");
+        Capture("clear-popup");
+    }
     float elapsed = model.elapsed;
     Click({1090, 49}, true);
     for (int i = 0; i < 20; ++i)
@@ -78,7 +103,7 @@ inline int Game::Smoke() {
     check(screen == Campaign::Screen::Pause && model.elapsed - elapsed < 0.08f,
           "pause freezes fixed simulation");
     Capture("pause");
-    Click({640, 418});
+    ClickButton(6);
     int shotsBeforeFocus = model.shotsFired;
     held.touchCount = 1;
     held.touches[0] = {11, target};
@@ -89,7 +114,7 @@ inline int Game::Smoke() {
     check(screen == Campaign::Screen::Pause, "focus loss pauses");
     Step();
     check(model.shotsFired == shotsBeforeFocus, "focus loss cancels held shot");
-    Click({640, 418});
+    ClickButton(6);
     // Fixtures exercise the full result/menu transitions; normal-command campaigns are in
     // campaign_tests.
     for (int stage = 0; stage < 3; ++stage) {
@@ -109,14 +134,14 @@ inline int Game::Smoke() {
         check(screen == Campaign::Screen::Won && unlocked >= std::min(3, stage + 2),
               "victory unlocks and saves");
         Capture(stage == 2 ? "campaign-complete" : "victory");
-        Click({640, 418});
+        ClickButton(6);
         check(screen == Campaign::Screen::Play, "next level or replay through result button");
     }
     model.balls.front().distance = model.path.length;
     Step();
     check(screen == Campaign::Screen::Lost, "gate breach loses");
     Capture("defeat");
-    Click({530, 482});
+    ClickButton(7);
     check(screen == Campaign::Screen::Play && model.outcome == 0, "restart after defeat");
     for (auto size : {Vector2{1024, 768}, {1600, 720}, {720, 1000}}) {
         SetWindowSize(static_cast<int>(size.x), static_cast<int>(size.y));
@@ -126,12 +151,12 @@ inline int Game::Smoke() {
         Click({1090, 49}, true);
         check(screen == Campaign::Screen::Pause, "adaptive touch hit boxes");
         Capture(TextFormat("layout-%dx%d", static_cast<int>(size.x), static_cast<int>(size.y)));
-        Click({640, 418}, true);
+        ClickButton(6, true);
         SetScreen(Campaign::Screen::Menu);
         Step();
         Capture(TextFormat("menu-%dx%d", static_cast<int>(size.x), static_cast<int>(size.y)));
         check(MenuPanelVisible(), "menu renders at its adaptive logical position");
-        Click({640, 376}, true);
+        ClickButton(1, true);
         check(screen == Campaign::Screen::Play, "responsive menu touch mapping");
     }
     SaveSystem saved;

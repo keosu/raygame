@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core.h"
+#include "Automation.h"
 #include "Scene.h"
 #include "GameTime.h"
 #include "Input.h"
@@ -46,6 +47,7 @@ public:
             SetConfigFlags(FLAG_FULLSCREEN_MODE);
             InitWindow(0, 0, windowTitle.c_str()); // Let Android supply the real surface size.
 #else
+            if (Automation::HiddenWindow()) SetConfigFlags(FLAG_WINDOW_HIDDEN);
             InitWindow(screenWidth, screenHeight, windowTitle.c_str());
 #endif
             if (!IsWindowReady()) throw std::runtime_error("Cannot initialize the game window");
@@ -299,6 +301,10 @@ private:
     }
 
     void Update() {
+        {
+            ScopeActivation scope(GetCallbackScope());
+            Automation::BeginFrame(); // scripted input must be queued before capture
+        }
         Input::CaptureFrame();
         RefreshWindowTheme();
 #if defined(__ANDROID__)

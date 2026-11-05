@@ -27,11 +27,11 @@ inline int Game::Smoke() {
     chinese = true;
     ApplySettings();
     SetTargetFPS(0);
-    Click({640, 508}, true);
+    ClickButton(3, true);
     check(screen == Campaign::Screen::Help, "instructions via touch");
     Capture("help");
     Click({640, 624});
-    Click({640, 376}, true);
+    ClickButton(1, true);
     check(screen == Campaign::Screen::Play, "start adventure");
     check(HudVisible(), "top HUD is fully visible after starting");
     CheckPauseSettings(check);
@@ -99,10 +99,31 @@ inline int Game::Smoke() {
     Click({458, 140});
     Click(Center(2, 2));
     check(model.PlantAt(2, 2) >= 0, "peashooter placed");
+    Capture("plant-pop");
     model.suns.push_back({100, {985, 420}});
     int sun = model.sun;
     Click({985, 420}, true);
     check(model.sun == sun + 25, "real sun token collection");
+    check(flights.size() == 1, "collected sun flies toward the counter");
+    for (int i = 0; i < 12; ++i)
+        Step();
+    Capture("sun-flight");
+    for (int i = 0; i < 22 && !flights.empty(); ++i)
+        Step();
+    check(flights.empty() && counterPulse > 0.8f, "sun lands on the counter and pulses it");
+    Step();
+    Capture("sun-landed");
+    model.suns.push_back({101, {700, 420}, 0, {700, Top - 130}, 3});
+    for (int i = 0; i < 12; ++i)
+        Step();
+    Vector2 overHud = model.suns.back().At();
+    check(overHud.y > 100 && overHud.y < 186 && Hit(overHud) == 100,
+          "a sun over the seed packets is drawn and grabbed above them");
+    Capture("sun-over-hud");
+    for (int i = 0; i < 48; ++i)
+        Step();
+    check(model.suns.back().At().y < 420 - 50, "sky sun drifts down before resting");
+    Capture("sky-sun");
     Click({1180, 140});
     Click(Center(0, 0));
     check(model.PlantAt(0, 0) < 0, "shovel removes plant");
@@ -119,7 +140,7 @@ inline int Game::Smoke() {
     Step();
     check(screen == Campaign::Screen::Pause && model.PlantAt(1, 0) < 0,
           "focus loss cancels held planting touch");
-    Click({640, 418});
+    ClickButton(6);
     for (int i = 0; i < 180; ++i)
         Step();
     Capture("garden");
@@ -130,13 +151,13 @@ inline int Game::Smoke() {
     check(screen == Campaign::Screen::Pause && model.elapsed - elapsed < 0.08f,
           "pause freezes waves");
     Capture("pause");
-    Click({640, 418});
+    ClickButton(6);
     InputFrame focus;
     focus.focused = false;
     Step(focus);
     check(screen == Campaign::Screen::Pause, "focus loss pauses");
     Step();
-    Click({640, 418});
+    ClickButton(6);
     for (int stage = 0; stage < 3; ++stage) {
         Begin(stage);
         Step();
@@ -161,14 +182,14 @@ inline int Game::Smoke() {
         check(screen == Campaign::Screen::Won && unlocked >= std::min(3, stage + 2),
               "victory unlock/save");
         Capture(stage == 2 ? "campaign-complete" : "victory");
-        Click({640, 418});
+        ClickButton(6);
     }
     model.mowerReady[0] = false;
     model.SpawnZombie(0, 0, Left - 50);
     Step();
     check(screen == Campaign::Screen::Lost, "second breach loses");
     Capture("defeat");
-    Click({530, 482});
+    ClickButton(7);
     check(screen == Campaign::Screen::Play && model.outcome == 0 && model.mowerReady[0],
           "retry resets lane defence");
     for (auto size : {Vector2{1024, 768}, {1600, 720}, {720, 1000}}) {
@@ -179,12 +200,12 @@ inline int Game::Smoke() {
         Click({1090, 49}, true);
         check(screen == Campaign::Screen::Pause, "adaptive touch navigation");
         Capture(TextFormat("layout-%dx%d", static_cast<int>(size.x), static_cast<int>(size.y)));
-        Click({640, 418}, true);
+        ClickButton(6, true);
         SetScreen(Campaign::Screen::Menu);
         Step();
         Capture(TextFormat("menu-%dx%d", static_cast<int>(size.x), static_cast<int>(size.y)));
         check(MenuPanelVisible(), "menu renders at its adaptive logical position");
-        Click({640, 376}, true);
+        ClickButton(1, true);
         check(screen == Campaign::Screen::Play, "responsive menu touch mapping");
     }
     SaveSystem saved;

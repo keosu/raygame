@@ -9,6 +9,14 @@ inline constexpr float LinkRange = 155, Radius = 15;
 struct Node {
     Body2D body;
     bool anchor = false, alive = true;
+    float age = 0;
+};
+// Short-lived feedback the renderer draws; it has no effect on the simulation.
+enum class Effect { Snap, Rescue, Splash, Recycle };
+struct Burst {
+    Effect kind;
+    Vector2 position;
+    float age = 0;
 };
 struct Link {
     int a, b;
@@ -62,6 +70,7 @@ public:
     std::vector<Node> nodes;
     std::vector<Link> links;
     std::vector<Traveler> travelers;
+    std::vector<Burst> bursts;
     int reserve = 0, waiting = 0, rescued = 0, lost = 0, placed = 0, broken = 0, outcome = 0;
     float elapsed = 0, launchClock = 0, readyTime = 0;
     bool sending = false;
@@ -78,6 +87,7 @@ public:
         nodes.clear();
         links.clear();
         travelers.clear();
+        bursts.clear();
         level = Stage(std::clamp(stage, 0, 2));
         reserve = level.budget;
         waiting = level.seeds;
@@ -206,6 +216,8 @@ public:
             return false;
         if (dragged == node)
             EndDrag();
+        Vector2 at = Pos(node);
+        bursts.push_back({at.y > 660 ? Effect::Splash : Effect::Recycle, at});
         world.Destroy(nodes[node].body);
         nodes[node].alive = false;
         links.erase(std::remove_if(links.begin(), links.end(),
@@ -297,6 +309,12 @@ public:
         if (outcome)
             return;
         elapsed += dt;
+        for (auto& n : nodes)
+            n.age += dt;
+        for (auto& b : bursts)
+            b.age += dt;
+        bursts.erase(std::remove_if(bursts.begin(), bursts.end(), [](const Burst& b) { return b.age > 0.8f; }),
+                     bursts.end());
         for (auto it = links.begin(); it != links.end();) {
             float extension = std::fabs(Distance(Pos(it->a), Pos(it->b)) / it->rest - 1);
             float force = world.JointForce(it->joint);
@@ -304,6 +322,7 @@ public:
             it->overload =
                 it->stress > 1 ? it->overload + dt : std::max(0.0f, it->overload - dt * 2);
             if (it->overload > 0.28f) {
+                bursts.push_back({Effect::Snap, RayGame::Lerp(Pos(it->a), Pos(it->b), 0.5f)});
                 world.Destroy(it->joint);
                 it = links.erase(it);
                 ++broken;
@@ -331,6 +350,8 @@ public:
             if (t.falling) {
                 t.position = world.Position(t.falling);
                 if (t.position.y > 665 || elapsed > 240) {
+                    if (t.position.y > 665)
+                        bursts.push_back({Effect::Splash, t.position});
                     world.Destroy(t.falling);
                     t.done = true;
                     ++lost;
@@ -350,6 +371,7 @@ public:
                 if (route.size() == 1) {
                     t.done = true;
                     ++rescued;
+                    bursts.push_back({Effect::Rescue, level.exit});
                     continue;
                 }
                 if (route.empty())

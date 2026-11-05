@@ -54,6 +54,46 @@ public:
                          {"Across the Quiet Brook", "Up to the Lantern", "The Windmill Pass"},
                          std::move(directory)) {
         hint = "Build triangles. Keep the bridge steady before sending the lights.";
+        accent = Mint;
+    }
+    void DrawEmblem(Vector2 c, float time) override {
+        DrawCircleV({c.x + 38, c.y - 34}, 22 + std::sin(time * 2) * 2, Fade(Gold, 0.3f));
+        DrawCircleV({c.x + 38, c.y - 34}, 10, Gold);
+        Vector2 nodes[] = {{c.x - 34, c.y + 26}, {c.x + 30, c.y + 26}, {c.x - 2, c.y - 26}};
+        for (int i = 0; i < 3; ++i) {
+            DrawLineEx(nodes[i], nodes[(i + 1) % 3], 12, Dark);
+            DrawLineEx(nodes[i], nodes[(i + 1) % 3], 7, {136, 205, 146, 255});
+        }
+        for (auto p : nodes)
+            Ball(p, 17, time, Mint);
+    }
+    void DrawLevelArt(int stage, Rectangle area, float time) override {
+        DrawRectangleGradientV(static_cast<int>(area.x), static_cast<int>(area.y), static_cast<int>(area.width),
+                               static_cast<int>(area.height), {127, 184, 183, 255}, {231, 230, 181, 255});
+        DrawCircleV({area.x + area.width - 50, area.y + 50}, 28, {255, 241, 193, 255});
+        float ground = area.y + area.height - 40;
+        DrawEllipse(static_cast<int>(area.x + 60), static_cast<int>(ground + 30), 120, 50, {92, 148, 139, 255});
+        DrawEllipse(static_cast<int>(area.x + area.width - 30), static_cast<int>(ground + 34), 140, 56,
+                    {74, 127, 124, 255});
+        // A small structure in the shape the stage asks for: bridge, tower, then a long span.
+        std::vector<Vector2> pts;
+        if (stage == 1)
+            pts = {{area.x + 100, ground}, {area.x + 150, ground}, {area.x + 125, ground - 45},
+                   {area.x + 160, ground - 85}, {area.x + 120, ground - 120}};
+        else
+            for (int i = 0; i < 5; ++i)
+                pts.push_back({area.x + 40 + i * (stage == 2 ? 46.0f : 40.0f), ground - 30 - (i % 2) * 34.0f});
+        for (size_t i = 0; i + 1 < pts.size(); ++i) {
+            DrawLineEx(pts[i], pts[i + 1], 7, Dark);
+            if (i + 2 < pts.size())
+                DrawLineEx(pts[i], pts[i + 2], 7, Dark);
+        }
+        for (auto p : pts)
+            Ball(p, 11, time, Mint);
+        Vector2 lantern = stage == 1 ? Vector2{area.x + 120, ground - 150}
+                                     : Vector2{area.x + area.width - 40, ground - 70};
+        DrawCircleV(lantern, 18, Fade(Gold, 0.3f));
+        DrawRectangleRounded({lantern.x - 9, lantern.y - 12, 18, 24}, 0.3f, 6, Gold);
     }
     Model& M() {
         return arena->model;
@@ -291,7 +331,9 @@ inline void World::Render() {
                 DrawLineEx({p.x - 24, p.y + 23}, {p.x + 24, p.y + 23}, 3, Fade(Gold, 0.6f));
             } else {
                 Vector2 look = Vector2Normalize(Vector2Subtract(game->aim, p));
-                Ball(p, Radius + (model.dragged == i ? 2 : 0), t, Mint, look);
+                float grow = std::clamp(model.nodes[i].age / 0.25f, 0.0f, 1.0f) - 1; // pops in when placed
+                grow = 1 + 2.70158f * grow * grow * grow + 1.70158f * grow * grow;
+                Ball(p, (Radius + (model.dragged == i ? 2 : 0)) * grow, t, Mint, look);
             }
         }
     for (const auto& traveler : model.travelers)
@@ -301,6 +343,36 @@ inline void World::Render() {
             DrawCircleV(p, 17, Fade(Gold, 0.2f));
             Ball(p, 8, t, Gold);
         }
+    for (const auto& b : model.bursts) {
+        float k = b.age / 0.8f, fade = 1 - k;
+        Vector2 c = b.position;
+        if (b.kind == Effect::Snap) {
+            for (int i = 0; i < 8; ++i) {
+                float a = i * PI / 4 + 0.4f, d = 6 + k * 46;
+                Vector2 s{c.x + std::cos(a) * d, c.y + std::sin(a) * d + k * k * 30};
+                DrawLineEx(s, {s.x - std::cos(a) * 7, s.y - std::sin(a) * 7}, 3, Fade({248, 126, 84, 255}, fade));
+            }
+            DrawCircleV(c, 10 * fade, Fade({255, 214, 150, 255}, fade));
+        } else if (b.kind == Effect::Rescue) {
+            DrawCircleV(c, 30 + k * 60, Fade(Gold, 0.35f * fade));
+            DrawRing(c, 26 + k * 70, 30 + k * 70, 0, 360, 64, Fade({255, 246, 211, 255}, fade));
+            for (int i = 0; i < 10; ++i) {
+                float a = i * PI / 5 + k * 2;
+                DrawCircleV({c.x + std::cos(a) * (20 + k * 80), c.y + std::sin(a) * (20 + k * 80)}, 3 * fade + 1,
+                            Fade(Gold, fade));
+            }
+        } else if (b.kind == Effect::Splash) {
+            for (int i = 0; i < 7; ++i) {
+                float spread = (i - 3) * 9.0f, up = 70 * k - 110 * k * k;
+                DrawCircleV({c.x + spread * (1 + k * 2), std::min(670.0f, c.y - up * (1 - std::fabs(i - 3.0f) / 5))},
+                            4 * fade + 1, Fade({196, 235, 230, 255}, fade));
+            }
+            DrawEllipseLines(static_cast<int>(c.x), 668, 12 + k * 40, 3 + k * 6, Fade({196, 235, 230, 255}, fade));
+        } else {
+            DrawRing(c, Radius * (1 - k) - 2, Radius * (1 - k) + 2, 0, 360, 48, Fade(Mint, fade));
+            DrawCircleV(c, 6 * fade, Fade({255, 249, 221, 255}, fade));
+        }
+    }
     if (game->screen == Campaign::Screen::Play) {
         Vector2 p = game->placing ? game->preview : game->aim;
         if (!game->removeMode && model.dragged < 0 && p.y > 185 && p.y < 615 && model.Pick(p) < 0) {

@@ -1,0 +1,20 @@
+# 示例皮肤：由 tools/make_sample_skin.py 根据内置画面生成。格式说明见 --export-skin 导出的 skin.txt。
+name 霓虹夜
+
+color gold      120 236 255 255
+color cyan      255 120 220 255
+color timer     255 120 220 255
+color muted     160 150 210 255
+color line      150  90 200 150
+color green     120 255 190 255
+
+kaiju baltan       frames 12 fps 12 size 80 feet 0.94
+kaiju baltan_clone frames 12 fps 12 size 80 feet 0.94
+kaiju belial       frames 12 fps 12 size 80 feet 0.94
+kaiju eleking      frames 12 fps 12 size 80 feet 0.94
+kaiju gomora       frames 12 fps 12 size 80 feet 0.94
+kaiju redking      frames 12 fps 12 size 80 feet 0.94
+kaiju zetton       frames 12 fps 12 size 80 feet 0.94
+
+map_paths on
+map_decor on

@@ -1,5 +1,11 @@
 # Shared campaign interface, merged into each game's own catalog by prepare-campaign-fonts.py.
 ADVENTURE COMPLETE	旅程完成
+ADVENTURE PROGRESS	冒险进度
+CLEARED	已通关
+NEW RECORD!	新纪录！
+Not played yet	尚未挑战
+READY	可挑战
+UP / DOWN  SELECT     ENTER  CONFIRM	↑ ↓ 选择    Enter 确认
 BACK	返回
 BEST	最高分
 CHOOSE A LEVEL	选择关卡

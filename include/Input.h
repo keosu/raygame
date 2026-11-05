@@ -3,6 +3,7 @@
 #include "Core.h"
 #include "Display.h"
 #include <array>
+#include <functional>
 
 namespace RayGame {
 
@@ -31,7 +32,11 @@ struct InputFrame {
 
 class RAYGAME_API Input {
 public:
-    static void CaptureFrame();
+    static void CaptureFrame();                // polls the devices, then commits like the overload
+    static void CaptureFrame(InputFrame raw);  // passes a device frame through the capture filter
+    // Edits every captured frame before it is committed, e.g. to layer scripted input over the
+    // devices. SetFrame bypasses it. One filter at a time; an empty function removes it.
+    static void SetCaptureFilter(std::function<void(InputFrame&)> filter) { captureFilter = std::move(filter); }
     static void SetFrame(const InputFrame& value);
     static const InputFrame& GetFrame() { return inFixedTick ? fixedFrame : frame; }
     static void Reset(); // Preserves action bindings and configured deadzone.
@@ -138,6 +143,7 @@ private:
     struct ActionBinding { std::vector<int> keys; std::vector<int> buttons; };
     static inline std::unordered_map<std::string, ActionBinding> actions;
     static inline float deadzone = 0.2f;
+    static inline std::function<void(InputFrame&)> captureFilter;
 };
 
 }

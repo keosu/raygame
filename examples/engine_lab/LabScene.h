@@ -239,16 +239,7 @@ public:
     void Render() override {
         if (!ready)
             return;
-        auto canvas = Display::GetCanvasTexture();
-        float sx = canvas.width / Display::GetWidth(), sy = canvas.height / Display::GetHeight();
-        BeginScissorMode(static_cast<int>(viewport.x * sx), static_cast<int>(viewport.y * sy),
-                         static_cast<int>(viewport.width * sx),
-                         static_cast<int>(viewport.height * sy));
-        struct Clip {
-            ~Clip() {
-                EndScissorMode();
-            }
-        } clip;
+        Display::ClipScope clip(viewport);
         camera->Begin();
         for (int x = -400; x <= 400; x += 40)
             DrawLine(x, -210, x, 210, {25, 42, 55, 255});

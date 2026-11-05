@@ -19,11 +19,11 @@ inline int Game::Smoke() {
     Step();
     CheckStartup(check);
     CheckSettings(check);
-    Click({640, 508}, true);
+    ClickButton(3, true);
     check(screen == Campaign::Screen::Help, "touch opens instructions");
     Capture("help");
     Click({640, 624});
-    Click({640, 376}, true);
+    ClickButton(1, true);
     check(screen == Campaign::Screen::Play, "start adventure through menu");
     CheckPauseSettings(check);
     auto dragGesture = [&](Vector2 from, Vector2 to, bool touch, bool cancel) {
@@ -68,7 +68,7 @@ inline int Game::Smoke() {
     dragGesture({130, 670}, {470, 550}, true, true);
     check(screen == Campaign::Screen::Pause && M().reserve == budget && !placing,
           "focus loss cancels placement and pauses");
-    Click({640, 418});
+    ClickButton(6);
     Click({345, 670});
     Click(M().Pos(5));
     check(!M().nodes[5].alive && M().reserve == budget + 1,
@@ -119,7 +119,7 @@ inline int Game::Smoke() {
     Step();
     check(screen == Campaign::Screen::Lost, "dusk deadline produces a loss");
     Capture("defeat");
-    Click({530, 482});
+    ClickButton(7);
     check(screen == Campaign::Screen::Play && M().elapsed < 0.1f,
           "retry starts a fresh simulation");
     for (auto size : {Vector2{1024, 768}, {1600, 720}, {720, 1000}}) {
@@ -130,7 +130,7 @@ inline int Game::Smoke() {
         Capture(TextFormat("layout-%dx%d", static_cast<int>(size.x), static_cast<int>(size.y)));
         Click({1090, 49}, true);
         check(screen == Campaign::Screen::Pause, "adaptive touch pause mapping");
-        Click({640, 418}, true);
+        ClickButton(6, true);
     }
     Save();
     Shutdown();

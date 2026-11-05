@@ -9,7 +9,7 @@ task("android")
         description = "Build and verify Android APKs without changing the desktop configuration.",
         options = {
             {"m", "mode", "kv", "release", "Build mode: debug or release."},
-            {"g", "game", "kv", "all", "Example target, or all nine games."},
+            {"g", "game", "kv", "all", "Example target, or all ten games."},
             {"j", "jobs", "kv", "4", "Parallel compiler jobs."},
             {nil, "sdk", "kv", nil, "Android SDK directory."},
             {nil, "ndk", "kv", nil, "Android NDK directory (auto-detected by default)."},

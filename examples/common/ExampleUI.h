@@ -137,10 +137,20 @@ inline void Footer(float width, float height, const std::string& controls,
 #endif
 }
 
-inline bool Result(float width, float height, const std::string& title, int score, bool victory = false) {
+// How far the result panel has appeared, `seconds` after the round ended: the last explosion
+// plays out for `delay` seconds, then the panel eases in.
+inline float ResultAppear(float seconds, float delay = 0.7f) {
+    return Clamp((seconds - delay) / 0.35f, 0.0f, 1.0f);
+}
+
+// `appear` (0..1) fades the backdrop and slides the panel in; the button only clicks once shown.
+inline bool Result(float width, float height, const std::string& title, int score, bool victory = false,
+                   float appear = 1) {
     using RayGame::UI;
-    DrawRectangle(0, 0, (int)width, (int)height, {4, 7, 16, 200});
-    float x = width / 2 - 220, y = height / 2 - 130;
+    if (appear <= 0) return false;
+    float ease = 1 - (1 - appear) * (1 - appear);
+    DrawRectangle(0, 0, (int)width, (int)height, {4, 7, 16, (unsigned char)(200 * ease)});
+    float x = width / 2 - 220, y = height / 2 - 130 + 36 * (1 - ease);
     UI::Panel({x, y, 440, 260}, {12, 19, 34, 250});
     Color accent = victory ? Color{123, 238, 174, 255} : pink;
     DrawRectangleRounded({x + 170, y, 100, 3}, 1, 8, accent);
@@ -148,10 +158,11 @@ inline bool Result(float width, float height, const std::string& title, int scor
     UI::TitleCentered(width / 2, y + 51, title, 52, accent);
     UI::LabelCentered(width / 2, y + 120, TextFormat("FINAL SCORE   %06d", score), 24);
 #if defined(__ANDROID__)
-    return UI::Button({x + 96, y + 186, 248, 44}, "PLAY AGAIN", 20);
+    bool clicked = UI::Button({x + 96, y + 186, 248, 44}, "PLAY AGAIN", 20);
 #else
-    return UI::Button({x + 96, y + 186, 248, 44}, "PLAY AGAIN  /  R", 20);
+    bool clicked = UI::Button({x + 96, y + 186, 248, 44}, "PLAY AGAIN  /  R", 20);
 #endif
+    return clicked && appear >= 1;
 }
 
 }

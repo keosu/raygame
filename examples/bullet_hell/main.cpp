@@ -202,6 +202,7 @@ public:
     BulletField* playerField = nullptr;
     int score = 0;
     bool gameOver = false;
+    float overTime = 0; // real seconds since the round ended, for the result panel's entrance
     bool won = false;
     bool restartRequested = false;
     float shake = 0;
@@ -329,6 +330,8 @@ public:
         if (!gameOver)
             Scene::Update();
 
+        if (gameOver)
+            overTime += GameTime::UnscaledDeltaTime();
         if (gameOver && (restartRequested || Input::GetKeyDown(KEY_R)))
             Restart();
     }
@@ -360,6 +363,7 @@ public:
         score = 0;
         shake = 0;
         gameOver = false;
+        overTime = 0;
         won = false;
         restartRequested = false;
         Load();
@@ -428,7 +432,8 @@ public:
         if (!started)
             DrawBriefing();
         if (gameOver && ExampleUI::Result(ExampleUI::Width(), ExampleUI::Height(),
-                                          won ? "VICTORY" : "DEFEATED", score, won)) {
+                                          won ? "VICTORY" : "DEFEATED", score, won,
+                                          ExampleUI::ResultAppear(overTime, 0.6f))) {
             restartRequested = true;
         }
     }

@@ -1,0 +1,28 @@
+# 格式说明见 01_tokyo.level
+id       fuji
+name     富士山麓
+subtitle 守护地球篇 · 群山回廊
+arc      守护地球篇
+desc     山道反复折返。先用穿透和爆炸卡住拐角，首领只会在最后出现一只。
+theme    mountain
+gold     420
+lives    20
+hp       2.18
+seed     1967
+base     18 7
+path     -1,9 3,9 3,2 7,2 7,9 11,9 11,2 15,2 15,7 18,7
+
+wave     gomora x6 every 1.4
+wave     gomora x5 every 1.2 | baltan x4 every 1.1 after 3
+wave     baltan x8 every 1.0
+wave     gomora x6 every 1.1 | eleking x4 every 0.95 after 4
+wave     redking x1 every 2.8 | gomora x6 every 1.05 after 2
+wave     eleking x8 every 0.75
+wave     baltan x8 every 0.85 | redking x2 every 2.6 after 3
+wave     gomora x8 every 0.95 | eleking x5 every 0.8 after 4
+wave     redking x3 every 2.2 | baltan x8 every 0.8 after 2
+wave     eleking x10 every 0.7 | gomora x6 every 0.9 after 3
+wave     redking x3 every 2 | eleking x6 every 0.75 after 3
+wave     gomora x10 every 0.8 | baltan x8 every 0.7 after 3
+wave     eleking x12 every 0.65 | redking x2 every 2.2 after 4
+wave     zetton x1 | gomora x6 every 1.1 after 2 | eleking x5 every 0.85 after 5
