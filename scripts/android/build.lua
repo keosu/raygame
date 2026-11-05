@@ -3,7 +3,7 @@ import("verify")
 
 function main(opt)
     local games = {"space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "forge_runner",
-                   "engine_lab", "marble_temple", "garden_guard", "goo_journey", "ultra_guard"}
+                   "engine_lab", "marble_temple", "garden_guard", "goo_journey", "ultra_guard", "ultra_quest"}
     local mode, game = opt.mode or "release", opt.game or "all"
     local jobs = tonumber(opt.jobs or "4")
     assert(mode == "debug" or mode == "release", "Mode must be debug or release")

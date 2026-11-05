@@ -10,7 +10,7 @@ option("example_console")
     set_description("Enable the Windows console and raylib logs for examples")
 option_end()
 
-local example_names = {"space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "engine_lab", "marble_temple", "garden_guard", "ultra_guard"}
+local example_names = {"space_shooter", "bouncing_balls", "neon_breakout", "bullet_hell", "engine_lab", "marble_temple", "garden_guard", "ultra_guard", "ultra_quest"}
 if has_config("physics_box2d") then table.insert(example_names, "goo_journey") end
 local examples_root = os.scriptdir()
 
@@ -53,7 +53,7 @@ if not is_plat("android") and (has_config("build_examples") or has_config("build
                 for _, dir in ipairs({desktop_dir, path.join(os.projectdir(), "bin")}) do
                     copy_assets(path.join(examples_root, name, "assets"), path.join(dir, "assets", name), os, io)
                 end
-                if name == "engine_lab" or name == "marble_temple" or name == "garden_guard" or name == "goo_journey" or name == "ultra_guard"  then
+                if name == "engine_lab" or name == "marble_temple" or name == "garden_guard" or name == "goo_journey" or name == "ultra_guard" or name == "ultra_quest" then
                     os.cp(path.join(examples_root, name, "README.md"), path.join(os.projectdir(), "bin", name .. "-README.md"))
                 end
             end)
