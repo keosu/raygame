@@ -8,7 +8,7 @@ namespace UQ {
 // them in (the fight uses world units, the street uses street pixels); Draw takes a mapping.
 class Fx {
 public:
-    enum class Kind { Spark, Dust, Debris, Ring, Flash, Ember, Text, Streak };
+    enum class Kind { Spark, Dust, Debris, Ring, Flash, Ember, Text, Streak, Burst };
     struct Particle {
         Kind kind;
         Vector2 p, v;
@@ -28,6 +28,11 @@ public:
     void Embers(Vector2 at, int count, Color color);
     void Streak(Vector2 at, Vector2 velocity, float length, Color color, float life = 0.18f);
     void Text(Vector2 at, const std::string& text, Color color, float size = 34, float life = 1.1f);
+    // A hit: star-shaped flash, ring, sparks and speed lines along `dir` (+1 right, -1 left).
+    // `power` 1 is a jab, 2 a finisher.
+    void Impact(Vector2 at, int dir, float power, Color color);
+    // A damage number that pops and drifts up.
+    void Number(Vector2 at, int value, Color color, float size);
 
     // Ground height for bouncing debris, in the owner's space; y grows upward when `upIsPositive`.
     void Update(float dt, bool upIsPositive);

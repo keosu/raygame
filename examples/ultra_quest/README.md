@@ -1,7 +1,8 @@
 # 泽塔传说 · Ultra Quest
 
-> 非官方同人作品，仅供学习与交流，与圆谷制作无关。奥特曼泽塔、雷德王等角色版权属于原权利人；
-> 战斗立绘裁剪自 Ultra 系列百科（ultra.fandom.com）的官方渲染图，人物与场景由代码绘制，
+> 非官方同人作品，仅供学习与交流，与圆谷制作、BANDAI SPIRITS 无关。奥特曼泽塔、雷德王等角色版权属于原权利人；
+> 战斗动作图抠自 BANDAI SPIRITS 官方的可动手办产品照片（S.H.Figuarts、Figure-rise Standard、ULTRA-ACT），
+> 对话头像取自 Ultra 系列百科（ultra.fandom.com）的渲染图，人物与场景由代码绘制，
 > 音效与音乐由脚本合成。若权利人提出要求，将移除本示例。
 
 以 RayGame 制作的奥特曼动作冒险小样：先以人类形态在小镇调查，再变身奥特曼泽塔，与雷德王实时对战。
@@ -61,10 +62,21 @@ xmake android --game=ultra_quest
 | `Controls.*` | 键盘、手柄与触屏按键合并为同一组动作 |
 | `Fx.*` | 火花、尘土、碎片、冲击环、浮动文字 |
 
+## 动作与打击反馈
+
+- 每个动作都有真实动作图：泽塔待机、准备、指向、出拳、高踢、单膝跪地、泽斯提姆光线、ご唱和ください；
+  雷德王站立、咆哮、步行、蹲身爪击、冲撞前扑、举石、投石、倒地。
+- 出招分蓄力、打击、收招三段换图；攻击与冲刺带残影，被打会后仰并短暂换成痛苦姿势，重击击倒时单膝跪地，
+  撞墙眩晕和战败时雷德王倒地。
+- 命中时：放射状打击光、伤害数字、速度线、命中停顿（刺拳 0.06 秒、踢 0.12 秒）、沿打击方向的镜头震动与推近，
+  重击白闪，泽塔受伤时红色暗角。
+
 ## 素材工具
 
-- `tools/make_poses.py`：从百科渲染图生成 `assets/poses/`，统一同一角色的尺寸、裁掉底座、
-  校正偏色，并写出身体中心与朝向（`poses.txt`）。下载时要取原始 PNG（`?format=original`）。
+- `tools/cut_poses.py`：用 rembg（`pip install rembg`，模型 isnet-general-use）把 BANDAI 官方手办照片抠成
+  `assets/poses/`：只保留主体（去掉说明文字和地面倒影），不同产品线统一颜色，同一角色统一尺寸，
+  并写出身体中心与朝向（`poses.txt`）。照片来源：魂ウェブ商品页 13596、14009、14686、1761，
+  BANDAI SPIRITS 模型开发博客 2023-07-31（Figure-rise Standard 泽塔）。
 - `tools/make_audio.py`：合成全部音效与三首配乐（需要 numpy、soundfile）。
 - `tools/make_icon.py`：用泽塔头像合成窗口、Windows 和 Android 图标。
 - `tools/make_font.py`：按源码和剧本里用到的字生成中文字体子集。修改文本后需要重新运行。

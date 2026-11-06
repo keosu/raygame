@@ -94,9 +94,9 @@ void TransformScene::Render() {
     if (t >= 2.6f) {
         float k = (t - 2.6f) / 1.6f;
         DrawRays({640, 360}, t * 2, {255, 230, 160, 255}, 24, 0.12f);
-        if (const Pose* pose = Poses::Get("z_idle")) {
+        if (const Pose* pose = Poses::Get("z_win")) { // the "chant my name" spread
             const Texture2D& tex = *pose->texture;
-            float h = 560 + 140 * EaseOut(k), w = tex.width * h / tex.height;
+            float h = 500 + 120 * EaseOut(k), w = tex.width * h / tex.height;
             float y = 720 - h + (1 - EaseOut(k * 1.6f)) * 240;
             Draw::BlendAdd();
             Draw::GlowStretched({640, y + h / 2}, w, h * 0.7f, 0, WithAlpha({150, 220, 255, 255}, 0.5f));
@@ -141,10 +141,10 @@ void TitleScene::DrawBackdrop() const {
         DrawCircleV(p, r.Range(0.6f, 1.8f), WithAlpha(WHITE, 0.3f + 0.5f * tw));
     }
     // Red King's silhouette on the horizon, Z in front.
-    if (const Pose* rk = Poses::Get("rk_raise")) {
+    if (const Pose* rk = Poses::Get("rk_lift")) {
         const Texture2D& t = *rk->texture;
         float h = 430, w = t.width * h / t.height;
-        DrawTexturePro(t, {0, 0, (float)t.width, (float)t.height}, {640, 620 - h, w, h}, {0, 0}, 0, {40, 30, 60, 230});
+        DrawTexturePro(t, {0, 0, (float)t.width, (float)t.height}, {560, 620 - h, w, h}, {0, 0}, 0, {40, 30, 60, 230});
     }
     Rng s(9);
     for (float x = 0; x < kCanvasW; x += s.Range(40, 90)) {
@@ -154,17 +154,14 @@ void TitleScene::DrawBackdrop() const {
             if (s.Chance(0.5f)) DrawRectangleRec({x + 8, 630 - h + y * 20, 6, 8}, WithAlpha({255, 220, 140, 255}, 0.7f));
     }
     DrawRectangleRec({0, 620, (float)kCanvasW, 100}, {14, 16, 30, 255});
-    if (const Pose* z = Poses::Get("z_win")) {
+    if (const Pose* z = Poses::Get("z_point")) {
         const Texture2D& t = *z->texture;
         float h = 640, w = t.width * h / t.height;
-        float x = 1000 - w / 2, y = 720 - h + 20 + std::sin(time * 1.2f) * 4;
+        float cx = 1010, x = cx - w * z->anchor, y = 720 - h + 10 + std::sin(time * 1.2f) * 4;
         Draw::BlendAdd();
-        Draw::GlowStretched({1000, y + h * 0.45f}, w * 0.9f, h * 0.6f, 0, WithAlpha({100, 180, 255, 255}, 0.35f));
+        Draw::GlowStretched({cx, y + h * 0.45f}, w * 0.8f, h * 0.6f, 0, WithAlpha({100, 180, 255, 255}, 0.35f));
         Draw::BlendNormal();
         DrawTexturePro(t, {0, 0, (float)t.width, (float)t.height}, {x, y, w, h}, {0, 0}, 0, WHITE);
-        Draw::BlendAdd();
-        Draw::Glow({1000, y + h * 0.23f}, 22 + 4 * std::sin(time * 4), WithAlpha(Palette::timer, 0.9f));
-        Draw::BlendNormal();
     }
     DrawRectangleRec({0, 0, 620, (float)kCanvasH}, WithAlpha(Palette::ink, 0.35f));
 }

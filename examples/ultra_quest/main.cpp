@@ -88,8 +88,22 @@ private:
             {after(1), [] { GoToFight(true); }},
             {after(56), shot("12_fight_landing")},
             {after(100), shot("13_fight_banner")},
-            {after(1), [fight] { if (auto* f = fight()) { f->DebugSkipIntro(); f->DebugAutoplay(true); } }},
+            {after(1), [this, fight] { if (auto* f = fight()) { f->DebugSkipIntro(); f->DebugAutoplay(true, 0.45f); collecting = true; } }},
             {after(200), shot("14_fight_melee")},
+            // Let the bot fight while the kaiju cycles its moves, until every action shot is taken.
+            {[this] { return actionShots.size() >= kActions.size() || stepFrame > 1100; },
+             [this, fight] { collecting = false; if (auto* f = fight()) { f->DebugAutoplay(false); f->Model().DebugSetHp(1000, 2500); } }},
+            // Scripted moments: knocked down by a swing, an air kick, a wall crash.
+            {after(20), [fight] { if (auto* f = fight()) { f->Model().DebugPlace(900, 1150, 0.1f); f->Model().DebugForceMove(KaijuMove::Swing); } }},
+            {[fight] { auto* f = fight(); return f && f->Model().hero().state == HeroState::Down && f->Model().hero().stateTime > 0.3f; },
+             shot("a7_hero_down")},
+            {after(90), [fight] { if (auto* f = fight()) { f->Model().DebugPlace(900, 1250); FightInput in; in.jump = true; f->DebugInput(in); } }},
+            {after(14), [fight] { if (auto* f = fight()) { FightInput in; in.attack = true; f->DebugInput(in); } }},
+            {[fight] { auto* f = fight(); return f && f->Model().hero().state == HeroState::AirKick && f->Model().hero().stateTime > 0.05f; },
+             shot("a9_air_kick")},
+            {after(60), [fight] { if (auto* f = fight()) { f->Model().DebugPlace(700, 1500); f->Model().DebugForceMove(KaijuMove::Charge); f->DebugAutoplay(true, 1.0f); } }},
+            {[fight] { auto* f = fight(); return f && f->Model().kaiju().state == KaijuState::Stunned && f->Model().kaiju().stateTime > 0.2f; },
+             shot("a8_kaiju_stunned")},
             {after(1), [fight] { if (auto* f = fight()) f->Model().DebugForceMove(KaijuMove::Charge); }},
             {[fight] { auto* f = fight(); return f && f->Model().WindupProgress() > 0.6f; }, shot("15_warning")},
             {after(90), [fight] { if (auto* f = fight()) { f->DebugAutoplay(false); f->Model().DebugEnergy(100); } }},
@@ -127,8 +141,44 @@ private:
         };
     }
 
+    // Fight moments captured whenever they first happen during the bot's fight.
+    struct ActionShot {
+        const char* name;
+        std::function<bool(FightScene&)> when;
+    };
+    const std::vector<ActionShot> kActions = {
+        {"a1_punch_hit", [](FightScene& f) { const auto& h = f.Model().hero(); return h.state == HeroState::Attack && h.combo < 2 && f.DebugRecoil() > 0.12f; }},
+        {"a2_kick_hit", [](FightScene& f) { const auto& h = f.Model().hero(); return h.state == HeroState::Attack && h.combo == 2 && f.DebugRecoil() > 0.12f; }},
+        {"a3_kaiju_swing", [](FightScene& f) { const auto& k = f.Model().kaiju(); return k.state == KaijuState::Active && k.move == KaijuMove::Swing && k.stateTime > 0.04f; }},
+        {"a4_kaiju_charge", [](FightScene& f) { const auto& k = f.Model().kaiju(); return k.state == KaijuState::Active && k.move == KaijuMove::Charge && k.stateTime > 0.3f; }},
+        {"a5_kaiju_throw", [](FightScene& f) { const auto& k = f.Model().kaiju(); return k.state == KaijuState::Active && k.move == KaijuMove::Boulder && k.stateTime > 0.08f; }},
+        {"a6_boulder_lift", [](FightScene& f) { const auto& k = f.Model().kaiju(); return k.state == KaijuState::Windup && k.move == KaijuMove::Boulder && k.stateTime > 0.4f; }},
+    };
+    std::vector<std::string> actionShots;
+    int forced = 0;
+    bool collecting = false;
+
+    void CaptureActions() {
+        auto* f = Current<FightScene>();
+        if (!collecting || !f || f->DebugPhase() != 1) return;
+        for (const auto& a : kActions) {
+            if (std::find(actionShots.begin(), actionShots.end(), a.name) != actionShots.end() || !a.when(*f)) continue;
+            Automation::SaveCanvas(a.name);
+            actionShots.push_back(a.name);
+        }
+        // Keep the kaiju cycling through its moves so each one shows up, and nobody dies yet.
+        const auto& k = f->Model().kaiju();
+        if (actionShots.size() < kActions.size() && (f->Model().hero().hp < 300 || k.hp < k.maxHp * 0.55f))
+            f->Model().DebugSetHp(1000, k.maxHp * 0.9f);
+        if (k.state == KaijuState::Idle && k.idleFor < 0.3f && actionShots.size() < kActions.size()) {
+            static const KaijuMove order[] = {KaijuMove::Swing, KaijuMove::Charge, KaijuMove::Boulder, KaijuMove::Stomp};
+            f->Model().DebugForceMove(order[forced++ % 4]);
+        }
+    }
+
     void Capture(int frame) {
         if (frame == 1) BuildTour();
+        CaptureActions();
         ++stepFrame;
         // A tour that stalls (a condition never met) still ends instead of hanging the run.
         if (stepIndex < tour.size() && stepFrame > 1200) {

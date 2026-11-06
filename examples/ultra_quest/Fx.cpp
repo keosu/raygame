@@ -55,6 +55,31 @@ void Fx::Text(Vector2 at, const std::string& text, Color color, float size, floa
     particles.push_back(p);
 }
 
+void Fx::Impact(Vector2 at, int dir, float power, Color color) {
+    Particle burst{Kind::Burst, at, {0, 0}, 0, 0.16f + 0.06f * power, 70 * power, color};
+    burst.angle = rng.Range(0, PI);
+    burst.spin = (float)dir;
+    particles.push_back(burst);
+    Flash(at, 110 * power, WithAlpha(WHITE, 1), 0.12f);
+    Ring(at, 60 + 50 * power, WithAlpha(color, 0.9f), 0.22f);
+    for (int i = 0; i < (int)(10 * power); ++i) {
+        float a = rng.Range(-0.7f, 0.7f) + (dir > 0 ? 0.0f : PI);
+        float s = rng.Range(500, 1100) * (0.7f + 0.3f * power);
+        particles.push_back({Kind::Spark, at, Mul(Dir(a), s), 0, rng.Range(0.12f, 0.3f), rng.Range(3, 6) * power, color, 0, a, 0});
+    }
+    for (int i = 0; i < 3 + (int)(2 * power); ++i) {
+        Vector2 p = {at.x + rng.Range(-20, 20), at.y + rng.Range(-60, 60)};
+        Streak(p, {dir * rng.Range(1400, 2200), 0}, rng.Range(60, 140) * power, WithAlpha(WHITE, 0.9f), 0.1f);
+    }
+}
+
+void Fx::Number(Vector2 at, int value, Color color, float size) {
+    Particle p{Kind::Text, {at.x + rng.Range(-30, 30), at.y + rng.Range(-10, 20)}, {rng.Range(-40, 40), 160}, 0, 0.7f, size,
+               color};
+    p.text = std::to_string(value);
+    particles.push_back(p);
+}
+
 void Fx::Update(float dt, bool upIsPositive) {
     float up = upIsPositive ? 1.0f : -1.0f;
     for (auto& p : particles) {
@@ -62,6 +87,7 @@ void Fx::Update(float dt, bool upIsPositive) {
         p.v.y -= p.gravity * dt;
         if (p.kind == Kind::Spark) p.v = Mul(p.v, std::pow(0.02f, dt));
         if (p.kind == Kind::Dust) p.v = Mul(p.v, std::pow(0.15f, dt));
+        if (p.kind == Kind::Text) p.v.y *= std::pow(0.05f, dt);
         p.p.x += p.v.x * dt;
         p.p.y += p.v.y * dt * up;
         p.angle += p.spin * dt;
@@ -115,6 +141,26 @@ void Fx::DrawOne(const Particle& p, Vector2 at, float scale) const {
         Vector2 tail = {at.x - dir.x * p.size * scale, at.y + dir.y * p.size * scale};
         Draw::BlendAdd();
         Draw::Line(tail, at, 6 * scale * fade, MulAlpha(p.color, fade * 0.8f));
+        Draw::BlendNormal();
+        break;
+    }
+    case Kind::Burst: {
+        // A jagged star: long spikes that snap open and thin out.
+        float r = p.size * scale * (0.5f + 0.8f * EaseOut(t / 0.4f));
+        Draw::BlendAdd();
+        std::vector<Vector2> pts;
+        int spikes = 9;
+        for (int i = 0; i < spikes * 2; ++i) {
+            float a = p.angle + i * PI / spikes;
+            float k = i % 2 == 0 ? (i % 4 == 0 ? 1.0f : 0.7f) : 0.22f;
+            Vector2 d = Dir(a);
+            d.x *= 1.0f + 0.5f * (d.x * p.spin > 0); // stretched along the blow
+            pts.push_back({at.x + d.x * r * k, at.y + d.y * r * k});
+        }
+        Draw::Fan(at, pts, MulAlpha(p.color, fade));
+        std::vector<Vector2> core;
+        for (auto& q : pts) core.push_back({at.x + (q.x - at.x) * 0.5f, at.y + (q.y - at.y) * 0.5f});
+        Draw::Fan(at, core, MulAlpha(WHITE, fade));
         Draw::BlendNormal();
         break;
     }

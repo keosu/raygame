@@ -166,6 +166,7 @@ void Load() {
 }
 
 void Save() {
+    if (Automation::Active()) return; // scripted runs must not touch the player's progress
     store.SetBool("sfx", settings.sfx);
     store.SetBool("music", settings.music);
     store.SetBool("fullscreen", settings.fullscreen);

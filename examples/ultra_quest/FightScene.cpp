@@ -163,7 +163,23 @@ void FightScene::Update() {
         if (b.down) b.fall = std::min(1.0f, b.fall + dt * 1.6f);
     shake = Approach(shake, 0, dt * 40);
     float amount = Progress::Options().shake ? shake : shake * 0.15f;
-    shakeOffset = {Rand(-amount, amount), Rand(-amount, amount) * 0.6f};
+    float along = shakeDir != 0 ? shakeDir * Rand(0.3f, 1.0f) * amount : Rand(-amount, amount);
+    shakeOffset = {along, Rand(-amount, amount) * 0.5f};
+    if (shake < 1) shakeDir = 0;
+    kaijuRecoil = std::max(0.0f, kaijuRecoil - dt);
+    heroRecoil = std::max(0.0f, heroRecoil - dt);
+    whiteFlash = std::max(0.0f, whiteFlash - dt);
+    redFlash = std::max(0.0f, redFlash - dt);
+    zoomKick = Approach(zoomKick, 0, dt * 0.25f);
+    kaijuMoving = std::fabs(fight.kaiju().x - lastKaijuX) > 40 * dt;
+    lastKaijuX = fight.kaiju().x;
+    if (fight.kaiju().state == KaijuState::Dying && fight.kaiju().stateTime >= 1.0f && !kaijuFell) {
+        kaijuFell = true;
+        fx.Dust({fight.kaiju().x, 0}, 26, 320);
+        fx.Debris({fight.kaiju().x, 40}, 16, {150, 140, 120, 255});
+        shake = std::max(shake, 16.0f);
+        Sfx::Play("stomp", 1.0f, 0);
+    }
     UpdateCamera(dt);
 
     if (phase == Phase::Fight && fight.timerWarning()) {
@@ -196,10 +212,14 @@ void FightScene::StepModel(float dt) {
         HandleEvents();
         const Hero& h = fight.hero();
         ghostTimer -= kFightStep;
-        if ((h.state == HeroState::Dash || h.state == HeroState::AirKick) && ghostTimer <= 0) {
-            ghostTimer = 0.035f;
-            ghosts.push_back({h.x, h.y, h.facing, h.state == HeroState::Dash ? 14.0f * h.facing : 32.0f * h.facing, 0.22f,
-                              "z_step"});
+        bool striking = h.state == HeroState::Attack && h.stateTime > 0.05f && h.stateTime < 0.2f;
+        if ((h.state == HeroState::Dash || h.state == HeroState::AirKick || striking) && ghostTimer <= 0) {
+            ghostTimer = 0.03f;
+            const char* pose = h.state == HeroState::Dash ? "z_ready" : h.state == HeroState::AirKick ? "z_kick"
+                               : h.combo < 2                ? "z_punch"
+                                                            : "z_kick";
+            float rot = h.state == HeroState::Dash ? 16.0f : h.state == HeroState::AirKick ? 28.0f : 0.0f;
+            ghosts.push_back({h.x, h.y, h.facing, rot * h.facing, 0.2f, pose});
         }
         if (fight.kaiju().state == KaijuState::Active && fight.kaiju().move == KaijuMove::Charge && rng.Chance(0.5f))
             fx.Dust({fight.kaiju().x - fight.kaiju().facing * 60, 0}, 1, 80);
@@ -220,27 +240,52 @@ void FightScene::HandleEvents() {
     for (const auto& e : fight.events()) {
         bool sound = !e.text.empty() && e.kind != EventKind::Text;
         switch (e.kind) {
-        case EventKind::Hit:
-            if (e.onKaiju) {
-                bool heavy = e.amount >= 40;
-                fx.Sparks(e.at, {255, 230, 140, 255}, heavy ? 22 : 12, heavy ? 900 : 600, heavy ? 7 : 5);
-                fx.Flash(e.at, heavy ? 150 : 90, {255, 240, 200, 255});
-                if (e.text.empty()) fx.Embers(e.at, 2, {150, 230, 255, 255}); // beam ticks
-                else fx.Ring(e.at, heavy ? 130 : 80, WithAlpha(WHITE, 0.8f), 0.25f);
-                if (heavy) shake = std::max(shake, 7.0f);
+        case EventKind::Hit: {
+            int toKaiju = fight.kaiju().x >= fight.hero().x ? 1 : -1;
+            if (e.onKaiju && e.text.empty()) { // beam tick
+                fx.Embers(e.at, 3, {150, 230, 255, 255});
+                fx.Sparks(e.at, {200, 240, 255, 255}, 4, 700, 5);
+                kaijuRecoil = 0.1f;
+                recoilDir = toKaiju;
+                recoilPower = 0.6f;
+            } else if (e.onKaiju) {
+                float power = Clamp(e.amount / 30.0f, 0.8f, 2.0f);
+                fx.Impact(e.at, toKaiju, power, {255, 214, 110, 255});
+                fx.Number({e.at.x, e.at.y + 90}, (int)std::round(e.amount), power >= 1.5f ? Palette::gold : WHITE,
+                           26 + 12 * power);
+                kaijuRecoil = 0.18f;
+                recoilDir = toKaiju;
+                recoilPower = power;
+                zoomKick = std::max(zoomKick, 0.022f * power);
+                shake = std::max(shake, 3.5f * power);
+                shakeDir = (float)toKaiju;
+                if (power >= 1.5f) whiteFlash = 0.07f;
+                if (power >= 1.5f) fx.Dust({fight.kaiju().x, 0}, 6, 160);
             } else {
-                fx.Sparks(e.at, {255, 90, 80, 255}, 14, 700, 6);
-                fx.Flash(e.at, 120, {255, 110, 90, 255});
+                fx.Impact(e.at, -toKaiju, 1.7f, {255, 110, 80, 255});
+                fx.Number({e.at.x, e.at.y + 90}, (int)std::round(e.amount), {255, 120, 110, 255}, 40);
+                heroRecoil = 0.22f;
+                redFlash = 0.4f;
+                whiteFlash = std::max(whiteFlash, 0.05f);
+                zoomKick = std::max(zoomKick, 0.04f);
+                shakeDir = (float)-toKaiju;
             }
             break;
-        case EventKind::Guard:
-            fx.Sparks(e.at, {130, 200, 255, 255}, 12, 600, 5);
-            fx.Ring(e.at, 110, WithAlpha(Palette::cyan, 0.8f), 0.3f);
+        }
+        case EventKind::Guard: {
+            int toKaiju = fight.kaiju().x >= fight.hero().x ? 1 : -1;
+            fx.Impact(e.at, -toKaiju, 0.9f, {130, 200, 255, 255});
+            fx.Ring(e.at, 130, WithAlpha(Palette::cyan, 0.9f), 0.3f);
+            heroRecoil = 0.12f;
+            shake = std::max(shake, 5.0f);
+            shakeDir = (float)-toKaiju;
             break;
+        }
         case EventKind::Parry:
-            fx.Flash(e.at, 260, WHITE, 0.3f);
-            fx.Ring(e.at, 240, WithAlpha(WHITE, 0.9f), 0.4f);
-            fx.Sparks(e.at, {200, 240, 255, 255}, 24, 1000, 6);
+            fx.Impact(e.at, fight.kaiju().x >= fight.hero().x ? 1 : -1, 2.0f, {200, 240, 255, 255});
+            fx.Ring(e.at, 300, WithAlpha(WHITE, 0.9f), 0.45f);
+            whiteFlash = 0.12f;
+            zoomKick = std::max(zoomKick, 0.05f);
             slowmo = std::max(slowmo, 0.35f);
             break;
         case EventKind::Shake:
@@ -301,8 +346,9 @@ void FightScene::UpdateCamera(float dt) {
     float dist = kaijuGone ? 0 : std::fabs(h.x - k.x);
     float target = Clamp(1180.0f / (dist + 640.0f), 0.66f, 1.0f);
     if (phase == Phase::Intro && story && phaseTime < 1.5f) target = 0.75f;
-    zoom = Lerpf(zoom, target, 1 - std::exp(-3.0f * dt));
-    float half = 640 / zoom;
+    baseZoom = Lerpf(baseZoom, target, 1 - std::exp(-3.0f * dt));
+    zoom = baseZoom * (1 + zoomKick);
+    float half = 640 / baseZoom;
     float goal = Clamp(mid, half, kArenaW - half);
     camX = Lerpf(camX, goal, 1 - std::exp(-5.0f * dt));
 }
@@ -433,75 +479,101 @@ void FightScene::DrawPoseAt(const std::string& key, Vector2 feet, float wpp, int
     }
 }
 
+namespace {
+// Height of the colour timer above the feet for each hero pose, in world units.
+float ChestHeight(const std::string& key) {
+    if (key == "z_kneel") return 220;
+    if (key == "z_kick") return 262;
+    if (key == "z_punch") return 282;
+    if (key == "z_beam") return 300;
+    if (key == "z_idle") return 300;
+    return 318;
+}
+} // namespace
+
 void FightScene::DrawHero() const {
     const Hero& h = fight.hero();
     float t = h.stateTime;
     int f = h.facing;
-    std::string key = fight.timerWarning() ? "z_hurt" : "z_idle";
+    std::string key = "z_idle";
     float rot = 0;
     Vector2 scale = {1, 1};
     Vector2 offset = {0, 0};
+    bool chest = true;
     switch (h.state) {
     case HeroState::Idle:
         scale.y = 1 + 0.008f * std::sin(sceneTime * 3);
         break;
     case HeroState::Walk:
-        key = std::fmod(t, 0.52f) < 0.26f ? "z_step" : "z_idle";
-        offset.y = std::fabs(std::sin(t * 12)) * 6;
-        rot = 3.0f * f;
+        key = std::fmod(t, 0.56f) < 0.28f ? "z_ready" : "z_idle";
+        offset.y = std::fabs(std::sin(t * 11)) * 7;
+        rot = 3.0f * (h.vx > 0 ? 1 : -1);
         break;
     case HeroState::Air:
-        key = "z_step";
-        rot = 6.0f * f;
+        key = "z_ready";
+        rot = 8.0f * f;
+        scale = {1, 0.96f};
         break;
     case HeroState::AirKick:
-        key = "z_step";
-        rot = 32.0f * f;
+        key = "z_kick";
+        rot = 28.0f * f;
         break;
     case HeroState::Dash:
-        key = "z_step";
-        rot = 14.0f * f;
+        key = "z_ready";
+        rot = 16.0f * f;
         break;
     case HeroState::Attack: {
-        key = h.combo < 2 ? "z_step" : "z_idle";
-        float lean = h.combo < 2 ? 11.0f : 20.0f;
-        float k = t < 0.1f ? t / 0.1f : std::max(0.0f, 1 - (t - 0.1f) / 0.3f);
-        rot = lean * f * k;
-        offset.x = f * 16 * k;
+        static const float startup[] = {0.07f, 0.08f, 0.12f};
+        static const float active[] = {0.07f, 0.07f, 0.09f};
+        float s = startup[h.combo], a = active[h.combo];
+        if (t < s) { // wind-up: pull back
+            key = "z_ready";
+            rot = -5.0f * f;
+            offset.x = -f * 8;
+        } else if (t < s + a + 0.1f) { // the blow
+            key = h.combo < 2 ? "z_punch" : "z_kick";
+            float k = EaseOut((t - s) / 0.05f);
+            rot = (h.combo == 1 ? 7.0f : h.combo == 2 ? -4.0f : 3.0f) * f * k;
+            offset.x = f * (14 + h.combo * 10) * k;
+        } else { // recovery
+            key = "z_idle";
+            rot = 2.0f * f;
+        }
         break;
     }
     case HeroState::Guard:
-        key = "z_hurt";
-        rot = -4.0f * f;
+        key = "z_ready";
+        rot = -3.0f * f;
         break;
     case HeroState::Hurt:
-        key = "z_hurt";
-        rot = -10.0f * f;
+        key = "z_ready";
+        rot = -12.0f * f;
         break;
     case HeroState::Down:
-        key = "z_hurt";
-        rot = -f * 78.0f * EaseOut(t / 0.3f);
+        key = "z_kneel";
+        rot = t < 0.25f ? -20.0f * f * (1 - t / 0.25f) : 0;
         break;
     case HeroState::GetUp:
-        key = "z_hurt";
-        rot = -f * 78.0f * (1 - EaseOut(t / 0.35f));
+        key = t < 0.18f ? "z_kneel" : "z_ready";
         break;
     case HeroState::BeamCharge:
+        key = "z_ready";
+        break;
     case HeroState::Beam:
         key = "z_beam";
+        rot = -2.0f * f;
         break;
     case HeroState::Win:
         key = "z_win";
         break;
     case HeroState::Lose:
-        key = "z_hurt";
-        scale.y = 1 - 0.1f * EaseOut(t / 1.5f);
-        rot = -6.0f * f * EaseOut(t / 1.5f);
+        key = "z_kneel";
+        scale.y = 1 - 0.06f * EaseOut(t / 1.5f);
         break;
     }
-    // Afterimages.
+    if (heroRecoil > 0) offset.x -= f * 26 * (heroRecoil / 0.22f);
     for (const auto& g : ghosts)
-        DrawPoseAt(g.pose, {g.x, g.y}, kHeroWpp, g.facing, g.rot, {1, 1}, WithAlpha({120, 200, 255, 255}, g.life / 0.22f * 0.45f), 0);
+        DrawPoseAt(g.pose, {g.x, g.y}, kHeroWpp, g.facing, g.rot, {1, 1}, WithAlpha({120, 200, 255, 255}, g.life / 0.2f * 0.4f), 0);
     Vector2 feet = {h.x + offset.x, h.y + offset.y};
     Vector2 shadow = ToScreen({h.x, 0});
     Draw::Shadow(shadow, 90 * zoom * (1 - std::min(0.6f, h.y / 600)), 14 * zoom, 0.4f);
@@ -509,15 +581,18 @@ void FightScene::DrawHero() const {
     if (h.state == HeroState::Lose) tint = {170, 170, 190, 255};
     if (h.invulnerable > 0 && h.state == HeroState::Idle && std::fmod(sceneTime, 0.12f) < 0.06f) tint.a = 140;
     float flash = std::max(0.0f, h.flash / 0.14f) * 0.8f;
-    // Charging light at the arms.
     if (h.state == HeroState::BeamCharge) {
         Vector2 hand = ToScreen({h.x + f * 40, h.y + 300});
         Draw::BlendAdd();
-        Draw::Glow(hand, (60 + 120 * t) * zoom, WithAlpha({150, 230, 255, 255}, 0.4f + t));
+        Draw::Glow(hand, (60 + 160 * t) * zoom, WithAlpha({150, 230, 255, 255}, 0.4f + t));
+        for (int i = 0; i < 6; ++i) {
+            float a = sceneTime * 6 + i * PI / 3;
+            Vector2 p = {hand.x + std::cos(a) * (90 - 120 * t) * zoom, hand.y + std::sin(a) * (90 - 120 * t) * zoom};
+            DrawCircleV(p, 5 * zoom, WithAlpha({200, 240, 255, 255}, 0.9f));
+        }
         Draw::BlendNormal();
     }
     if (story && phase == Phase::Intro && phaseTime < 0.9f) {
-        // Arriving inside a pillar of light.
         float k = phaseTime / 0.9f;
         Vector2 top = ToScreen({h.x, 1400 * (1 - k)});
         Draw::BlendAdd();
@@ -528,7 +603,6 @@ void FightScene::DrawHero() const {
     }
     DrawPoseAt(key, feet, kHeroWpp, f, rot, scale, tint, flash);
     if (h.state == HeroState::Guard) {
-        // Z's barrier: a hexagonal shimmer in front.
         Vector2 c = ToScreen({h.x + f * 95, h.y + 230});
         float r = 120 * zoom;
         std::vector<Vector2> hex;
@@ -538,25 +612,22 @@ void FightScene::DrawHero() const {
         Draw::PolyLine(hex, 3 * zoom, WithAlpha({170, 230, 255, 255}, 0.8f));
         Draw::BlendNormal();
     }
-    if (h.state == HeroState::Attack) {
-        static const float reach[] = {150, 170, 210};
-        float active0 = h.combo < 2 ? 0.07f : 0.12f;
-        if (t >= active0 && t < active0 + 0.1f) {
-            Vector2 fist = ToScreen({h.x + f * reach[h.combo] * 0.85f, h.y + 230 + h.combo * 30.0f});
-            Draw::BlendAdd();
-            Draw::Glow(fist, 70 * zoom, WithAlpha({200, 235, 255, 255}, 0.8f));
-            if (h.combo == 2) Draw::Arc(ToScreen({h.x, h.y + 200}), 170 * zoom, 12 * zoom, f > 0 ? -1.2f : PI - 0.3f,
-                                        f > 0 ? 0.3f : PI + 1.2f, WithAlpha({170, 220, 255, 255}, 0.7f));
-            Draw::BlendNormal();
-        }
-    }
-    // The colour timer on the chest.
-    if (h.state != HeroState::Down && h.state != HeroState::GetUp) {
-        Vector2 chest = ToScreen({h.x + offset.x, h.y + offset.y + 318 * scale.y});
-        bool warn = fight.timerWarning() && std::fmod(sceneTime, 0.5f) < 0.25f;
-        Color c = h.state == HeroState::Lose ? Color{60, 60, 70, 255} : fight.timerWarning() ? (warn ? Palette::red : Color{120, 20, 20, 255}) : Palette::timer;
+    if (key == "z_punch" || key == "z_kick") {
+        // Light on the striking fist or foot.
+        Vector2 tip = key == "z_punch" ? Vector2{h.x + offset.x + f * 128, h.y + 278} : Vector2{h.x + offset.x + f * 150, h.y + 246};
+        if (h.state == HeroState::AirKick) tip = {h.x + f * 110, h.y + 120};
         Draw::BlendAdd();
-        Draw::Glow(chest, 26 * zoom, WithAlpha(c, 0.9f));
+        Draw::Glow(ToScreen(tip), 70 * zoom, WithAlpha({200, 235, 255, 255}, 0.75f));
+        Draw::BlendNormal();
+    }
+    if (chest && h.state != HeroState::Down && h.state != HeroState::AirKick && h.state != HeroState::Dash) {
+        Vector2 c = ToScreen({h.x + offset.x, h.y + offset.y + ChestHeight(key) * scale.y});
+        bool warn = fight.timerWarning() && std::fmod(sceneTime, 0.5f) < 0.25f;
+        Color col = h.state == HeroState::Lose ? Color{60, 60, 70, 255}
+                    : fight.timerWarning()     ? (warn ? Palette::red : Color{120, 20, 20, 255})
+                                               : Palette::timer;
+        Draw::BlendAdd();
+        Draw::Glow(c, 24 * zoom, WithAlpha(col, 0.85f));
         Draw::BlendNormal();
     }
 }
@@ -571,52 +642,76 @@ void FightScene::DrawKaiju() const {
     float rot = 0;
     Vector2 scale = {1, 1};
     Vector2 offset = {0, 0};
+    bool stars = false;
     switch (k.state) {
     case KaijuState::Idle:
-        scale.y = 1 + 0.01f * std::sin(sceneTime * 2.2f);
-        break;
     case KaijuState::Walk:
-        rot = 3 * std::sin(sceneTime * 7);
-        offset.y = std::fabs(std::sin(sceneTime * 7)) * 5;
+        if (kaijuMoving) {
+            key = "rk_walk";
+            offset.y = std::fabs(std::sin(sceneTime * 6)) * 6;
+            rot = 2 * std::sin(sceneTime * 6);
+        } else {
+            scale.y = 1 + 0.01f * std::sin(sceneTime * 2.2f);
+        }
         break;
     case KaijuState::Windup:
         switch (k.move) {
-        case KaijuMove::Swing: key = "rk_raise"; rot = -8.0f * f * progress; break;
-        case KaijuMove::Charge: key = "rk_roar"; rot = -6.0f * f; offset.x = Rand(-3, 3); break;
-        case KaijuMove::Boulder: scale.y = 1 - 0.07f * EaseOut(progress); break;
-        case KaijuMove::Stomp: key = k.y > 0 ? "rk_idle" : "rk_raise"; break;
+        case KaijuMove::Swing: key = "rk_roar"; rot = -7.0f * f * progress; break;
+        case KaijuMove::Charge: key = "rk_roar"; rot = -5.0f * f; offset.x = Rand(-4, 4); break;
+        // Rock raised, then drawn back to throw; the photos hold the rock until it leaves.
+        case KaijuMove::Boulder: key = progress < 0.65f ? "rk_lift" : "rk_throw"; break;
+        case KaijuMove::Stomp: key = k.y > 0 ? "rk_roar" : "rk_idle"; if (k.y <= 0) scale.y = 1 - 0.06f * progress; break;
         default: break;
         }
         break;
     case KaijuState::Active:
         switch (k.move) {
-        case KaijuMove::Swing: key = "rk_raise"; rot = 14.0f * f; break;
-        case KaijuMove::Charge: key = "rk_raise"; rot = 16.0f * f + 2 * std::sin(sceneTime * 30); break;
-        case KaijuMove::Boulder: key = "rk_raise"; break;
-        case KaijuMove::Stomp: key = k.y > 0 ? "rk_idle" : "rk_raise"; if (k.y <= 0) scale.y = 0.96f; break;
+        case KaijuMove::Swing: key = "rk_swing"; rot = 6.0f * f; offset.x = f * 30; break;
+        case KaijuMove::Charge: key = "rk_charge"; rot = 3.0f * f + 2 * std::sin(sceneTime * 30); break;
+        case KaijuMove::Boulder: key = "rk_swing"; offset.x = f * 20; break; // empty-handed follow-through
+        case KaijuMove::Stomp: key = k.y > 0 ? "rk_roar" : "rk_idle"; if (k.y <= 0) scale.y = 0.93f; break;
         default: break;
         }
         break;
     case KaijuState::Recover:
+        if (k.move == KaijuMove::Swing && t < 0.2f) key = "rk_swing";
+        if (k.move == KaijuMove::Boulder && t < 0.2f) key = "rk_swing";
+        if (k.move == KaijuMove::Charge && t < 0.2f) key = "rk_charge";
         break;
     case KaijuState::Stagger:
-        rot = -8.0f * f;
+        key = "rk_roar";
+        rot = -10.0f * f;
+        offset.x = Rand(-2, 2);
         break;
     case KaijuState::Stunned:
-        rot = -10.0f * f + 3 * std::sin(sceneTime * 5);
+        key = "rk_down";
+        stars = true;
         break;
     case KaijuState::Roar:
         key = "rk_roar";
         offset.x = Rand(-4, 4);
         break;
     case KaijuState::Dying:
-        key = "rk_roar";
-        rot = -f * 28.0f * EaseInOut(progress);
-        offset.x = Rand(-3, 3) * progress;
+        if (t < 1.0f) {
+            key = "rk_roar";
+            rot = -f * 14.0f * EaseInOut(t);
+            offset.x = Rand(-3, 3);
+        } else {
+            key = "rk_down";
+            offset.y = -20 * EaseOut((t - 1.0f) / 0.3f) + 20;
+        }
         break;
     case KaijuState::Win:
         key = "rk_roar";
         break;
+    }
+    // Every blow shoves the kaiju back and tips it; a heavy one makes it flinch in pain.
+    if (kaijuRecoil > 0 && k.state != KaijuState::Dying) {
+        float r = kaijuRecoil / 0.18f;
+        offset.x += recoilDir * 22 * recoilPower * r;
+        rot += recoilDir * 4.0f * recoilPower * r;
+        bool reacts = k.state == KaijuState::Idle || k.state == KaijuState::Walk || k.state == KaijuState::Recover;
+        if (reacts && recoilPower >= 1.5f) key = "rk_roar";
     }
     Vector2 shadow = ToScreen({k.x, 0});
     Draw::Shadow(shadow, 130 * zoom, 18 * zoom, 0.45f);
@@ -626,34 +721,38 @@ void FightScene::DrawKaiju() const {
         Draw::GlowStretched(c, 220 * zoom, 300 * zoom, 0, WithAlpha({255, 60, 30, 255}, 0.28f + 0.1f * std::sin(sceneTime * 6)));
         Draw::BlendNormal();
     }
-    Color tint = k.enraged ? Color{255, 220, 210, 255} : WHITE;
-    float flash = std::max(0.0f, k.flash / 0.1f) * 0.6f;
+    Color tint = k.enraged ? Color{255, 214, 204, 255} : WHITE;
+    float flash = std::max(0.0f, k.flash / 0.1f) * 0.35f;
     if (k.state == KaijuState::Dying) flash = std::max(flash, (std::fmod(sceneTime, 0.2f) < 0.1f ? 0.5f : 0.0f) * progress);
-    DrawPoseAt(key, {k.x + offset.x, k.y + offset.y}, kKaijuWpp, f, rot, scale, tint, flash);
-    // Swing claw trail.
-    if (k.state == KaijuState::Active && k.move == KaijuMove::Swing) {
-        Vector2 c = ToScreen({k.x + f * 120, 260});
+    if (k.state == KaijuState::Active && k.move == KaijuMove::Charge) {
+        // Speed lines behind the charge.
         Draw::BlendAdd();
-        Draw::Arc(c, 200 * zoom, 22 * zoom, f > 0 ? -1.4f : PI - 0.5f, f > 0 ? 0.5f : PI + 1.4f, WithAlpha({255, 200, 120, 255}, 0.7f));
+        for (int i = 0; i < 6; ++i) {
+            Vector2 a = ToScreen({k.x - f * (140 + i * 26.0f), 80 + i * 55.0f});
+            Draw::Line(a, {a.x - f * 160 * zoom, a.y}, 4 * zoom, WithAlpha(WHITE, 0.35f));
+        }
         Draw::BlendNormal();
     }
-    if (k.state == KaijuState::Windup && k.move == KaijuMove::Boulder && progress > 0.4f) {
-        Vector2 hand = ToScreen({k.x + f * 60, 420 * progress});
-        DrawCircleV(hand, 44 * zoom, {120, 96, 74, 255});
-        DrawCircleV({hand.x - 12 * zoom, hand.y - 14 * zoom}, 16 * zoom, {150, 124, 98, 255});
+    DrawPoseAt(key, {k.x + offset.x, k.y + offset.y}, kKaijuWpp, f, rot, scale, tint, flash);
+    if (k.state == KaijuState::Active && k.move == KaijuMove::Swing) {
+        Vector2 c = ToScreen({k.x + f * 140, 230});
+        Draw::BlendAdd();
+        Draw::Arc(c, 210 * zoom, 26 * zoom, f > 0 ? -1.4f : PI - 0.5f, f > 0 ? 0.5f : PI + 1.4f, WithAlpha({255, 200, 120, 255}, 0.75f));
+        Draw::Arc(c, 170 * zoom, 10 * zoom, f > 0 ? -1.2f : PI - 0.3f, f > 0 ? 0.3f : PI + 1.2f, WithAlpha(WHITE, 0.6f));
+        Draw::BlendNormal();
     }
-    if (k.state == KaijuState::Stunned) {
-        Vector2 head = ToScreen({k.x, 470});
+    if (stars) {
+        Vector2 head = ToScreen({k.x - f * 120, 250});
         for (int i = 0; i < 4; ++i) {
             float a = sceneTime * 4 + i * PI / 2;
             Draw::Star({head.x + std::cos(a) * 60 * zoom, head.y + std::sin(a) * 16 * zoom}, 14 * zoom, 6 * zoom, a, Palette::gold);
         }
     }
     if (k.state == KaijuState::Dying) {
-        Vector2 body = ToScreen({k.x + Rand(-90, 90), Rand(80, 380)});
-        if (std::fmod(sceneTime, 0.18f) < 0.03f) {
+        Vector2 body = ToScreen({k.x + Rand(-110, 110), Rand(60, t < 1 ? 380.0f : 200.0f)});
+        if (std::fmod(sceneTime, 0.15f) < 0.03f) {
             Draw::BlendAdd();
-            Draw::Glow(body, 80 * zoom, WithAlpha({255, 200, 120, 255}, 0.9f));
+            Draw::Glow(body, 90 * zoom, WithAlpha({255, 200, 120, 255}, 0.9f));
             Draw::BlendNormal();
         }
     }
@@ -810,6 +909,15 @@ void FightScene::Render() {
     DrawBeam();
     fx.Draw([this](Vector2 p) { return ToScreen(p); }, zoom);
     DrawWarning();
+    if (whiteFlash > 0) DrawRectangleRec({0, 0, (float)kCanvasW, (float)kCanvasH}, WithAlpha(WHITE, whiteFlash / 0.12f * 0.4f));
+    if (redFlash > 0) {
+        // Red edges when Z is hurt.
+        Color edge = WithAlpha({220, 20, 20, 255}, redFlash / 0.4f * 0.55f), clear = WithAlpha({220, 20, 20, 255}, 0);
+        DrawRectangleGradientH(0, 0, 180, kCanvasH, edge, clear);
+        DrawRectangleGradientH(kCanvasW - 180, 0, 180, kCanvasH, clear, edge);
+        DrawRectangleGradientV(0, 0, kCanvasW, 120, edge, clear);
+        DrawRectangleGradientV(0, kCanvasH - 120, kCanvasW, 120, clear, edge);
+    }
     if (phase != Phase::Result && phase != Phase::Defeat) DrawHud();
     if (phase == Phase::Fight || phase == Phase::Intro)
         controls.Draw(Controls::Layout::Fight, fight.hero().energy >= fight.hero().maxEnergy);

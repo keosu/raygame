@@ -25,6 +25,7 @@ public:
     int DebugPhase() const { return (int)phase; } // Intro, Fight, Finish, Epilogue, Result, Defeat
     float DebugPhaseTime() const { return phaseTime; }
     bool DebugExploded() const { return exploded; }
+    float DebugRecoil() const { return kaijuRecoil; }
 
 private:
     enum class Phase { Intro, Fight, Finish, Epilogue, Result, Defeat };
@@ -57,7 +58,17 @@ private:
     Fx fx;
     float shake = 0;
     Vector2 shakeOffset{};
-    float camX = kArenaW / 2, zoom = 0.9f;
+    float camX = kArenaW / 2, zoom = 0.9f, baseZoom = 0.9f; // zoom = baseZoom plus the hit kick
+    // Hit feedback, presentation only.
+    float kaijuRecoil = 0, recoilPower = 0;
+    int recoilDir = 1;
+    float heroRecoil = 0;
+    float zoomKick = 0;
+    float whiteFlash = 0, redFlash = 0;
+    float shakeDir = 0;     // -1/1 biases the shake along the blow, 0 is all-round
+    float lastKaijuX = 0;
+    bool kaijuMoving = false;
+    bool kaijuFell = false; // the dying fall has thrown up its dust
     Dialogue dialogue;
     float timerBeep = 0;
     float slowmo = 0;

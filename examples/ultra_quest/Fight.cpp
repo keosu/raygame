@@ -20,9 +20,9 @@ struct Swing {
 };
 // Jab, straight, then the spinning kick that finishes the chain.
 constexpr Swing kCombo[3] = {
-    {0.07f, 0.07f, 0.15f, 150, 26, 20, 100, 160, 0.05f, "punch"},
-    {0.08f, 0.07f, 0.18f, 170, 32, 26, 140, 180, 0.06f, "punch"},
-    {0.12f, 0.09f, 0.30f, 210, 52, 62, 380, 240, 0.09f, "kick"},
+    {0.07f, 0.07f, 0.15f, 150, 26, 20, 100, 160, 0.06f, "punch"},
+    {0.08f, 0.07f, 0.18f, 170, 32, 26, 140, 180, 0.075f, "punch"},
+    {0.12f, 0.09f, 0.30f, 210, 52, 62, 380, 240, 0.12f, "kick"},
 };
 
 int Sign(float v) { return v < 0 ? -1 : 1; }
@@ -271,7 +271,7 @@ void Fight::HeroHits() {
         if (std::fabs(footX - k.x) < kKaijuHalf + 40 && h.y < kKaijuHeight) {
             h.hitDone = true;
             HurtKaiju(44, 45, 240 * h.facing, {k.x - h.facing * kKaijuHalf * 0.5f, h.y + 40}, "kick");
-            freeze = 0.08f;
+            freeze = 0.1f;
             SetHero(HeroState::Air);
             h.vy = 900;
             h.vx = -h.facing * 360;
@@ -358,7 +358,7 @@ bool Fight::HurtHero(KaijuMove source, float damage, float knock, float fromX, b
 void Fight::HurtKaiju(float damage, float poise, float knock, Vector2 at, const char* sound) {
     if (k.state == KaijuState::Dying || k.state == KaijuState::Roar || outcome != FightResult::Running) return;
     k.hp -= damage;
-    k.flash = 0.1f;
+    k.flash = sound ? 0.1f : 0.035f; // beam ticks only tint, or the kaiju washes out white
     stat.hits++;
     chain++;
     chainTime = 1.3f;
@@ -524,9 +524,9 @@ void Fight::StepKaiju(float dt) {
                     float target = h.x + (count > 1 ? (i - 1) * 230.0f : 0.0f);
                     target = Clamp(target, kArenaMargin, kArenaW - kArenaMargin);
                     float flight = 0.95f + i * 0.12f;
-                    Rock r;
-                    r.x = k.x + k.facing * 60;
-                    r.y = 400;
+                    Rock r; // leaves the hands of the throwing pose
+                    r.x = k.x + k.facing * 150;
+                    r.y = 280;
                     r.vx = (target - r.x) / flight;
                     r.vy = (0.5f * kRockGravity * flight * flight - r.y) / flight;
                     r.spin = rng.Range(-6, 6);

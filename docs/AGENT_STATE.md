@@ -2,6 +2,24 @@
 
 更新时间：2026-10-20。
 
+## 工作包：Ultra Quest 真实动作图与打击反馈（2026-11-06，分支 `ultra-quest`）
+
+用户反馈：需要各种动作的真实图，打斗要有反馈效果，原版完全不行。
+- 素材：百科剧照多为其他形态/被遮挡，不可用；改用 BANDAI 官方可动手办照片（S.H.Figuarts 泽塔 13596/14009、
+  Figure-rise Standard 泽塔开发博客、S.H.Figuarts 雷德王 14686、ULTRA-ACT 雷德王 1761），`tools/cut_poses.py`
+  用 rembg isnet-general-use 抠图、保留主体块、颜色匹配、统一尺寸。16 张：泽塔 8（idle/ready/point/punch/kick/
+  kneel/beam/win），雷德王 8（idle/roar/walk/swing/charge/lift/throw/down）。旧 `make_poses.py` 与渲染图删除。
+  原图暂存 `build/uq-src2`（ULTRA-ACT 原图只有 355×500）。
+- 表现：出招蓄力→打击→收招换图，攻击/冲刺/飞踢残影；怪兽受击后仰、重击换痛苦姿势，眩晕与战败倒地，
+  投石为举石→投掷→空手收势；`Fx::Impact` 放射状打击光 + 速度线，`Fx::Number` 伤害数字；命中停顿加大；
+  方向性震屏、命中推近（zoomKick）、重击白闪、泽塔受伤红色暗角；光线持续伤害只轻微泛白。
+- 截图巡检新增 9 张动作镜头（a1~a9：出拳/踢命中、爪击、冲撞、投石、举石、击倒、撞墙眩晕、飞踢），
+  前 6 张在机器人对战中出现即拍，后 3 张脚本触发。修复：自动运行不再写存档（之前把调试战绩写进了用户存档，
+  已删除 `%LOCALAPPDATA%\raygame.ultra_quest\progress.sav`）。
+- 平衡（`build/uq-bal-10.txt`）：1.0/0.75/0.5/0.3 胜率 100/94/78.5/44%。
+- 验证（通过）：全目标构建；tests 499、campaign_tests 37、quest_tests 22、smoke；`--capture` 34 张；
+  `xmake android --game=ultra_quest` 通过校验。未做：真人试玩、Linux、真机。
+
 ## 工作包：新示例 Ultra Quest（泽塔传说）第一章小样（2026-11-05，分支 `ultra-quest`）
 
 用户询问引擎做剧情 + 实时战斗的可行性后，选定“人类形态调查 + 变身 1v1 实时战怪兽”和“多姿势真实立绘”，
